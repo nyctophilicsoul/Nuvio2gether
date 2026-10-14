@@ -131,6 +131,7 @@ import com.nuvio.app.features.player.recordExternalPlaybackProgress
 import com.nuvio.app.features.player.ExternalPlayerPlatform
 import com.nuvio.app.features.player.PlayerLaunch
 import com.nuvio.app.features.player.PlayerLaunchStore
+import com.nuvio.app.features.player.LocalFilePlaybackBridge
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.player.SubtitleLanguageOption
 import com.nuvio.app.features.player.prepareExternalPlayerLaunch
@@ -225,6 +226,27 @@ internal fun MainAppContent(
                 onLocalNavigate = if (posterNavigationEnabled) posterNavigation::navigate else null,
                 onLocalPop = if (posterNavigationEnabled) posterNavigation::clear else null,
             )
+        }
+
+        // Receive Android document URIs on the app-owned Compose navigation stack.
+        LaunchedEffect(ownsAppRuntime, navController) {
+            if (!ownsAppRuntime) return@LaunchedEffect
+            LocalFilePlaybackBridge.requests.collectLatest { request ->
+                val playerLaunch = PlayerLaunch(
+                    profileId = ProfileRepository.activeProfileId,
+                    title = request.title,
+                    sourceUrl = request.uri,
+                    streamTitle = request.title,
+                    streamSubtitle = "Local file",
+                    providerName = "Local file",
+                    providerAddonId = "local-file",
+                    contentType = "local",
+                    parentMetaId = request.uri,
+                    parentMetaType = "local",
+                )
+                val launchId = PlayerLaunchStore.put(playerLaunch)
+                navController.navigate(PlayerRoute(launchId = launchId, title = playerLaunch.title))
+            }
         }
         val appUpdaterController = rememberAppUpdaterController()
         if (ownsAppRuntime) {
