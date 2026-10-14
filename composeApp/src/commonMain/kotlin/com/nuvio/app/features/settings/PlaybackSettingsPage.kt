@@ -1066,8 +1066,8 @@ private fun PlaybackSettingsSection(
                     SettingsSwitchRow(
                         title = stringResource(Res.string.settings_playback_tunneled_playback),
                         description = stringResource(Res.string.settings_playback_tunneled_playback_description),
-                        checked = tunnelingEnabled,
-                        enabled = exoOptionsEnabled,
+                        checked = tunnelingEnabled && decoderPriority != 2,
+                        enabled = exoOptionsEnabled && decoderPriority != 2,
                         isTablet = isTablet,
                         onCheckedChange = PlayerSettingsRepository::setTunnelingEnabled,
                     )
