@@ -317,7 +317,6 @@ internal fun EpisodeNavigatorEmptyState(query: String, onClear: () -> Unit, modi
     }
 }
 
-@Composable
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun EpisodeGoToSheet(
