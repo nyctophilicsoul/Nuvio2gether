@@ -781,11 +781,21 @@ actual object PlayerSettingsStorage {
 
     actual fun loadLocalFilePlaybackEnabled(): Boolean? = loadStoredBooleanCompat(localFilePlaybackEnabledKey)
 
-    actual fun saveLocalFilePlaybackEnabled(enabled: Boolean) = preferences?.edit()?.putBoolean(ProfileScopedKey.of(localFilePlaybackEnabledKey), enabled)?.apply()
+    actual fun saveLocalFilePlaybackEnabled(enabled: Boolean) {
+        preferences
+            ?.edit()
+            ?.putBoolean(ProfileScopedKey.of(localFilePlaybackEnabledKey), enabled)
+            ?.apply()
+    }
 
     actual fun loadAudioVideoDelayEnabled(): Boolean? = loadStoredBooleanCompat(audioVideoDelayEnabledKey)
 
-    actual fun saveAudioVideoDelayEnabled(enabled: Boolean) = preferences?.edit()?.putBoolean(ProfileScopedKey.of(audioVideoDelayEnabledKey), enabled)?.apply()
+    actual fun saveAudioVideoDelayEnabled(enabled: Boolean) {
+        preferences
+            ?.edit()
+            ?.putBoolean(ProfileScopedKey.of(audioVideoDelayEnabledKey), enabled)
+            ?.apply()
+    }
 
     actual fun loadAudioVideoDelayMs(): Int? = loadStoredInt(audioVideoDelayMsKey)
 
