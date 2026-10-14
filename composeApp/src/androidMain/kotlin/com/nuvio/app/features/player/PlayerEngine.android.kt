@@ -3,6 +3,9 @@ package com.nuvio.app.features.player
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.media.AudioDeviceCallback
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
 import android.text.SpannableString
 import android.net.Uri
 import android.util.Log
@@ -279,6 +282,12 @@ private fun ExoPlayerSurface(
     var selectedExternalSubtitleMimeType by remember(playerSourceKey) { mutableStateOf<String?>(null) }
     val latestSubtitleDelayMs = rememberUpdatedState(subtitleDelayMs)
     val latestExternalSubtitleMimeType = rememberUpdatedState(selectedExternalSubtitleMimeType)
+    var activeAudioRoute by remember(context) { mutableStateOf(AudioOutputRouteDetector.detect(context)) }
+    var activeRouteDelayMs by remember(context) { mutableStateOf(activeAudioRoute?.let { AudioDelayRouteStore.loadDelayMs(context, it.key) } ?: 0) }
+    val latestActiveRoute = rememberUpdatedState(activeAudioRoute)
+    val latestRouteDelayMs = rememberUpdatedState(activeRouteDelayMs)
+    var forcePcmAudioFallback by remember(playerSourceKey) { mutableStateOf(false) }
+    var audioDisabledAfterFallback by remember(playerSourceKey) { mutableStateOf(false) }
     var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
     var videoAspectRatio by remember(playerSourceKey) { mutableStateOf(0f) }
     val latestVideoAspectRatio = rememberUpdatedState(videoAspectRatio)
@@ -367,8 +376,14 @@ private fun ExoPlayerSurface(
         ) {
             val settings = PlayerSettingsRepository.uiState.value
             if (settings.audioVideoDelayEnabled) {
+                // When enabled, use the active route's saved delay; otherwise use the global delay.
+                val effectiveDelayMs = if (settings.rememberAudioDelayPerDeviceEnabled) {
+                    latestRouteDelayMs.value
+                } else {
+                    settings.audioVideoDelayMs
+                }
                 // The wrapper shifts video timestamps by the negative provider value.
-                -settings.audioVideoDelayMs.toLong() * 1_000L
+                -effectiveDelayMs.toLong() * 1_000L
             } else {
                 0L
             }
@@ -394,6 +409,7 @@ private fun ExoPlayerSurface(
         normalizedStreamType,
         useYoutubeChunkedPlayback,
         effectiveDecoderPriority,
+        forcePcmAudioFallback,
         initialPositionRequestKey,
         playerSettings.exoNativeMemoryEnabled,
         playerSettings.bufferEngineEnabled,
@@ -415,6 +431,8 @@ private fun ExoPlayerSurface(
             videoBoundsFractionProvider = {
                 playerViewRef?.videoBoundsFraction(latestVideoAspectRatio.value)
             },
+            forcePcmAudioProvider = { forcePcmAudioFallback },
+            bluetoothForcePcmProvider = { latestActiveRoute.value?.isBluetooth == true },
         )
             .setExtensionRendererMode(effectiveDecoderPriority)
             .setEnableDecoderFallback(true)
@@ -2305,6 +2323,8 @@ private class SubtitleOffsetRenderersFactory(
     private val shouldNormalizeCuePositionProvider: () -> Boolean,
     private val shouldStripSdhProvider: () -> Boolean,
     private val videoBoundsFractionProvider: () -> RectF?,
+    private val forcePcmAudioProvider: () -> Boolean,
+    private val bluetoothForcePcmProvider: () -> Boolean,
 ) : DefaultRenderersFactory(context) {
     override fun buildAudioSink(
         context: Context,
@@ -2315,7 +2335,12 @@ private class SubtitleOffsetRenderersFactory(
             .setEnableFloatOutput(enableFloatOutput)
             .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
             .build()
-        return PlaybackSpeedAwareAudioSink(baseSink)
+        return PlaybackSpeedAwareAudioSink(
+            sink = baseSink,
+            initialForcePcm = forcePcmAudioProvider(),
+            forcePcmForBluetooth = bluetoothForcePcmProvider(),
+            bluetoothForcePcmProvider = bluetoothForcePcmProvider,
+        )
     }
 
     override fun buildAudioRenderers(
