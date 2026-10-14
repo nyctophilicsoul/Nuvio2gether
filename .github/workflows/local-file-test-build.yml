@@ -1,8 +1,7 @@
 name: Local File Test Build
 
+# Intentionally manual-only. Do not build APKs on pushes.
 on:
-  push:
-    branches: [Test-Build]
   workflow_dispatch:
 
 permissions:
