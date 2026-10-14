@@ -25,6 +25,9 @@ internal class RuntimeWatchPartyPlayer(
     override val isBuffering: Boolean
         get() = runtime.playbackSnapshot.isLoading
 
+    override val playbackSpeed: Float
+        get() = runtime.playbackSnapshot.playbackSpeed
+
     override fun play() {
         if (runtime.shouldPlay) return
         runtime.shouldPlay = true

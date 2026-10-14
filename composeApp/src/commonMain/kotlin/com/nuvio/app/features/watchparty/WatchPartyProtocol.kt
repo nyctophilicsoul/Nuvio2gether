@@ -40,6 +40,7 @@ data class WatchPartyWire(
     val media: WatchPartyMedia? = null,
     val positionMs: Long? = null,
     val playing: Boolean? = null,
+    val playbackSpeed: Float? = null,
     val action: String? = null,
 )
 

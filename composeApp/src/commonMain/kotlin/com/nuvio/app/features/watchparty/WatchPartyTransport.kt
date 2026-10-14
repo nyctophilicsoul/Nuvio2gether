@@ -25,6 +25,7 @@ interface WatchPartyPlayer {
     /** Intenzione di riprodurre (playWhenReady): resta true anche mentre bufferizza. */
     val isPlaying: Boolean
     val isBuffering: Boolean
+    val playbackSpeed: Float get() = 1f
     fun play()
     fun pause()
     fun seekTo(positionMs: Long)

@@ -68,6 +68,7 @@ class WatchPartySession(
 
     private var hostPosition = 0L
     private var hostPlaying = false
+    private var hostPlaybackSpeed = 1f
     private var hostStateAt = -1L
 
     // Guest: dopo un salto aspetta che il player riparta prima di correggere di nuovo, e misura
@@ -78,6 +79,8 @@ class WatchPartySession(
     private var settledAt = 0L
     private var seekLeadMs = 0L
     private var currentSpeed = 1f
+    private var smoothedSpeedCorrection = 0f
+    private var lastCorrectionHostSpeed = 1f
 
     private fun now(): Long = clock.elapsedNow().inWholeMilliseconds
 
@@ -250,6 +253,7 @@ class WatchPartySession(
                 media = media,
                 positionMs = p?.positionMs,
                 playing = p?.isPlaying,
+                playbackSpeed = p?.playbackSpeed,
             ),
             uuid,
         )
@@ -261,7 +265,14 @@ class WatchPartySession(
         val p = player ?: return
         if (playerMedia == null) return
         lastStateSentAt = now()
-        send(WatchPartyWire(type = WatchPartyProtocol.STATE, positionMs = p.positionMs, playing = p.isPlaying))
+        send(
+            WatchPartyWire(
+                type = WatchPartyProtocol.STATE,
+                positionMs = p.positionMs,
+                playing = p.isPlaying,
+                playbackSpeed = p.playbackSpeed,
+            )
+        )
     }
 
     private fun applyGuestCommand(msg: WatchPartyWire) {
@@ -292,11 +303,12 @@ class WatchPartySession(
         val position = msg.positionMs ?: return
         hostPosition = position
         hostPlaying = msg.playing ?: hostPlaying
+        hostPlaybackSpeed = (msg.playbackSpeed ?: hostPlaybackSpeed).coerceIn(0.25f, 4f)
         hostStateAt = now()
     }
 
     private fun estimatedHostPosition(): Long =
-        if (hostPlaying) hostPosition + (now() - hostStateAt) else hostPosition
+        if (hostPlaying) hostPosition + ((now() - hostStateAt) * hostPlaybackSpeed).toLong() else hostPosition
 
     private fun applyHostState(force: Boolean) {
         val p = player ?: return
@@ -314,7 +326,8 @@ class WatchPartySession(
         val drift = target - p.positionMs
         when {
             abs(drift) > SEEK_THRESHOLD_MS || ((force || !hostPlaying) && abs(drift) > SPEED_START_MS) -> {
-                setSpeed(p, 1f)
+                smoothedSpeedCorrection = 0f
+                setSpeed(p, hostPlaybackSpeed)
                 val seekTarget = target + if (hostPlaying) seekLeadMs else 0L
                 p.seekTo(seekTarget)
                 lastSeekAt = t
@@ -323,9 +336,26 @@ class WatchPartySession(
                 suppressUntil = t + SUPPRESS_MS
                 resetBaseline(p, expectedPosition = seekTarget, expectedPlaying = hostPlaying)
             }
-            hostPlaying && abs(drift) > SPEED_START_MS ->
-                setSpeed(p, 1f + (drift / SPEED_GAIN_MS).coerceIn(-MAX_SPEED_DELTA, MAX_SPEED_DELTA))
-            !hostPlaying || abs(drift) < SPEED_STOP_MS -> setSpeed(p, 1f)
+            hostPlaying && abs(drift) > SPEED_START_MS -> {
+                if (kotlin.math.abs(hostPlaybackSpeed - lastCorrectionHostSpeed) > 0.001f) {
+                    smoothedSpeedCorrection = 0f
+                    lastCorrectionHostSpeed = hostPlaybackSpeed
+                }
+                val desiredCorrection =
+                    (drift / SPEED_GAIN_MS).coerceIn(-MAX_SPEED_DELTA, MAX_SPEED_DELTA)
+                smoothedSpeedCorrection +=
+                    (desiredCorrection - smoothedSpeedCorrection) * CORRECTION_SMOOTHING
+                setSpeed(
+                    p,
+                    (hostPlaybackSpeed + smoothedSpeedCorrection)
+                        .coerceIn(hostPlaybackSpeed - MAX_SPEED_DELTA, hostPlaybackSpeed + MAX_SPEED_DELTA)
+                )
+            }
+            !hostPlaying || abs(drift) < SPEED_STOP_MS -> {
+                smoothedSpeedCorrection = 0f
+                lastCorrectionHostSpeed = hostPlaybackSpeed
+                setSpeed(p, hostPlaybackSpeed)
+            }
         }
     }
 
@@ -442,6 +472,7 @@ class WatchPartySession(
         const val SPEED_STOP_MS = 120L
         const val SPEED_GAIN_MS = 12_000f
         const val MAX_SPEED_DELTA = 0.10f
+        const val CORRECTION_SMOOTHING = 0.25f
         const val SETTLE_MS = 1_500L
         const val SETTLE_TIMEOUT_MS = 20_000L
         const val MAX_SEEK_LEAD_MS = 8_000L
