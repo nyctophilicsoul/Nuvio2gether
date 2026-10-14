@@ -3,7 +3,6 @@ package com.nuvio.app
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
-import androidx.activity.result.contract.ActivityResultContracts
 import android.content.res.Configuration
 import com.nuvio.app.features.autosync.AutoSyncPreferencesAndroid
 import android.os.Bundle
@@ -79,12 +78,6 @@ import com.nuvio.app.features.watchprogress.WatchProgressStorage
 
 open class MainActivity : AppCompatActivity() {
     private var pipRemoteActionReceiver: PipRemoteActionReceiver? = null
-
-    private val openLocalVideo = registerForActivityResult(
-        ActivityResultContracts.OpenDocument(),
-    ) { uri ->
-        uri?.let(::openLocalDocument)
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -171,11 +164,6 @@ open class MainActivity : AppCompatActivity() {
         setIntent(intent)
         handleIncomingAppIntent(intent)
         handleIncomingLocalVideoIntent(intent)
-    }
-
-    /** Entry point for an in-app Open local file action. */
-    fun chooseLocalVideo() {
-        openLocalVideo.launch(arrayOf("video/*"))
     }
 
     private fun handleIncomingLocalVideoIntent(intent: Intent?) {
