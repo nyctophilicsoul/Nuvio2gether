@@ -87,6 +87,10 @@ internal expect object PlayerSettingsStorage {
     fun saveAudioVideoDelayEnabled(enabled: Boolean)
     fun loadAudioVideoDelayMs(): Int?
     fun saveAudioVideoDelayMs(delayMs: Int)
+    fun loadRememberAudioDelayPerDeviceEnabled(): Boolean?
+    fun saveRememberAudioDelayPerDeviceEnabled(enabled: Boolean)
+    fun loadShowPlaybackDiagnostics(): Boolean?
+    fun saveShowPlaybackDiagnostics(enabled: Boolean)
     fun loadExoNativeMemoryEnabled(): Boolean?
     fun saveExoNativeMemoryEnabled(enabled: Boolean)
     fun loadVodCacheEnabled(): Boolean?
