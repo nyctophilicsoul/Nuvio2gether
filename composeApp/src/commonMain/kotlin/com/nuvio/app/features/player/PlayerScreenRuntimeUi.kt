@@ -238,6 +238,16 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
             p2pRebufferMessage = p2pRebufferMessage,
             p2pRebufferProgress = p2pRebufferProgress,
         )
+        SubtitleSyncByEarCard(
+            visible = showSubtitleSyncByEar,
+            subtitleDelayMs = subtitleDelayMs,
+            heardCaptured = subtitleSyncHeardPositionMs != null,
+            sawCaptured = subtitleSyncSawPositionMs != null,
+            onHeard = { captureSubtitleSyncHeard() },
+            onSaw = { captureSubtitleSyncSaw() },
+            onClose = { closeSubtitleSyncByEar() },
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = 24.dp),
+        )
         RenderPlayerModals(displayedPositionMs = displayedPositionMs)
     }
 }
@@ -555,6 +565,7 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
         onSubtitleStyleChanged = PlayerSettingsRepository::setSubtitleStyle,
         onSubtitleDelayChanged = { delayMs -> setSubtitleDelay(delayMs) },
         onSubtitleDelayReset = { setSubtitleDelay(0) },
+        onSyncByEarClick = { openSubtitleSyncByEar() },
         onAutoSyncCapture = { captureSubtitleAutoSyncTime() },
         onAutoSyncCueSelected = { cue -> applySubtitleAutoSyncCue(cue) },
         onAutoSyncReload = { loadSubtitleAutoSyncCues(force = true) },
