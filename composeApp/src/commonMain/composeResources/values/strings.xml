@@ -1170,6 +1170,10 @@
     <string name="settings_playback_av_delay_enabled_description">Adjust video timing against audio in ExoPlayer. The change applies during playback.</string>
     <string name="settings_playback_av_delay_ms">Video delay</string>
     <string name="settings_playback_av_delay_value">%1$d ms</string>
+    <string name="settings_playback_remember_audio_delay_per_device">Remember audio delay per device</string>
+    <string name="settings_playback_remember_audio_delay_per_device_description">Keep a separate video-delay correction for the active audio output, such as Bluetooth headphones or speakers.</string>
+    <string name="settings_playback_show_diagnostics">Show playback diagnostics</string>
+    <string name="settings_playback_show_diagnostics_description">Display playback engine, codec, buffer, speed, and bitrate information on the video.</string>
     <string name="settings_playback_engine">Playback Engine</string>
     <string name="settings_playback_engine_auto_description">Use ExoPlayer first and fall back to libmpv if playback fails.</string>
     <string name="settings_playback_engine_exoplayer_description">Use ExoPlayer and Android Media3 decoders.</string>
