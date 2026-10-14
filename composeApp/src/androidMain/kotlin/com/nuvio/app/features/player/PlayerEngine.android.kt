@@ -2337,19 +2337,22 @@ private class SubtitleOffsetRenderersFactory(
         )
 
         if (speedAwareSink != null && out.size > startIndex) {
+            // Replace only the platform MediaCodec renderer. If the factory produced only
+            // extension renderers, leave them untouched rather than replacing one by index.
             val rendererIndex = (startIndex until out.size)
                 .firstOrNull { out[it] is MediaCodecAudioRenderer }
-                ?: startIndex
 
-            out[rendererIndex] = PlaybackSpeedAwareAudioRenderer(
-                rendererContext = context,
-                codecAdapterFactory = getCodecAdapterFactory(),
-                mediaCodecSelector = mediaCodecSelector,
-                enableDecoderFallback = enableDecoderFallback,
-                eventHandler = eventHandler,
-                eventListener = eventListener,
-                playbackSpeedAwareAudioSink = speedAwareSink,
-            )
+            if (rendererIndex != null) {
+                out[rendererIndex] = PlaybackSpeedAwareAudioRenderer(
+                    rendererContext = context,
+                    codecAdapterFactory = getCodecAdapterFactory(),
+                    mediaCodecSelector = mediaCodecSelector,
+                    enableDecoderFallback = enableDecoderFallback,
+                    eventHandler = eventHandler,
+                    eventListener = eventListener,
+                    playbackSpeedAwareAudioSink = speedAwareSink,
+                )
+            }
         }
     }
 
