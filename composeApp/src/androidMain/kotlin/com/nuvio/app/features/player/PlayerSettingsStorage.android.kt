@@ -779,13 +779,13 @@ actual object PlayerSettingsStorage {
             ?.apply()
     }
 
-    actual fun loadLocalFilePlaybackEnabled(): Boolean? = loadStoredBoolean(localFilePlaybackEnabledKey)
+    actual fun loadLocalFilePlaybackEnabled(): Boolean? = loadStoredBooleanCompat(localFilePlaybackEnabledKey)
 
-    actual fun saveLocalFilePlaybackEnabled(enabled: Boolean) = saveStoredBoolean(localFilePlaybackEnabledKey, enabled)
+    actual fun saveLocalFilePlaybackEnabled(enabled: Boolean) = preferences?.edit()?.putBoolean(ProfileScopedKey.of(localFilePlaybackEnabledKey), enabled)?.apply()
 
-    actual fun loadAudioVideoDelayEnabled(): Boolean? = loadStoredBoolean(audioVideoDelayEnabledKey)
+    actual fun loadAudioVideoDelayEnabled(): Boolean? = loadStoredBooleanCompat(audioVideoDelayEnabledKey)
 
-    actual fun saveAudioVideoDelayEnabled(enabled: Boolean) = saveStoredBoolean(audioVideoDelayEnabledKey, enabled)
+    actual fun saveAudioVideoDelayEnabled(enabled: Boolean) = preferences?.edit()?.putBoolean(ProfileScopedKey.of(audioVideoDelayEnabledKey), enabled)?.apply()
 
     actual fun loadAudioVideoDelayMs(): Int? = loadStoredInt(audioVideoDelayMsKey)
 
@@ -866,6 +866,12 @@ actual object PlayerSettingsStorage {
     actual fun loadTargetBufferSizeMb(): Int? = loadStoredInt(targetBufferSizeMbKey)
 
     actual fun saveTargetBufferSizeMb(value: Int) = saveStoredInt(targetBufferSizeMbKey, value)
+
+    private fun loadStoredBooleanCompat(keyBase: String): Boolean? =
+        preferences?.let { sharedPreferences ->
+            val key = ProfileScopedKey.of(keyBase)
+            if (sharedPreferences.contains(key)) sharedPreferences.getBoolean(key, false) else null
+        }
 
     private fun loadStoredInt(keyBase: String): Int? =
         preferences?.let { sharedPreferences ->
