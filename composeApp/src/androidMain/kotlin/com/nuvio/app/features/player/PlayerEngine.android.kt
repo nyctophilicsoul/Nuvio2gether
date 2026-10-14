@@ -132,7 +132,13 @@ actual fun PlatformPlayerSurface(
         useYoutubeChunkedPlayback,
         initialPositionRequestKey.orEmpty(),
     )
-    val requestedEngine = playbackEngine ?: playerSettings.androidPlaybackEngine
+    // Android document-provider URIs are reliably supported by ExoPlayer's DefaultDataSource.
+    // libmpv does not consistently open content:// URIs across providers.
+    val requestedEngine = if (sourceUrl.startsWith("content://", ignoreCase = true)) {
+        AndroidPlaybackEngine.ExoPlayer
+    } else {
+        playbackEngine ?: playerSettings.androidPlaybackEngine
+    }
     var activeEngine by remember(playerSourceKey, requestedEngine) {
         mutableStateOf(requestedEngine.initialAndroidEngine())
     }
@@ -347,20 +353,29 @@ private fun ExoPlayerSurface(
     }
 
     fun ExoPlayer.setPlaybackMediaItem(videoMediaItem: MediaItem, startPositionMs: Long? = null) {
-        if (!sourceAudioUrl.isNullOrBlank()) {
-            val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
-            val videoSource = mediaSourceFactory.createMediaSource(videoMediaItem)
-            val audioSource = mediaSourceFactory.createMediaSource(playbackMediaItemFromUrl(sourceAudioUrl))
-            val mergedSource = MergingMediaSource(videoSource, audioSource)
-            if (startPositionMs != null) {
-                setMediaSource(mergedSource, startPositionMs.coerceAtLeast(0L))
+        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
+        // Keep the provider live so changing the saved delay does not require a new player.
+        val videoSource = AudioDelayMediaSource(
+            mediaSourceFactory.createMediaSource(videoMediaItem),
+        ) {
+            val settings = PlayerSettingsRepository.uiState.value
+            if (settings.audioVideoDelayEnabled) {
+                // The wrapper shifts video timestamps by the negative provider value.
+                -settings.audioVideoDelayMs.toLong() * 1_000L
             } else {
-                setMediaSource(mergedSource)
+                0L
             }
-        } else if (startPositionMs != null) {
-            setMediaItem(videoMediaItem, startPositionMs.coerceAtLeast(0L))
+        }
+        val playbackSource = if (!sourceAudioUrl.isNullOrBlank()) {
+            val audioSource = mediaSourceFactory.createMediaSource(playbackMediaItemFromUrl(sourceAudioUrl))
+            MergingMediaSource(videoSource, audioSource)
         } else {
-            setMediaItem(videoMediaItem)
+            videoSource
+        }
+        if (startPositionMs != null) {
+            setMediaSource(playbackSource, startPositionMs.coerceAtLeast(0L))
+        } else {
+            setMediaSource(playbackSource)
         }
     }
 
