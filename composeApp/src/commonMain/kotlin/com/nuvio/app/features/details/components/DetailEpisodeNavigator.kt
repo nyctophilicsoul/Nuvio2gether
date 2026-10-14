@@ -135,7 +135,7 @@ internal fun List<MetaVideo>.filteredAndSortedForNavigator(
     return when (sort) {
         EpisodeSortOrder.FirstToLast -> filtered
         EpisodeSortOrder.LastToFirst -> filtered.asReversed()
-        EpisodeSortOrder.HighestRated -> filtered.sortedByDescending { it.imdbRating ?: it.tmdbRating ?: it.rating ?: -1.0 }
+        EpisodeSortOrder.HighestRated -> filtered.sortedByDescending { it.rating ?: -1.0 }
         EpisodeSortOrder.NewestAired -> filtered.sortedByDescending { it.released.orEmpty() }
         EpisodeSortOrder.UnwatchedFirst -> filtered.sortedBy { isWatched(it) }
     }
