@@ -415,6 +415,30 @@ internal fun DetailSeriesListEpisode(
     }
 }
 
+internal fun MetaDetails.isEpisodeWatchedForNavigator(
+    episode: MetaVideo,
+    progressByVideoId: Map<String, WatchProgressEntry>,
+    watchedKeys: Set<String>,
+): Boolean {
+    val episodeVideoId = buildPlaybackVideoId(
+        parentMetaId = id,
+        seasonNumber = episode.season,
+        episodeNumber = episode.episode,
+        fallbackVideoId = episode.id,
+    )
+    return progressByVideoId[episodeVideoId]?.isEffectivelyCompleted == true ||
+        WatchingState.isEpisodeWatched(
+            watchedKeys = watchedKeys,
+            metaType = type,
+            metaId = id,
+            episode = episode,
+        )
+}
+
+@Composable
+internal fun seasonDisplayLabel(meta: MetaDetails, season: Int): String =
+    if (meta.type != "series" && season <= 0) stringResource(Res.string.details_videos) else season.label()
+
 @Composable
 private fun SeriesSeasonSelector(
     meta: MetaDetails,
