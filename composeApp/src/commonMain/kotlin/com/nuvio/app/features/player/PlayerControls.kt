@@ -76,6 +76,8 @@ import com.nuvio.app.core.ui.nuvioTypeScale
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import com.nuvio.app.core.i18n.localizedEpisodeTitle
+import androidx.compose.material.icons.rounded.Groups
+import com.nuvio.app.features.watchparty.WatchPartyManager
 
 @Composable
 internal fun PlayerControlsShell(
@@ -669,6 +671,11 @@ private fun ProgressControls(
                         painter = audioPainter,
                         onClick = onAudioClick,
                     )
+                    PlayerActionPillButton(
+    label = stringResource(Res.string.watch_party_title),
+    icon = Icons.Rounded.Groups,
+    onClick = WatchPartyManager::openPanel,
+)
                     if (onSourcesClick != null) {
                         PlayerActionPillButton(
                             label = stringResource(Res.string.compose_player_sources),
