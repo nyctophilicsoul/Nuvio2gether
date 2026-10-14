@@ -50,6 +50,13 @@ import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.TransferListener
 import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
+import androidx.media3.exoplayer.mediacodec.MediaCodecAdapter
+import androidx.media3.exoplayer.audio.MediaCodecAudioRenderer
+import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.AudioRendererEventListener
+import android.os.Handler
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.ForwardingRenderer
 import androidx.media3.exoplayer.Renderer
@@ -2291,6 +2298,59 @@ private class SubtitleOffsetRenderersFactory(
     private val shouldStripSdhProvider: () -> Boolean,
     private val videoBoundsFractionProvider: () -> RectF?,
 ) : DefaultRenderersFactory(context) {
+    override fun buildAudioSink(
+        context: Context,
+        enableFloatOutput: Boolean,
+        enableAudioTrackPlaybackParams: Boolean,
+    ): AudioSink {
+        val baseSink = DefaultAudioSink.Builder(context)
+            .setEnableFloatOutput(enableFloatOutput)
+            .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+            .build()
+        return PlaybackSpeedAwareAudioSink(baseSink)
+    }
+
+    override fun buildAudioRenderers(
+        context: Context,
+        extensionRendererMode: Int,
+        mediaCodecSelector: MediaCodecSelector,
+        enableDecoderFallback: Boolean,
+        audioSink: AudioSink,
+        eventHandler: Handler,
+        eventListener: AudioRendererEventListener,
+        out: ArrayList<Renderer>,
+    ) {
+        val speedAwareSink = audioSink as? PlaybackSpeedAwareAudioSink
+        val startIndex = out.size
+
+        super.buildAudioRenderers(
+            context,
+            extensionRendererMode,
+            mediaCodecSelector,
+            enableDecoderFallback,
+            audioSink,
+            eventHandler,
+            eventListener,
+            out,
+        )
+
+        if (speedAwareSink != null && out.size > startIndex) {
+            val rendererIndex = (startIndex until out.size)
+                .firstOrNull { out[it] is MediaCodecAudioRenderer }
+                ?: startIndex
+
+            out[rendererIndex] = PlaybackSpeedAwareAudioRenderer(
+                rendererContext = context,
+                codecAdapterFactory = getCodecAdapterFactory(),
+                mediaCodecSelector = mediaCodecSelector,
+                enableDecoderFallback = enableDecoderFallback,
+                eventHandler = eventHandler,
+                eventListener = eventListener,
+                playbackSpeedAwareAudioSink = speedAwareSink,
+            )
+        }
+    }
+
     override fun buildTextRenderers(
         context: Context,
         output: TextOutput,
