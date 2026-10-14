@@ -241,6 +241,12 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
             p2pRebufferMessage = p2pRebufferMessage,
             p2pRebufferProgress = p2pRebufferProgress,
         )
+        if (playerSettingsUiState.showPlaybackDiagnostics) {
+            PlaybackDiagnosticsOverlay(
+                snapshot = playbackSnapshot,
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 12.dp),
+            )
+        }
         SubtitleSyncByEarCard(
             visible = showSubtitleSyncByEar,
             subtitleDelayMs = subtitleDelayMs,
