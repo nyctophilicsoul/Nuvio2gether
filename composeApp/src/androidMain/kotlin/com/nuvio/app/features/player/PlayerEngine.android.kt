@@ -38,6 +38,7 @@ import org.jetbrains.compose.resources.getString
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.C
+import androidx.media3.common.AudioAttributes
 import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -53,6 +54,7 @@ import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.TransferListener
 import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.mediacodec.MediaCodecAdapter
 import androidx.media3.exoplayer.audio.MediaCodecAudioRenderer
@@ -641,6 +643,55 @@ private fun ExoPlayerSurface(
             latestOnError.value(error.localizedMessage ?: runBlocking { getString(Res.string.player_unable_to_play_stream) })
         }
 
+        fun attemptAudioRecovery(error: PlaybackException): Boolean {
+            val messages = generateSequence<Throwable>(error) { it.cause }
+                .mapNotNull { it.message }
+                .joinToString(" ")
+            val audioTrackFailure =
+                error.errorCode == PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED ||
+                    error.errorCode == PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED ||
+                    messages.contains("AudioTrack init failed", ignoreCase = true) ||
+                    messages.contains("AudioTrack write failed", ignoreCase = true)
+            if (!audioTrackFailure) return false
+
+            val step = PlaybackAudioRecoveryPolicy.nextStep(
+                safeDecoderActive = effectiveDecoderPriority != DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON,
+                pcmForced = forcePcmAudioFallback,
+                audioDisabled = audioDisabledAfterFallback,
+            ) ?: return false
+
+            val position = exoPlayer.currentPosition.coerceAtLeast(0L)
+            return when (step) {
+                PlaybackAudioRecoveryPolicy.Step.SAFE_DECODER -> {
+                    Log.w(PLAYER_DIAGNOSTIC_TAG, "Audio recovery: retrying with app decoders at ${position}ms", error)
+                    fallbackStartPositionMs = position
+                    decoderPriorityOverride = DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+                    latestOnError.value(null)
+                    true
+                }
+                PlaybackAudioRecoveryPolicy.Step.FORCE_PCM -> {
+                    Log.w(PLAYER_DIAGNOSTIC_TAG, "Audio recovery: retrying with forced PCM at ${position}ms", error)
+                    fallbackStartPositionMs = position
+                    forcePcmAudioFallback = true
+                    latestOnError.value(null)
+                    true
+                }
+                PlaybackAudioRecoveryPolicy.Step.DISABLE_AUDIO -> {
+                    Log.w(PLAYER_DIAGNOSTIC_TAG, "Audio recovery: disabling audio after repeated output failures", error)
+                    audioDisabledAfterFallback = true
+                    exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+                        .buildUpon()
+                        .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
+                        .build()
+                    exoPlayer.seekTo(position)
+                    exoPlayer.prepare()
+                    exoPlayer.playWhenReady = latestPlayWhenReady.value
+                    latestOnError.value(null)
+                    true
+                }
+            }
+        }
+
         val listener = object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
                 syncPlayerViewKeepScreenOn()
@@ -656,6 +707,8 @@ private fun ExoPlayerSurface(
                         "causeChain=${diagnosticThrowableChain(error)}",
                     error,
                 )
+
+                if (attemptAudioRecovery(error)) return
 
                 val isSourceError = error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW ||
                         error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED ||
@@ -919,6 +972,13 @@ private fun ExoPlayerSurface(
                 }
 
                 override fun retry() {
+                    if (audioDisabledAfterFallback) {
+                        audioDisabledAfterFallback = false
+                        exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+                            .buildUpon()
+                            .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
+                            .build()
+                    }
                     exoPlayer.prepare()
                     exoPlayer.playWhenReady = true
                 }
