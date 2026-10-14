@@ -108,7 +108,8 @@ internal fun CoroutineScope.launchPlayerNextEpisodeAutoPlay(
         settings.streamAutoPlayMode == StreamAutoPlayMode.MANUAL &&
             (
                 settings.streamAutoPlayNextEpisodeEnabled ||
-                    settings.streamAutoPlayPreferBingeGroup
+                    settings.streamAutoPlayPreferBingeGroup ||
+                    settings.streamReuseLastLinkEnabled
                 )
 
     val bingeGroupOnlyManualMode =
