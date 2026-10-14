@@ -63,6 +63,8 @@ data class PlayerSettingsUiState(
     val localFilePlaybackEnabled: Boolean = true,
     val audioVideoDelayEnabled: Boolean = false,
     val audioVideoDelayMs: Int = 0,
+    val rememberAudioDelayPerDeviceEnabled: Boolean = false,
+    val showPlaybackDiagnostics: Boolean = false,
     val exoNativeMemoryEnabled: Boolean = false,
     val bufferEngineEnabled: Boolean = false,
     val minBufferMs: Int = PlaybackBufferSettings.DEFAULT_MIN_BUFFER_MS,
@@ -148,6 +150,8 @@ object PlayerSettingsRepository {
     private var localFilePlaybackEnabled = true
     private var audioVideoDelayEnabled = false
     private var audioVideoDelayMs = 0
+    private var rememberAudioDelayPerDeviceEnabled = false
+    private var showPlaybackDiagnostics = false
     private var exoNativeMemoryEnabled = false
     private var bufferEngineEnabled = false
     private var minBufferMs = PlaybackBufferSettings.DEFAULT_MIN_BUFFER_MS
@@ -235,6 +239,8 @@ object PlayerSettingsRepository {
         decoderPriority = 1
         mapDV7ToHevc = false
         tunnelingEnabled = false
+        rememberAudioDelayPerDeviceEnabled = false
+        showPlaybackDiagnostics = false
         exoNativeMemoryEnabled = false
         bufferEngineEnabled = false
         minBufferMs = PlaybackBufferSettings.DEFAULT_MIN_BUFFER_MS
@@ -355,6 +361,8 @@ object PlayerSettingsRepository {
         localFilePlaybackEnabled = PlayerSettingsStorage.loadLocalFilePlaybackEnabled() ?: true
         audioVideoDelayEnabled = PlayerSettingsStorage.loadAudioVideoDelayEnabled() ?: false
         audioVideoDelayMs = (PlayerSettingsStorage.loadAudioVideoDelayMs() ?: 0).coerceIn(-1_000, 1_000)
+        rememberAudioDelayPerDeviceEnabled = PlayerSettingsStorage.loadRememberAudioDelayPerDeviceEnabled() ?: false
+        showPlaybackDiagnostics = PlayerSettingsStorage.loadShowPlaybackDiagnostics() ?: false
         exoNativeMemoryEnabled = (PlayerSettingsStorage.loadExoNativeMemoryEnabled() ?: false) &&
             isExoNativeMemorySupported()
         vodCacheEnabled = PlayerSettingsStorage.loadVodCacheEnabled() ?: false
@@ -718,6 +726,22 @@ object PlayerSettingsRepository {
         audioVideoDelayMs = coerced
         publish()
         PlayerSettingsStorage.saveAudioVideoDelayMs(coerced)
+    }
+
+    fun setRememberAudioDelayPerDeviceEnabled(enabled: Boolean) {
+        ensureLoaded()
+        if (rememberAudioDelayPerDeviceEnabled == enabled) return
+        rememberAudioDelayPerDeviceEnabled = enabled
+        publish()
+        PlayerSettingsStorage.saveRememberAudioDelayPerDeviceEnabled(enabled)
+    }
+
+    fun setShowPlaybackDiagnostics(enabled: Boolean) {
+        ensureLoaded()
+        if (showPlaybackDiagnostics == enabled) return
+        showPlaybackDiagnostics = enabled
+        publish()
+        PlayerSettingsStorage.saveShowPlaybackDiagnostics(enabled)
     }
 
     fun setExoNativeMemoryEnabled(enabled: Boolean) {
@@ -1219,6 +1243,8 @@ object PlayerSettingsRepository {
             localFilePlaybackEnabled = localFilePlaybackEnabled,
             audioVideoDelayEnabled = audioVideoDelayEnabled,
             audioVideoDelayMs = audioVideoDelayMs,
+            rememberAudioDelayPerDeviceEnabled = rememberAudioDelayPerDeviceEnabled,
+            showPlaybackDiagnostics = showPlaybackDiagnostics,
             exoNativeMemoryEnabled = exoNativeMemoryEnabled,
             bufferEngineEnabled = bufferEngineEnabled,
             minBufferMs = minBufferMs,
