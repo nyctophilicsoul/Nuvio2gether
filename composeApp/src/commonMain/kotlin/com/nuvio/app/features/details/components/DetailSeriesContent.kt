@@ -32,6 +32,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -215,8 +221,66 @@ fun DetailSeriesContent(
                     }
                     val seasonEpisodes = groupedEpisodes.getValue(seasonForContent)
                     if (episodeCardStyle == MetaEpisodeCardStyle.Horizontal) {
-                        EpisodeHorizontalRow(
-                            episodes = seasonEpisodes,
+                        val navigator = rememberEpisodeNavigatorState(meta.id + ":" + seasonForContent)
+                        val rowState = rememberLazyListState()
+                        val navigatorScope = rememberCoroutineScope()
+                        val isWatched: (MetaVideo) -> Boolean = { episode ->
+                            meta.isEpisodeWatchedForNavigator(episode, progressByVideoId, watchedKeys)
+                        }
+                        val shownEpisodes = remember(seasonEpisodes, navigator.query, navigator.sort, progressByVideoId, watchedKeys) {
+                            seasonEpisodes.filteredAndSortedForNavigator(navigator.query, navigator.sort, isWatched)
+                        }
+                        val jumpTo: (MetaVideo) -> Unit = { targetEpisode ->
+                            navigatorScope.launch {
+                                if (shownEpisodes.none { it.navigatorKey() == targetEpisode.navigatorKey() }) {
+                                    navigator.query = ""
+                                    withFrameNanos { }
+                                    withFrameNanos { }
+                                }
+                                val index = seasonEpisodes
+                                    .filteredAndSortedForNavigator(navigator.query, navigator.sort, isWatched)
+                                    .indexOfFirst { it.navigatorKey() == targetEpisode.navigatorKey() }
+                                if (index >= 0) {
+                                    rowState.animateScrollToItem(index)
+                                    navigator.flashHighlight(targetEpisode.navigatorKey())
+                                }
+                            }
+                        }
+                        var navigatorOrderInitialized by remember { mutableStateOf(false) }
+                        LaunchedEffect(navigator.sort, navigator.query) {
+                            if (navigatorOrderInitialized) rowState.scrollToItem(0)
+                            navigatorOrderInitialized = true
+                        }
+                        EpisodeNavigatorBar(
+                            state = navigator,
+                            shownCount = shownEpisodes.size,
+                            totalCount = seasonEpisodes.size,
+                            onSubmitNumber = { number ->
+                                seasonEpisodes.firstOrNull { it.episode == number }?.let(jumpTo)
+                            },
+                        )
+                        if (navigator.goToSheetVisible) {
+                            EpisodeGoToSheet(
+                                seasonLabel = seasonDisplayLabel(meta, seasonForContent),
+                                episodes = seasonEpisodes,
+                                isWatched = isWatched,
+                                onPick = jumpTo,
+                                onDismiss = { navigator.goToSheetVisible = false },
+                            )
+                        }
+                        if (navigator.sortSheetVisible) {
+                            EpisodeSortSheet(
+                                current = navigator.sort,
+                                onSelect = { navigator.sort = it },
+                                onDismiss = { navigator.sortSheetVisible = false },
+                            )
+                        }
+                        if (shownEpisodes.isEmpty()) {
+                            EpisodeNavigatorEmptyState(query = navigator.query, onClear = { navigator.query = "" })
+                        } else EpisodeHorizontalRow(
+                            episodes = shownEpisodes,
+                            listState = rowState,
+                            highlightedKey = navigator.highlightedEpisodeKey,
                             maxWidthDp = containerWidthDp,
                             horizontalScrollPadding = horizontalScrollPadding,
                             parentMetaId = meta.id,
