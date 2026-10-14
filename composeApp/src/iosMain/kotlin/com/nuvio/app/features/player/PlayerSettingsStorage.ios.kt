@@ -59,6 +59,8 @@ actual object PlayerSettingsStorage {
     private const val localFilePlaybackEnabledKey = "local_file_playback_enabled"
     private const val audioVideoDelayEnabledKey = "audio_video_delay_enabled"
     private const val audioVideoDelayMsKey = "audio_video_delay_ms"
+    private const val rememberAudioDelayPerDeviceEnabledKey = "remember_audio_delay_per_device_enabled"
+    private const val showPlaybackDiagnosticsKey = "show_playback_diagnostics"
     private const val exoNativeMemoryEnabledKey = "exo_native_memory_enabled"
     private const val vodCacheEnabledKey = "vod_cache_enabled"
     private const val vodCacheSizeModeKey = "vod_cache_size_mode"
@@ -110,6 +112,8 @@ actual object PlayerSettingsStorage {
     private const val iosSaturationKey = "ios_saturation"
     private const val iosGammaKey = "ios_gamma"
     private val syncKeys = listOf(
+        rememberAudioDelayPerDeviceEnabledKey,
+        showPlaybackDiagnosticsKey,
         showLoadingOverlayKey,
         showPlayerLoadingStatusKey,
         pauseOverlayEnabledKey,
@@ -667,6 +671,11 @@ actual object PlayerSettingsStorage {
 
     actual fun saveAudioVideoDelayMs(delayMs: Int) = saveInt(audioVideoDelayMsKey, delayMs.coerceIn(-1_000, 1_000))
 
+    actual fun loadRememberAudioDelayPerDeviceEnabled(): Boolean? = loadBoolean(rememberAudioDelayPerDeviceEnabledKey)
+    actual fun saveRememberAudioDelayPerDeviceEnabled(enabled: Boolean) = saveBoolean(rememberAudioDelayPerDeviceEnabledKey, enabled)
+    actual fun loadShowPlaybackDiagnostics(): Boolean? = loadBoolean(showPlaybackDiagnosticsKey)
+    actual fun saveShowPlaybackDiagnostics(enabled: Boolean) = saveBoolean(showPlaybackDiagnosticsKey, enabled)
+
     actual fun loadExoNativeMemoryEnabled(): Boolean? = loadBoolean(exoNativeMemoryEnabledKey)
 
     actual fun saveExoNativeMemoryEnabled(enabled: Boolean) {
@@ -1132,6 +1141,8 @@ actual object PlayerSettingsStorage {
         loadDecoderPriority()?.let { put(decoderPriorityKey, encodeSyncInt(it)) }
         loadMapDV7ToHevc()?.let { put(mapDV7ToHevcKey, encodeSyncBoolean(it)) }
         loadTunnelingEnabled()?.let { put(tunnelingEnabledKey, encodeSyncBoolean(it)) }
+        loadRememberAudioDelayPerDeviceEnabled()?.let { put(rememberAudioDelayPerDeviceEnabledKey, encodeSyncBoolean(it)) }
+        loadShowPlaybackDiagnostics()?.let { put(showPlaybackDiagnosticsKey, encodeSyncBoolean(it)) }
         loadStreamAutoPlayMode()?.let { put(streamAutoPlayModeKey, encodeSyncString(it)) }
         loadStreamAutoPlaySource()?.let { put(streamAutoPlaySourceKey, encodeSyncString(it)) }
         loadStreamAutoPlaySelectedAddons()?.let { put(streamAutoPlaySelectedAddonsKey, encodeSyncStringSet(it)) }
@@ -1212,6 +1223,8 @@ actual object PlayerSettingsStorage {
         payload.decodeSyncInt(decoderPriorityKey)?.let(::saveDecoderPriority)
         payload.decodeSyncBoolean(mapDV7ToHevcKey)?.let(::saveMapDV7ToHevc)
         payload.decodeSyncBoolean(tunnelingEnabledKey)?.let(::saveTunnelingEnabled)
+        payload.decodeSyncBoolean(rememberAudioDelayPerDeviceEnabledKey)?.let(::saveRememberAudioDelayPerDeviceEnabled)
+        payload.decodeSyncBoolean(showPlaybackDiagnosticsKey)?.let(::saveShowPlaybackDiagnostics)
         payload.decodeSyncString(streamAutoPlayModeKey)?.let(::saveStreamAutoPlayMode)
         payload.decodeSyncString(streamAutoPlaySourceKey)?.let(::saveStreamAutoPlaySource)
         payload.decodeSyncStringSet(streamAutoPlaySelectedAddonsKey)?.let(::saveStreamAutoPlaySelectedAddons)
