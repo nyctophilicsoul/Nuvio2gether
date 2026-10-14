@@ -778,6 +778,67 @@ private fun ExoPlayerSurface(
         }
     }
 
+    DisposableEffect(context, exoPlayer) {
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        if (audioManager == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            onDispose { }
+        } else {
+            var routeChangeJob: Job? = null
+            val callback = object : AudioDeviceCallback() {
+                override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
+                    scheduleRouteRecheck()
+                }
+
+                override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {
+                    scheduleRouteRecheck()
+                }
+
+                private fun scheduleRouteRecheck() {
+                    routeChangeJob?.cancel()
+                    routeChangeJob = coroutineScope.launch {
+                        delay(700L)
+                        val previousRoute = activeAudioRoute
+                        val nextRoute = AudioOutputRouteDetector.detect(context)
+                        if (previousRoute?.key == nextRoute?.key) return@launch
+
+                        if (playerSettings.rememberAudioDelayPerDeviceEnabled && previousRoute != null) {
+                            AudioDelayRouteStore.saveDelayMs(
+                                context,
+                                previousRoute.key,
+                                activeRouteDelayMs,
+                            )
+                        }
+
+                        activeAudioRoute = nextRoute
+                        activeRouteDelayMs = if (
+                            playerSettings.rememberAudioDelayPerDeviceEnabled && nextRoute != null
+                        ) {
+                            AudioDelayRouteStore.loadDelayMs(context, nextRoute.key)
+                        } else {
+                            PlayerSettingsRepository.uiState.value.audioVideoDelayMs
+                        }
+                        Log.i(
+                            PLAYER_DIAGNOSTIC_TAG,
+                            "audio route changed from ${previousRoute?.label ?: "unknown"} " +
+                                "to ${nextRoute?.label ?: "unknown"}; bluetooth=${nextRoute?.isBluetooth == true}",
+                        )
+
+                        // Force track selection to reconsider passthrough vs PCM using the live
+                        // route provider. This updates the current player without rebuilding it.
+                        exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+                            .buildUpon()
+                            .build()
+                    }
+                }
+            }
+            audioManager.registerAudioDeviceCallback(callback, null)
+            onDispose {
+                routeChangeJob?.cancel()
+                runCatching { audioManager.unregisterAudioDeviceCallback(callback) }
+            }
+        }
+    }
+
     DisposableEffect(exoPlayer, lifecycleOwner) {
         val activity = context.findActivity()
         val observer = LifecycleEventObserver { _, event ->
