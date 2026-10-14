@@ -81,6 +81,12 @@ internal expect object PlayerSettingsStorage {
     fun saveMapDV7ToHevc(enabled: Boolean)
     fun loadTunnelingEnabled(): Boolean?
     fun saveTunnelingEnabled(enabled: Boolean)
+    fun loadLocalFilePlaybackEnabled(): Boolean?
+    fun saveLocalFilePlaybackEnabled(enabled: Boolean)
+    fun loadAudioVideoDelayEnabled(): Boolean?
+    fun saveAudioVideoDelayEnabled(enabled: Boolean)
+    fun loadAudioVideoDelayMs(): Int?
+    fun saveAudioVideoDelayMs(delayMs: Int)
     fun loadExoNativeMemoryEnabled(): Boolean?
     fun saveExoNativeMemoryEnabled(enabled: Boolean)
     fun loadVodCacheEnabled(): Boolean?
