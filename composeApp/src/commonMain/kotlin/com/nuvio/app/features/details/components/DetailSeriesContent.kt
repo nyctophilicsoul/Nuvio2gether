@@ -280,7 +280,6 @@ fun DetailSeriesContent(
                         } else EpisodeHorizontalRow(
                             episodes = shownEpisodes,
                             listState = rowState,
-                            highlightedKey = navigator.highlightedEpisodeKey,
                             maxWidthDp = containerWidthDp,
                             horizontalScrollPadding = horizontalScrollPadding,
                             parentMetaId = meta.id,
@@ -762,6 +761,7 @@ private fun SeasonPosterButton(
 @Composable
 private fun EpisodeHorizontalRow(
     episodes: List<MetaVideo>,
+    listState: LazyListState = rememberLazyListState(),
     maxWidthDp: Float,
     horizontalScrollPadding: Dp,
     parentMetaId: String,
@@ -777,7 +777,6 @@ private fun EpisodeHorizontalRow(
     onEpisodeLongPress: ((MetaVideo) -> Unit)?,
 ) {
     val rowMetrics = rememberEpisodeHorizontalCardMetrics(maxWidthDp)
-    val listState = rememberLazyListState()
     var hasPositioned by remember(episodes) { mutableStateOf(false) }
 
     LaunchedEffect(episodes, preferredEpisodeNumber) {
