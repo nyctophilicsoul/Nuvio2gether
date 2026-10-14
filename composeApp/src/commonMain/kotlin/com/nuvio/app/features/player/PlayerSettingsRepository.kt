@@ -60,6 +60,9 @@ data class PlayerSettingsUiState(
     val decoderPriority: Int = 1,
     val mapDV7ToHevc: Boolean = false,
     val tunnelingEnabled: Boolean = false,
+    val localFilePlaybackEnabled: Boolean = true,
+    val audioVideoDelayEnabled: Boolean = false,
+    val audioVideoDelayMs: Int = 0,
     val exoNativeMemoryEnabled: Boolean = false,
     val bufferEngineEnabled: Boolean = false,
     val minBufferMs: Int = PlaybackBufferSettings.DEFAULT_MIN_BUFFER_MS,
@@ -142,6 +145,9 @@ object PlayerSettingsRepository {
     private var decoderPriority = 1
     private var mapDV7ToHevc = false
     private var tunnelingEnabled = false
+    private var localFilePlaybackEnabled = true
+    private var audioVideoDelayEnabled = false
+    private var audioVideoDelayMs = 0
     private var exoNativeMemoryEnabled = false
     private var bufferEngineEnabled = false
     private var minBufferMs = PlaybackBufferSettings.DEFAULT_MIN_BUFFER_MS
@@ -346,6 +352,9 @@ object PlayerSettingsRepository {
         decoderPriority = PlayerSettingsStorage.loadDecoderPriority() ?: 1
         mapDV7ToHevc = PlayerSettingsStorage.loadMapDV7ToHevc() ?: false
         tunnelingEnabled = PlayerSettingsStorage.loadTunnelingEnabled() ?: false
+        localFilePlaybackEnabled = PlayerSettingsStorage.loadLocalFilePlaybackEnabled() ?: true
+        audioVideoDelayEnabled = PlayerSettingsStorage.loadAudioVideoDelayEnabled() ?: false
+        audioVideoDelayMs = (PlayerSettingsStorage.loadAudioVideoDelayMs() ?: 0).coerceIn(-1_000, 1_000)
         exoNativeMemoryEnabled = (PlayerSettingsStorage.loadExoNativeMemoryEnabled() ?: false) &&
             isExoNativeMemorySupported()
         vodCacheEnabled = PlayerSettingsStorage.loadVodCacheEnabled() ?: false
@@ -684,6 +693,31 @@ object PlayerSettingsRepository {
         tunnelingEnabled = enabled
         publish()
         PlayerSettingsStorage.saveTunnelingEnabled(enabled)
+    }
+
+    fun setLocalFilePlaybackEnabled(enabled: Boolean) {
+        ensureLoaded()
+        if (localFilePlaybackEnabled == enabled) return
+        localFilePlaybackEnabled = enabled
+        publish()
+        PlayerSettingsStorage.saveLocalFilePlaybackEnabled(enabled)
+    }
+
+    fun setAudioVideoDelayEnabled(enabled: Boolean) {
+        ensureLoaded()
+        if (audioVideoDelayEnabled == enabled) return
+        audioVideoDelayEnabled = enabled
+        publish()
+        PlayerSettingsStorage.saveAudioVideoDelayEnabled(enabled)
+    }
+
+    fun setAudioVideoDelayMs(value: Int) {
+        ensureLoaded()
+        val coerced = value.coerceIn(-1_000, 1_000)
+        if (audioVideoDelayMs == coerced) return
+        audioVideoDelayMs = coerced
+        publish()
+        PlayerSettingsStorage.saveAudioVideoDelayMs(coerced)
     }
 
     fun setExoNativeMemoryEnabled(enabled: Boolean) {
@@ -1182,6 +1216,9 @@ object PlayerSettingsRepository {
             decoderPriority = decoderPriority,
             mapDV7ToHevc = mapDV7ToHevc,
             tunnelingEnabled = tunnelingEnabled,
+            localFilePlaybackEnabled = localFilePlaybackEnabled,
+            audioVideoDelayEnabled = audioVideoDelayEnabled,
+            audioVideoDelayMs = audioVideoDelayMs,
             exoNativeMemoryEnabled = exoNativeMemoryEnabled,
             bufferEngineEnabled = bufferEngineEnabled,
             minBufferMs = minBufferMs,
