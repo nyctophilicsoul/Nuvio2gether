@@ -232,6 +232,10 @@ data class PlayerPlaybackSnapshot(
     val playbackSpeed: Float = 1f,
     val videoWidth: Int = 0,
     val videoHeight: Int = 0,
+    val videoBitrate: Int = 0,
+    val audioBitrate: Int = 0,
+    val videoCodec: String? = null,
+    val audioCodec: String? = null,
 )
 
 data class PlayerNowPlayingInfo(
