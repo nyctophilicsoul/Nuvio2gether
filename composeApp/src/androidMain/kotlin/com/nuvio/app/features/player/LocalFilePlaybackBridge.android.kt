@@ -13,6 +13,13 @@ internal object LocalFilePlaybackBridge {
     private val queue = Channel<LocalFilePlaybackRequest>(capacity = Channel.BUFFERED)
     val requests = queue.receiveAsFlow()
 
+    private val openPickerQueue = Channel<Unit>(capacity = Channel.CONFLATED)
+    val openPickerRequests = openPickerQueue.receiveAsFlow()
+
+    fun requestOpenPicker() {
+        openPickerQueue.trySend(Unit)
+    }
+
     fun requestPlayback(uri: String, title: String) {
         queue.trySend(LocalFilePlaybackRequest(uri = uri, title = title))
     }
