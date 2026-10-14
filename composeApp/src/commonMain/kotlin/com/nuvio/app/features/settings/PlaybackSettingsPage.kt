@@ -438,6 +438,18 @@ private fun PlaybackSettingsSection(
                             onValueChange = PlayerSettingsRepository::setAudioVideoDelayMs,
                         )
                     }
+                    if (autoPlayPlayerSettings.audioVideoDelayEnabled &&
+                        autoPlayPlayerSettings.androidPlaybackEngine != AndroidPlaybackEngine.Libmpv &&
+                        !autoPlayPlayerSettings.externalPlayerEnabled) {
+                        SettingsGroupDivider(isTablet = isTablet)
+                        SettingsSwitchRow(
+                            title = stringResource(Res.string.settings_playback_remember_audio_delay_per_device),
+                            description = stringResource(Res.string.settings_playback_remember_audio_delay_per_device_description),
+                            checked = autoPlayPlayerSettings.rememberAudioDelayPerDeviceEnabled,
+                            isTablet = isTablet,
+                            onCheckedChange = PlayerSettingsRepository::setRememberAudioDelayPerDeviceEnabled,
+                        )
+                    }
                 }
             }
         }
@@ -476,6 +488,14 @@ private fun PlaybackSettingsSection(
                     checked = autoPlayPlayerSettings.pauseOverlayEnabled,
                     isTablet = isTablet,
                     onCheckedChange = PlayerSettingsRepository::setPauseOverlayEnabled,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_show_diagnostics),
+                    description = stringResource(Res.string.settings_playback_show_diagnostics_description),
+                    checked = autoPlayPlayerSettings.showPlaybackDiagnostics,
+                    isTablet = isTablet,
+                    onCheckedChange = PlayerSettingsRepository::setShowPlaybackDiagnostics,
                 )
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsSwitchRow(
