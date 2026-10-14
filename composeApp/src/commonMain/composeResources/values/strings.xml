@@ -1151,6 +1151,17 @@
     <string name="settings_playback_secondary_audio_language">Secondary Audio Language</string>
     <string name="settings_playback_secondary_subtitle_language">Secondary Preferred Language</string>
     <string name="settings_playback_section_decoder">DECODER</string>
+    <string name="settings_playback_section_network">NETWORK &amp; BUFFERING</string>
+    <string name="settings_playback_section_local_files">LOCAL FILES</string>
+    <string name="settings_playback_section_av_delay">A/V DELAY</string>
+    <string name="settings_playback_local_file_enabled">Enable local file playback</string>
+    <string name="settings_playback_local_file_enabled_description">Show an in-app option to pick a video from device storage and play it in Nuvio.</string>
+    <string name="settings_playback_open_local_file">Open local video</string>
+    <string name="settings_playback_open_local_file_description">Choose a video using Android’s system file picker.</string>
+    <string name="settings_playback_av_delay_enabled">Enable A/V delay correction</string>
+    <string name="settings_playback_av_delay_enabled_description">Adjust video timing against audio in ExoPlayer. The change applies during playback.</string>
+    <string name="settings_playback_av_delay_ms">Video delay</string>
+    <string name="settings_playback_av_delay_value">%1$d ms</string>
     <string name="settings_playback_engine">Playback Engine</string>
     <string name="settings_playback_engine_auto_description">Use ExoPlayer first and fall back to libmpv if playback fails.</string>
     <string name="settings_playback_engine_exoplayer_description">Use ExoPlayer and Android Media3 decoders.</string>
