@@ -112,6 +112,7 @@ fun LibraryScreen(
     onPreviewClick: ((MetaPreview) -> Unit)? = null,
     onPreviewLongClick: ((MetaPreview) -> Unit)? = null,
     onDownloadsClick: (() -> Unit)? = null,
+    onOpenLocalFileClick: (() -> Unit)? = null,
     disintegrationRequest: DisintegrationRequest<String>? = null,
 ) {
     val uiState by remember {
@@ -355,6 +356,15 @@ fun LibraryScreen(
                                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
                                         }
+                                    }
+                                }
+                                if (onOpenLocalFileClick != null) {
+                                    androidx.compose.material3.IconButton(onClick = onOpenLocalFileClick) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.InsertDriveFile,
+                                            contentDescription = "Open local video",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
                                     }
                                 }
                                 if (onDownloadsClick != null) {
