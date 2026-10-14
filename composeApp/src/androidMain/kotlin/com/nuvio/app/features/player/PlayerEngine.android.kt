@@ -1885,6 +1885,8 @@ private const val MPV_SUBTITLE_OUTLINE_SIZE_SCALE = 1.5
 
 private fun ExoPlayer.snapshot(): PlayerPlaybackSnapshot {
     val (videoWidth, videoHeight) = videoDimensions()
+    val video = videoFormat
+    val audio = audioFormat
     return PlayerPlaybackSnapshot(
         isLoading = playbackState == Player.STATE_IDLE || playbackState == Player.STATE_BUFFERING,
         isPlaying = isPlaying,
@@ -1895,6 +1897,10 @@ private fun ExoPlayer.snapshot(): PlayerPlaybackSnapshot {
         playbackSpeed = playbackParameters.speed,
         videoWidth = videoWidth,
         videoHeight = videoHeight,
+        videoBitrate = video?.bitrate?.takeIf { it > 0 } ?: 0,
+        audioBitrate = audio?.bitrate?.takeIf { it > 0 } ?: 0,
+        videoCodec = video?.sampleMimeType,
+        audioCodec = audio?.sampleMimeType,
     )
 }
 
