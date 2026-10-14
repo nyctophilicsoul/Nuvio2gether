@@ -423,7 +423,9 @@ private fun ExoPlayerSurface(
         val trackSelector = DefaultTrackSelector(context).apply {
             var parameters = buildUponParameters()
                 .setAllowInvalidateSelectionsOnRendererCapabilitiesChange(true)
-            if (playerSettings.tunnelingEnabled) {
+            // Match Nuvio TV: tunneling cannot be combined with the preferred app/FFmpeg
+            // decoder path (decoder priority 2); that combination can stall playback at startup.
+            if (playerSettings.tunnelingEnabled && playerSettings.decoderPriority != 2) {
                 parameters = parameters.setTunnelingEnabled(true)
             }
             val captioningManager = context.getSystemService(Context.CAPTIONING_SERVICE)
