@@ -71,6 +71,7 @@ import com.nuvio.app.features.player.localizedLabel
 import com.nuvio.app.features.player.IosTargetPrimaries
 import com.nuvio.app.features.player.IosTargetTransfer
 import com.nuvio.app.features.player.PlayerSettingsRepository
+import com.nuvio.app.features.player.LocalFilePlaybackBridge
 import com.nuvio.app.features.player.STREAM_AUTO_PLAY_TIMEOUT_VALUES
 import com.nuvio.app.features.player.SubtitleBackgroundColorSwatches
 import com.nuvio.app.features.player.SubtitleColorSwatches
@@ -385,6 +386,61 @@ private fun PlaybackSettingsSection(
     Column(
         verticalArrangement = Arrangement.spacedBy(sectionSpacing),
     ) {
+        if (!isIos) {
+            SettingsSection(
+                title = stringResource(Res.string.settings_playback_section_local_files),
+                isTablet = isTablet,
+            ) {
+                SettingsGroup(isTablet = isTablet) {
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_playback_local_file_enabled),
+                        description = stringResource(Res.string.settings_playback_local_file_enabled_description),
+                        checked = autoPlayPlayerSettings.localFilePlaybackEnabled,
+                        isTablet = isTablet,
+                        onCheckedChange = PlayerSettingsRepository::setLocalFilePlaybackEnabled,
+                    )
+                    if (autoPlayPlayerSettings.localFilePlaybackEnabled) {
+                        SettingsGroupDivider(isTablet = isTablet)
+                        SettingsNavigationRow(
+                            title = stringResource(Res.string.settings_playback_open_local_file),
+                            description = stringResource(Res.string.settings_playback_open_local_file_description),
+                            isTablet = isTablet,
+                            onClick = LocalFilePlaybackBridge::requestOpenPicker,
+                        )
+                    }
+                }
+            }
+            SettingsSection(
+                title = stringResource(Res.string.settings_playback_section_av_delay),
+                isTablet = isTablet,
+            ) {
+                SettingsGroup(isTablet = isTablet) {
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_playback_av_delay_enabled),
+                        description = stringResource(Res.string.settings_playback_av_delay_enabled_description),
+                        checked = autoPlayPlayerSettings.audioVideoDelayEnabled,
+                        enabled = !autoPlayPlayerSettings.externalPlayerEnabled &&
+                            autoPlayPlayerSettings.androidPlaybackEngine != AndroidPlaybackEngine.Libmpv,
+                        isTablet = isTablet,
+                        onCheckedChange = PlayerSettingsRepository::setAudioVideoDelayEnabled,
+                    )
+                    if (autoPlayPlayerSettings.audioVideoDelayEnabled) {
+                        SettingsGroupDivider(isTablet = isTablet)
+                        SettingsSliderRow(
+                            title = stringResource(Res.string.settings_playback_av_delay_ms),
+                            value = autoPlayPlayerSettings.audioVideoDelayMs.coerceIn(-500, 500),
+                            valueText = { delayMs -> stringResource(Res.string.settings_playback_av_delay_value, delayMs) },
+                            valueRange = -500..500,
+                            step = 25,
+                            isTablet = isTablet,
+                            enabled = !autoPlayPlayerSettings.externalPlayerEnabled &&
+                                autoPlayPlayerSettings.androidPlaybackEngine != AndroidPlaybackEngine.Libmpv,
+                            onValueChange = PlayerSettingsRepository::setAudioVideoDelayMs,
+                        )
+                    }
+                }
+            }
+        }
         SettingsSection(
             title = stringResource(Res.string.settings_playback_section_player),
             isTablet = isTablet,
@@ -1046,7 +1102,13 @@ private fun PlaybackSettingsSection(
                             modifier = Modifier.padding(horizontal = if (isTablet) 20.dp else 16.dp, vertical = 4.dp),
                         )
                     }
-                    SettingsGroupDivider(isTablet = isTablet)
+                }
+            }
+            SettingsSection(
+                title = stringResource(Res.string.settings_playback_section_network),
+                isTablet = isTablet,
+            ) {
+                SettingsGroup(isTablet = isTablet) {
                     SettingsSwitchRow(
                         title = stringResource(Res.string.settings_playback_buffer_custom),
                         description = stringResource(Res.string.settings_playback_buffer_custom_description),
