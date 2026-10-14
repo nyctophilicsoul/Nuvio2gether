@@ -1118,6 +1118,8 @@ private fun PlaybackSettingsSection(
                         onCheckedChange = PlayerSettingsRepository::setBufferEngineEnabled,
                     )
                     if (autoPlayPlayerSettings.bufferEngineEnabled) {
+                        // The previous settings section has its own lambda scope.
+                        val nativeMemorySupported = isExoNativeMemorySupported()
                         val nativeBuffers = nativeMemorySupported && autoPlayPlayerSettings.exoNativeMemoryEnabled
                         val maxDurationSec = if (nativeBuffers) {
                             PlaybackBufferSettings.MAX_DURATION_SEC_NATIVE
