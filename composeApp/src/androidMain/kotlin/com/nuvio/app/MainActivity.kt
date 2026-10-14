@@ -1,6 +1,9 @@
 package com.nuvio.app
 
 import android.content.Intent
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.result.contract.ActivityResultContracts
 import android.content.res.Configuration
 import com.nuvio.app.features.autosync.AutoSyncPreferencesAndroid
 import android.os.Bundle
@@ -14,6 +17,7 @@ import com.nuvio.app.core.auth.AuthStorage
 import com.nuvio.app.core.network.ServerConfigurationStorage
 import com.nuvio.app.core.diagnostics.SentryInitializer
 import com.nuvio.app.core.deeplink.handleAppUrl
+import com.nuvio.app.features.player.LocalFilePlaybackBridge
 import com.nuvio.app.core.storage.PlatformLocalAccountDataCleaner
 import com.nuvio.app.core.sync.SyncClientIdentityStorage
 import com.nuvio.app.features.addons.AddonHttpClientProvider
@@ -75,6 +79,12 @@ import com.nuvio.app.features.watchprogress.WatchProgressStorage
 
 open class MainActivity : AppCompatActivity() {
     private var pipRemoteActionReceiver: PipRemoteActionReceiver? = null
+
+    private val openLocalVideo = registerForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        uri?.let(::openLocalDocument)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -149,6 +159,7 @@ open class MainActivity : AppCompatActivity() {
         EpisodeReleaseNotificationPlatform.initialize(applicationContext)
         EpisodeReleaseNotificationPlatform.bindActivity(this)
         handleIncomingAppIntent(intent)
+        handleIncomingLocalVideoIntent(intent)
 
         setContent {
             App()
@@ -159,6 +170,41 @@ open class MainActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleIncomingAppIntent(intent)
+        handleIncomingLocalVideoIntent(intent)
+    }
+
+    /** Entry point for an in-app Open local file action. */
+    fun chooseLocalVideo() {
+        openLocalVideo.launch(arrayOf("video/*"))
+    }
+
+    private fun handleIncomingLocalVideoIntent(intent: Intent?) {
+        if (intent == null) return
+        val uri = when (intent.action) {
+            Intent.ACTION_VIEW -> intent.data
+            Intent.ACTION_SEND -> intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+            else -> null
+        } ?: return
+        val mime = intent.type ?: contentResolver.getType(uri).orEmpty()
+        if (!mime.startsWith("video/") && !(uri.scheme == "content" && mime.isBlank())) return
+        openLocalDocument(uri)
+    }
+
+    private fun openLocalDocument(uri: Uri) {
+        val title = runCatching {
+            contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                ?.use { cursor ->
+                    val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (cursor.moveToFirst() && index >= 0) cursor.getString(index) else null
+                }
+        }.getOrNull()?.takeIf { it.isNotBlank() }
+            ?: uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
+            ?: "Local video"
+
+        runCatching {
+            contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        LocalFilePlaybackBridge.requestPlayback(uri.toString(), title)
     }
 
     override fun onUserLeaveHint() {
