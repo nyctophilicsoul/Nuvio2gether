@@ -36,8 +36,6 @@ import kotlinx.coroutines.launch
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.gestures.scrollBy
-import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
