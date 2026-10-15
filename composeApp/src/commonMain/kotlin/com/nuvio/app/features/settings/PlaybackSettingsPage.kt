@@ -163,6 +163,7 @@ private fun p2pProfileLabel(profile: P2pTorrentProfile): String = when (profile)
     P2pTorrentProfile.FAST -> stringResource(Res.string.settings_p2p_profile_fast)
 }
 
+@Composable
 private fun p2pCacheSizeLabel(size: P2pCacheSize): String = when (size) {
     P2pCacheSize.NONE -> stringResource(Res.string.settings_p2p_cache_none)
     P2pCacheSize.GB_2 -> stringResource(Res.string.settings_p2p_cache_2_gb)
