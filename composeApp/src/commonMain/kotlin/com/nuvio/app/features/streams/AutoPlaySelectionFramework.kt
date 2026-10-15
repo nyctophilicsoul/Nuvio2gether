@@ -48,9 +48,13 @@ object AutoPlaySelectionFramework {
         candidates: List<AutoPlaySourceCandidate<T>>,
         target: AutoPlayTargetQuality,
     ): List<AutoPlaySourceCandidate<T>> {
-        if (candidates.size < 2) return candidates
+        if (candidates.size < 2) {
+            return candidates.filter { it.qualityHeight == null || it.qualityHeight <= target.height }
+        }
         val targetHeight = target.height
-        return candidates.withIndex()
+        return candidates
+            .filter { it.qualityHeight == null || it.qualityHeight <= targetHeight }
+            .withIndex()
             .sortedWith(
                 compareBy<IndexedValue<AutoPlaySourceCandidate<T>>> { indexed ->
                     val height = indexed.value.qualityHeight
