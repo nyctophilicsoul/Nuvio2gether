@@ -215,7 +215,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
                             scrubbingPositionMs = null
                             controlsVisible = !playerControlsLocked
                             removeFailedStreamFromCache()
-                            if (args.onPlaybackFailure?.invoke(playbackSnapshot.positionMs) == true) {
+                            if (playerSettingsUiState.streamAutoPlaySmartSelectionEnabled && args.onPlaybackFailure?.invoke(playbackSnapshot.positionMs) == true) {
                                 return@PlatformPlayerSurface
                             }
                         }
