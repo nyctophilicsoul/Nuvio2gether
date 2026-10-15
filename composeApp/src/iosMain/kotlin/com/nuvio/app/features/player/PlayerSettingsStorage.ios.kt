@@ -164,6 +164,7 @@ actual object PlayerSettingsStorage {
         streamAutoPlayFallbackTimeoutSecondsKey,
         streamAutoPlaySourceKey,
         streamAutoPlaySelectedAddonsKey,
+        streamAutoPlayProviderPriorityOrderKey,
         streamAutoPlayPreferredAddonKey,
         streamAutoPlayPreferredQualityKey,
         streamAutoPlaySelectedPluginsKey,
