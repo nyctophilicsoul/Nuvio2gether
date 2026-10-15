@@ -24,6 +24,21 @@ data class AutoPlaySourceCandidate<T>(
     val providerOrder: Int = 0,
 )
 
+enum class AutoPlayQualityTier(val label: String, val height: Int?) {
+    P2160("4K · 2160p", 2160),
+    P1440("2K · 1440p", 1440),
+    P1080("1080p", 1080),
+    P720("720p", 720),
+    LOWER("Lower quality", null),
+}
+
+data class AutoPlayQualityOption<T>(
+    val tier: AutoPlayQualityTier,
+    val sources: List<T>,
+) {
+    val count: Int get() = sources.size
+}
+
 object AutoPlaySelectionFramework {
     private val qualityMarkers = listOf(
         Regex("""(?i)(?:\b4320p?\b|\b8k\b)""") to 4320,
@@ -74,6 +89,29 @@ object AutoPlaySelectionFramework {
             }
         }
         return AutoPlayQualityCounts(qhd1440, fullHd1080, hd720, lower)
+    }
+
+    /**
+     * Builds quality-picker options from the latest stream snapshot. Call again whenever
+     * addon/plugin results change; counts are derived from real candidate streams, not estimates.
+     * Unknown-quality streams are grouped under Lower quality rather than mislabelled as 720p.
+     */
+    fun <T> qualityOptions(
+        candidates: List<AutoPlaySourceCandidate<T>>,
+    ): List<AutoPlayQualityOption<T>> {
+        val tiered = candidates.groupBy { candidate ->
+            when (candidate.qualityHeight) {
+                2160, 4320 -> AutoPlayQualityTier.P2160
+                1440 -> AutoPlayQualityTier.P1440
+                1080 -> AutoPlayQualityTier.P1080
+                720 -> AutoPlayQualityTier.P720
+                else -> AutoPlayQualityTier.LOWER
+            }
+        }
+        return AutoPlayQualityTier.entries.mapNotNull { tier ->
+            val sources = tiered[tier].orEmpty().map { it.value }
+            if (sources.isEmpty()) null else AutoPlayQualityOption(tier, sources)
+        }
     }
 
     /** Detects quality from provider-supplied metadata only; it never guesses from URL size. */
