@@ -53,6 +53,7 @@ object StreamAutoPlaySelector {
         activeResolverProviderId: String? = null,
         preferredAddonName: String = "",
         preferredQuality: StreamAutoPlayPreferredQuality = StreamAutoPlayPreferredQuality.ANY,
+        providerPriorityOrder: List<String> = emptyList(),
     ): StreamItem? =
         evaluateAutoPlayStream(
             streams = streams,
@@ -69,6 +70,7 @@ object StreamAutoPlaySelector {
             activeResolverProviderId = activeResolverProviderId,
             preferredAddonName = preferredAddonName,
             preferredQuality = preferredQuality,
+            providerPriorityOrder = providerPriorityOrder,
         ).stream
 
     fun evaluateAutoPlayStream(
@@ -86,6 +88,7 @@ object StreamAutoPlaySelector {
         activeResolverProviderId: String? = null,
         preferredAddonName: String = "",
         preferredQuality: StreamAutoPlayPreferredQuality = StreamAutoPlayPreferredQuality.ANY,
+        providerPriorityOrder: List<String> = emptyList(),
     ): StreamAutoPlayEvaluation {
         if (streams.isEmpty()) return StreamAutoPlayEvaluation()
 
@@ -94,7 +97,7 @@ object StreamAutoPlaySelector {
             StreamAutoPlaySource.INSTALLED_ADDONS_ONLY -> streams.filter { it.serverTarget != null || it.addonName in installedAddonNames }
             StreamAutoPlaySource.ENABLED_PLUGINS_ONLY -> streams.filter { it.addonName !in installedAddonNames }
         }
-        val candidateStreams = sourceScopedStreams.filter { stream ->
+        val filteredCandidateStreams = sourceScopedStreams.filter { stream ->
             val isAddonStream = stream.addonName in installedAddonNames
             if (stream.serverTarget != null) {
                 true
@@ -104,6 +107,14 @@ object StreamAutoPlaySelector {
                 selectedPlugins.isEmpty() || stream.addonName in selectedPlugins
             }
         }
+        val candidateStreams = AutoPlaySelectionFramework.orderProvidersByPriority(
+            providers = filteredCandidateStreams,
+            providerId = { stream ->
+                if (stream.addonName in installedAddonNames) "addon:${stream.addonName}" else "plugin:${stream.addonName}"
+            },
+            priorityOrder = providerPriorityOrder,
+            isDirectDebrid = { stream -> stream.serverTarget != null || (stream.isAddonDebridCandidate && stream.isDirectDebridStream) },
+        )
         if (candidateStreams.isEmpty()) return StreamAutoPlayEvaluation()
         if (mode == StreamAutoPlayMode.MANUAL && !bingeGroupOnly) {
             return StreamAutoPlayEvaluation()
