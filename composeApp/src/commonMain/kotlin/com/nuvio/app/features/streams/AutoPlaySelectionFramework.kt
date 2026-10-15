@@ -35,6 +35,46 @@ object AutoPlaySelectionFramework {
         Regex("""(?i)\b360p?\b""") to 360,
     )
 
+    /**
+     * Sort provider groups by an explicit user-defined priority order.
+     * Providers omitted from the priority list remain after configured providers and
+     * keep their incoming order. Direct debrid entries retain their special first tier.
+     */
+    fun <T> orderProvidersByPriority(
+        providers: List<T>,
+        providerId: (T) -> String,
+        priorityOrder: List<String>,
+        isDirectDebrid: (T) -> Boolean = { false },
+    ): List<T> {
+        if (providers.size < 2 || priorityOrder.isEmpty()) return providers
+        val ranks = priorityOrder.withIndex().associate { it.value to it.index }
+        return providers.withIndex().sortedWith(
+            compareBy<IndexedValue<T>> { if (isDirectDebrid(it.value)) 0 else 1 }
+                .thenBy { ranks[providerId(it.value)]?.plus(1) ?: Int.MAX_VALUE }
+                .thenBy { it.index },
+        ).map { it.value }
+    }
+
+    /** Recalculates quality counts from the current stream snapshot, so late addon results update the picker. */
+    fun countAvailableQualities(
+        candidates: List<AutoPlaySourceCandidate<*>>,
+    ): AutoPlayQualityCounts {
+        var qhd1440 = 0
+        var fullHd1080 = 0
+        var hd720 = 0
+        var lower = 0
+        candidates.forEach { candidate ->
+            when (candidate.qualityHeight) {
+                4320, 2160, 1440 -> qhd1440++
+                1080 -> fullHd1080++
+                720 -> hd720++
+                null, in 1..719 -> lower++
+                else -> Unit
+            }
+        }
+        return AutoPlayQualityCounts(qhd1440, fullHd1080, hd720, lower)
+    }
+
     /** Detects quality from provider-supplied metadata only; it never guesses from URL size. */
     fun detectQualityHeight(metadata: String): Int? =
         qualityMarkers.firstOrNull { (regex, _) -> regex.containsMatchIn(metadata) }?.second
