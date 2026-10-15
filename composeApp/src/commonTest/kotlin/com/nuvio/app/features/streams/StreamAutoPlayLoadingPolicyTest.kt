@@ -51,6 +51,17 @@ class StreamAutoPlayLoadingPolicyTest {
     }
 
     @Test
+    fun `smart stream selection starts loading even when legacy mode is manual`() {
+        val settings = PlayerSettingsUiState(streamAutoPlaySmartSelectionEnabled = true)
+        assertTrue(StreamsUiState().shouldShowAutoPlayLoading("new", settings, false))
+        assertFalse(StreamsUiState().shouldUseLandscapeAutoPlayLoading("new", settings, false))
+        assertTrue(
+            StreamsUiState(requestToken = "new", autoPlayDecided = true, isDirectAutoPlayFlow = true, showDirectAutoPlayOverlay = true)
+                .shouldUseLandscapeAutoPlayLoading("new", settings, false),
+        )
+    }
+
+    @Test
     fun `last link reuse starts with loading even in manual mode`() {
         assertTrue(
             StreamsUiState().shouldShowAutoPlayLoading(
