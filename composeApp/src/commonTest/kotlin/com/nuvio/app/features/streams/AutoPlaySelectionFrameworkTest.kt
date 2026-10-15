@@ -117,6 +117,45 @@ class AutoPlaySelectionFrameworkTest {
     }
 
     @Test
+    fun `provider priority is respected and unspecified providers remain stable`() {
+        data class Provider(val id: String, val direct: Boolean = false)
+        val providers = listOf(
+            Provider("plugin-b"),
+            Provider("addon-a"),
+            Provider("plugin-a"),
+            Provider("debrid", direct = true),
+        )
+
+        val ordered = AutoPlaySelectionFramework.orderProvidersByPriority(
+            providers = providers,
+            providerId = { it.id },
+            priorityOrder = listOf("plugin-a", "addon-a"),
+            isDirectDebrid = { it.direct },
+        )
+
+        assertEquals(listOf("debrid", "plugin-a", "addon-a", "plugin-b"), ordered.map { it.id })
+    }
+
+    @Test
+    fun `quality counts reflect only matching 2k 1080p and 720p metadata`() {
+        val candidates = listOf(
+            candidate("2k-a", 1440, 0),
+            candidate("2k-b", 1440, 1),
+            candidate("1080p", 1080, 2),
+            candidate("720p", 720, 3),
+            candidate("4k", 2160, 4),
+            candidate("unknown", null, 5),
+        )
+
+        val counts = AutoPlaySelectionFramework.countAvailableQualities(candidates)
+
+        assertEquals(2, counts.qhd1440)
+        assertEquals(1, counts.fullHd1080)
+        assertEquals(1, counts.hd720)
+        assertEquals(1, counts.lower)
+    }
+
+    @Test
     fun `empty candidate list stays empty`() {
         assertEquals(
             emptyList(),
