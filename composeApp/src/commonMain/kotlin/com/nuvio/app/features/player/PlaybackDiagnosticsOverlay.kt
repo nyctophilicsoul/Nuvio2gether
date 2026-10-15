@@ -43,7 +43,7 @@ internal fun PlaybackDiagnosticsOverlay(
         )
         DiagnosticLine("engine", snapshot.videoCodec ?: "video pending")
         DiagnosticLine("audio", snapshot.audioCodec ?: "audio pending")
-        DiagnosticLine("speed", "${${(snapshot.playbackSpeed * 100).roundToInt() / 100f}}×")
+        DiagnosticLine("speed", "${(snapshot.playbackSpeed * 100).roundToInt() / 100f}×")
         DiagnosticLine("buffer", "${bufferAheadMs / 1000.0} s")
         DiagnosticLine(
             "resolution",
