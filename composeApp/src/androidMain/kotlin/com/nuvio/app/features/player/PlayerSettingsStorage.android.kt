@@ -75,6 +75,8 @@ actual object PlayerSettingsStorage {
     private const val backBufferDurationMsKey = "back_buffer_duration_ms"
     private const val targetBufferSizeMbKey = "target_buffer_size_mb"
     private const val streamAutoPlayModeKey = "stream_auto_play_mode"
+    private const val streamAutoPlaySmartSelectionEnabledKey = "stream_auto_play_smart_selection_enabled"
+    private const val streamAutoPlayFallbackTimeoutSecondsKey = "stream_auto_play_fallback_timeout_seconds"
     private const val streamAutoPlaySourceKey = "stream_auto_play_source"
     private const val streamAutoPlaySelectedAddonsKey = "stream_auto_play_selected_addons"
     private const val streamAutoPlayPreferredAddonKey = "stream_auto_play_preferred_addon"
@@ -155,6 +157,8 @@ actual object PlayerSettingsStorage {
         mapDV7ToHevcKey,
         tunnelingEnabledKey,
         streamAutoPlayModeKey,
+        streamAutoPlaySmartSelectionEnabledKey,
+        streamAutoPlayFallbackTimeoutSecondsKey,
         streamAutoPlaySourceKey,
         streamAutoPlaySelectedAddonsKey,
         streamAutoPlayPreferredAddonKey,
@@ -916,6 +920,20 @@ actual object PlayerSettingsStorage {
             ?.apply()
     }
 
+    actual fun loadStreamAutoPlaySmartSelectionEnabled(): Boolean? =
+        preferences?.getBoolean(ProfileScopedKey.of(streamAutoPlaySmartSelectionEnabledKey), false)
+
+    actual fun saveStreamAutoPlaySmartSelectionEnabled(enabled: Boolean) {
+        preferences?.edit()?.putBoolean(ProfileScopedKey.of(streamAutoPlaySmartSelectionEnabledKey), enabled)?.apply()
+    }
+
+    actual fun loadStreamAutoPlayFallbackTimeoutSeconds(): Int? =
+        preferences?.getInt(ProfileScopedKey.of(streamAutoPlayFallbackTimeoutSecondsKey), 20)
+
+    actual fun saveStreamAutoPlayFallbackTimeoutSeconds(seconds: Int) {
+        preferences?.edit()?.putInt(ProfileScopedKey.of(streamAutoPlayFallbackTimeoutSecondsKey), seconds.coerceIn(5, 120))?.apply()
+    }
+
     actual fun loadStreamAutoPlaySource(): String? =
         preferences?.getString(ProfileScopedKey.of(streamAutoPlaySourceKey), null)
 
@@ -1420,6 +1438,8 @@ actual object PlayerSettingsStorage {
         loadRememberAudioDelayPerDeviceEnabled()?.let { put(rememberAudioDelayPerDeviceEnabledKey, encodeSyncBoolean(it)) }
         loadShowPlaybackDiagnostics()?.let { put(showPlaybackDiagnosticsKey, encodeSyncBoolean(it)) }
         loadStreamAutoPlayMode()?.let { put(streamAutoPlayModeKey, encodeSyncString(it)) }
+        loadStreamAutoPlaySmartSelectionEnabled()?.let { put(streamAutoPlaySmartSelectionEnabledKey, encodeSyncBoolean(it)) }
+        loadStreamAutoPlayFallbackTimeoutSeconds()?.let { put(streamAutoPlayFallbackTimeoutSecondsKey, encodeSyncInt(it)) }
         loadStreamAutoPlaySource()?.let { put(streamAutoPlaySourceKey, encodeSyncString(it)) }
         loadStreamAutoPlaySelectedAddons()?.let { put(streamAutoPlaySelectedAddonsKey, encodeSyncStringSet(it)) }
         loadStreamAutoPlayPreferredAddon()?.let { put(streamAutoPlayPreferredAddonKey, encodeSyncString(it)) }
@@ -1505,6 +1525,8 @@ actual object PlayerSettingsStorage {
         payload.decodeSyncBoolean(rememberAudioDelayPerDeviceEnabledKey)?.let(::saveRememberAudioDelayPerDeviceEnabled)
         payload.decodeSyncBoolean(showPlaybackDiagnosticsKey)?.let(::saveShowPlaybackDiagnostics)
         payload.decodeSyncString(streamAutoPlayModeKey)?.let(::saveStreamAutoPlayMode)
+        payload.decodeSyncBoolean(streamAutoPlaySmartSelectionEnabledKey)?.let(::saveStreamAutoPlaySmartSelectionEnabled)
+        payload.decodeSyncInt(streamAutoPlayFallbackTimeoutSecondsKey)?.let(::saveStreamAutoPlayFallbackTimeoutSeconds)
         payload.decodeSyncString(streamAutoPlaySourceKey)?.let(::saveStreamAutoPlaySource)
         payload.decodeSyncStringSet(streamAutoPlaySelectedAddonsKey)?.let(::saveStreamAutoPlaySelectedAddons)
         payload.decodeSyncString(streamAutoPlayPreferredAddonKey)?.let(::saveStreamAutoPlayPreferredAddon)

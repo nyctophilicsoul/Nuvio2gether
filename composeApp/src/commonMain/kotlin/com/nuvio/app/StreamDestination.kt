@@ -518,7 +518,9 @@ internal fun StreamDestination(
             autoPlayFallbacks = streamsUiState.autoPlayCandidates
                 .drop(1)
                 .filter { it.playableDirectUrl != null && it.playableDirectUrl != sourceUrl }
-                .distinctBy { it.playableDirectUrl },
+                .distinctBy { it.playableDirectUrl }
+                .takeIf { playerSettings.streamAutoPlaySmartSelectionEnabled }
+                .orEmpty(),
         )
         if (playerSettings.externalPlayerEnabled && stream.serverTarget == null) {
             openExternalPlayback(playerLaunch)

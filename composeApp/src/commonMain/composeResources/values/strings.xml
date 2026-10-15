@@ -520,6 +520,7 @@
     <string name="settings_appearance_section_detail_page">DETAIL PAGE</string>
     <string name="compose_settings_page_notifications">Notifications</string>
     <string name="compose_settings_page_playback">Playback</string>
+    <string name="compose_settings_page_nuvio2gether">Nuvio2gether</string>
     <string name="compose_settings_page_plugins">Plugins</string>
     <string name="compose_settings_page_poster_customization">Poster Card Style</string>
     <string name="compose_settings_page_privacy_policy">Privacy Policy</string>
@@ -738,6 +739,16 @@
     <string name="settings_homescreen_visible">Visible</string>
     <string name="settings_hide_secret">Hide value</string>
     <string name="settings_playback_subtitle">Player, subtitles, and auto-play</string>
+    <string name="compose_settings_nuvio2gether_description">Smart stream selection and fallback behavior</string>
+    <string name="settings_nuvio2gether_smart_selection">Smart Stream Selection</string>
+    <string name="settings_nuvio2gether_smart_selection_description">Automatically choose a stream using your preferences and try another candidate if playback fails or never starts.</string>
+    <string name="settings_nuvio2gether_favourite_addon">Favourite stream add-on</string>
+    <string name="settings_nuvio2gether_favourite_addon_none">No favourite selected</string>
+    <string name="settings_nuvio2gether_preferred_quality">Preferred quality</string>
+    <string name="settings_nuvio2gether_fallback_timeout">Playback start timeout</string>
+    <string name="settings_nuvio2gether_fallback_timeout_description">Wait this long for the selected stream to start before trying the next candidate.</string>
+    <string name="settings_nuvio2gether_seconds">%1$d seconds</string>
+    <string name="settings_nuvio2gether_addon_picker_title">Choose favourite add-on</string>
     <string name="settings_card_depth_title">CARD DEPTH EFFECT</string>
     <string name="settings_card_depth_description">Adds a lit top edge and a soft sheen to image cards for a subtle sense of depth.</string>
     <string name="settings_card_depth_enabled">Enable depth effect</string>

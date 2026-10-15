@@ -25,6 +25,7 @@ import nuvio.composeapp.generated.resources.compose_settings_page_media_server
 import nuvio.composeapp.generated.resources.compose_settings_page_media_servers
 import nuvio.composeapp.generated.resources.compose_settings_page_meta_screen
 import nuvio.composeapp.generated.resources.compose_settings_page_notifications
+import nuvio.composeapp.generated.resources.compose_settings_page_nuvio2gether
 import nuvio.composeapp.generated.resources.compose_settings_page_playback
 import nuvio.composeapp.generated.resources.compose_settings_page_plugins
 import nuvio.composeapp.generated.resources.compose_settings_page_poster_customization
@@ -74,6 +75,11 @@ internal enum class SettingsPage(
     ),
     Playback(
         titleRes = Res.string.compose_settings_page_playback,
+        category = SettingsCategory.General,
+        parentPage = Root,
+    ),
+    Nuvio2gether(
+        titleRes = Res.string.compose_settings_page_nuvio2gether,
         category = SettingsCategory.General,
         parentPage = Root,
     ),

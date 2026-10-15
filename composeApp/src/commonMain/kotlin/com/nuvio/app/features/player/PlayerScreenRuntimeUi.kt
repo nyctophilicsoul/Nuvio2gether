@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -24,12 +25,23 @@ import com.nuvio.app.features.player.skip.internalSkipAction
 import com.nuvio.app.features.servers.ServerStreams
 import com.nuvio.app.features.streams.streamAddonInstanceId
 import com.nuvio.app.isIos
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 
 @Composable
 internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
     val runtime = this
+    val fallbackTimeoutAttempted = remember(args.launchId) { mutableStateOf(false) }
+    LaunchedEffect(args.launchId, playerSettingsUiState.streamAutoPlaySmartSelectionEnabled, playerSettingsUiState.streamAutoPlayFallbackTimeoutSeconds, activePlaybackKey) {
+        val timeoutSeconds = playerSettingsUiState.streamAutoPlayFallbackTimeoutSeconds
+        if (!playerSettingsUiState.streamAutoPlaySmartSelectionEnabled || args.onPlaybackFailure == null || initialLoadCompleted || timeoutSeconds !in 5..120) return@LaunchedEffect
+        delay(timeoutSeconds * 1_000L)
+        if (!initialLoadCompleted && !fallbackTimeoutAttempted.value) {
+            fallbackTimeoutAttempted.value = true
+            args.onPlaybackFailure?.invoke(playbackSnapshot.positionMs)
+        }
+    }
     val isInPip = rememberIsInPictureInPicture()
     val displayedPositionMs = scrubbingPositionMs ?: playbackSnapshot.positionMs
     val isEpisode = activeSeasonNumber != null && activeEpisodeNumber != null

@@ -78,6 +78,8 @@ data class PlayerSettingsUiState(
     val vodCacheSizeMode: VodCacheSizeMode = VodCacheSizeMode.AUTO,
     val vodCacheSizeMb: Int = VodCacheSizing.DEFAULT_SIZE_MB,
     val streamAutoPlayMode: StreamAutoPlayMode = StreamAutoPlayMode.MANUAL,
+    val streamAutoPlaySmartSelectionEnabled: Boolean = false,
+    val streamAutoPlayFallbackTimeoutSeconds: Int = 20,
     val streamAutoPlayPreferredAddon: String = "",
     val streamAutoPlayPreferredQuality: StreamAutoPlayPreferredQuality = StreamAutoPlayPreferredQuality.ANY,
     val streamAutoPlaySource: StreamAutoPlaySource = StreamAutoPlaySource.ALL_SOURCES,
@@ -167,6 +169,8 @@ object PlayerSettingsRepository {
     private var vodCacheSizeMode = VodCacheSizeMode.AUTO
     private var vodCacheSizeMb = VodCacheSizing.DEFAULT_SIZE_MB
     private var streamAutoPlayMode = StreamAutoPlayMode.MANUAL
+    private var streamAutoPlaySmartSelectionEnabled = false
+    private var streamAutoPlayFallbackTimeoutSeconds = 20
     private var streamAutoPlayPreferredAddon = ""
     private var streamAutoPlayPreferredQuality = StreamAutoPlayPreferredQuality.ANY
     private var streamAutoPlaySource = StreamAutoPlaySource.ALL_SOURCES
@@ -259,6 +263,8 @@ object PlayerSettingsRepository {
         vodCacheSizeMb = VodCacheSizing.DEFAULT_SIZE_MB
         applyExoPlayerNativeMemory(false)
         streamAutoPlayMode = StreamAutoPlayMode.MANUAL
+        streamAutoPlaySmartSelectionEnabled = false
+        streamAutoPlayFallbackTimeoutSeconds = 20
         streamAutoPlayPreferredAddon = ""
         streamAutoPlayPreferredQuality = StreamAutoPlayPreferredQuality.ANY
         streamAutoPlaySource = StreamAutoPlaySource.ALL_SOURCES
@@ -394,6 +400,8 @@ object PlayerSettingsRepository {
         streamAutoPlayMode = PlayerSettingsStorage.loadStreamAutoPlayMode()
             ?.let { runCatching { StreamAutoPlayMode.valueOf(it) }.getOrNull() }
             ?: StreamAutoPlayMode.MANUAL
+        streamAutoPlaySmartSelectionEnabled = PlayerSettingsStorage.loadStreamAutoPlaySmartSelectionEnabled() ?: false
+        streamAutoPlayFallbackTimeoutSeconds = (PlayerSettingsStorage.loadStreamAutoPlayFallbackTimeoutSeconds() ?: 20).coerceIn(5, 120)
         streamAutoPlaySource = PlayerSettingsStorage.loadStreamAutoPlaySource()
             ?.let { runCatching { StreamAutoPlaySource.valueOf(it) }.getOrNull() }
             ?: StreamAutoPlaySource.ALL_SOURCES
@@ -878,6 +886,23 @@ object PlayerSettingsRepository {
         PlayerSettingsStorage.saveVodCacheSizeMb(coerced)
     }
 
+    fun setStreamAutoPlaySmartSelectionEnabled(enabled: Boolean) {
+        ensureLoaded()
+        if (streamAutoPlaySmartSelectionEnabled == enabled) return
+        streamAutoPlaySmartSelectionEnabled = enabled
+        publish()
+        PlayerSettingsStorage.saveStreamAutoPlaySmartSelectionEnabled(enabled)
+    }
+
+    fun setStreamAutoPlayFallbackTimeoutSeconds(seconds: Int) {
+        ensureLoaded()
+        val value = seconds.coerceIn(5, 120)
+        if (streamAutoPlayFallbackTimeoutSeconds == value) return
+        streamAutoPlayFallbackTimeoutSeconds = value
+        publish()
+        PlayerSettingsStorage.saveStreamAutoPlayFallbackTimeoutSeconds(value)
+    }
+
     fun setStreamAutoPlayMode(mode: StreamAutoPlayMode) {
         ensureLoaded()
         if (streamAutoPlayMode == mode) return
@@ -1285,6 +1310,8 @@ object PlayerSettingsRepository {
             vodCacheSizeMode = vodCacheSizeMode,
             vodCacheSizeMb = vodCacheSizeMb,
             streamAutoPlayMode = streamAutoPlayMode,
+            streamAutoPlaySmartSelectionEnabled = streamAutoPlaySmartSelectionEnabled,
+            streamAutoPlayFallbackTimeoutSeconds = streamAutoPlayFallbackTimeoutSeconds,
             streamAutoPlayPreferredAddon = streamAutoPlayPreferredAddon,
             streamAutoPlayPreferredQuality = streamAutoPlayPreferredQuality,
             streamAutoPlaySource = streamAutoPlaySource,

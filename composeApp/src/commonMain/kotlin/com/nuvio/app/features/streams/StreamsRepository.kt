@@ -107,7 +107,10 @@ object StreamsRepository {
         val playerSettings = PlayerSettingsRepository.uiState.value
         val debridSettings = DebridSettingsRepository.snapshot()
         val streamBadgeRules = StreamBadgeSettingsRepository.snapshot()
-        val autoPlayMode = playerSettings.streamAutoPlayMode
+        val configuredAutoPlayMode = playerSettings.streamAutoPlayMode
+        val autoPlayMode = if (playerSettings.streamAutoPlaySmartSelectionEnabled && configuredAutoPlayMode == StreamAutoPlayMode.MANUAL) {
+            StreamAutoPlayMode.FIRST_STREAM
+        } else configuredAutoPlayMode
         val isAutoPlayEnabled = !manualSelection && autoPlayMode != StreamAutoPlayMode.MANUAL &&
             !(autoPlayMode == StreamAutoPlayMode.REGEX_MATCH &&
                 !StreamAutoPlayPolicy.isRegexSelectionConfigured(playerSettings.streamAutoPlayRegex))
@@ -265,8 +268,8 @@ object StreamsRepository {
                     bingeGroupOnly = bingeGroupOnly,
                     debridEnabled = debridSettings.canResolvePlayableLinks,
                     activeResolverProviderId = debridSettings.activeResolverProviderId,
-                    preferredAddonName = playerSettings.streamAutoPlayPreferredAddon,
-                    preferredQuality = playerSettings.streamAutoPlayPreferredQuality,
+                    preferredAddonName = playerSettings.streamAutoPlayPreferredAddon.takeIf { playerSettings.streamAutoPlaySmartSelectionEnabled }.orEmpty(),
+                    preferredQuality = if (playerSettings.streamAutoPlaySmartSelectionEnabled) playerSettings.streamAutoPlayPreferredQuality else com.nuvio.app.features.streams.StreamAutoPlayPreferredQuality.ANY,
                 )
 
             fun settleAutoPlay(evaluation: StreamAutoPlayEvaluation) {

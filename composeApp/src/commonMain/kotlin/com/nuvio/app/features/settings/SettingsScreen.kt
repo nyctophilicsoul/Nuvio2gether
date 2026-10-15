@@ -700,6 +700,7 @@ private fun MobileSettingsScreen(
                         settingsRootContent(
                             isTablet = false,
                             onPlaybackClick = { onPageChange(SettingsPage.Playback) },
+                            onNuvio2getherClick = { onPageChange(SettingsPage.Nuvio2gether) },
                             onAppearanceClick = { onPageChange(SettingsPage.Appearance) },
                             onAdvancedClick = { onPageChange(SettingsPage.Advanced) },
                             onNotificationsClick = { onPageChange(SettingsPage.Notifications) },
@@ -727,6 +728,7 @@ private fun MobileSettingsScreen(
                 SettingsPage.LicensesAttributions -> licensesAttributionsContent(
                     isTablet = false,
                 )
+                SettingsPage.Nuvio2gether -> nuvio2getherSettingsContent(isTablet = false)
                 SettingsPage.Playback -> playbackSettingsContent(
                     isTablet = false,
                     showLoadingOverlay = showLoadingOverlay,
@@ -1132,6 +1134,7 @@ private fun TabletSettingsScreen(
                             settingsRootContent(
                                 isTablet = true,
                                 onPlaybackClick = { openInlinePage(SettingsPage.Playback) },
+                                onNuvio2getherClick = { openInlinePage(SettingsPage.Nuvio2gether) },
                                 onAppearanceClick = { openInlinePage(SettingsPage.Appearance) },
                                 onAdvancedClick = { openInlinePage(SettingsPage.Advanced) },
                                 onNotificationsClick = { openInlinePage(SettingsPage.Notifications) },
@@ -1163,6 +1166,7 @@ private fun TabletSettingsScreen(
                     SettingsPage.LicensesAttributions -> licensesAttributionsContent(
                         isTablet = true,
                     )
+                    SettingsPage.Nuvio2gether -> nuvio2getherSettingsContent(isTablet = true)
                     SettingsPage.Playback -> playbackSettingsContent(
                         isTablet = true,
                         showLoadingOverlay = showLoadingOverlay,

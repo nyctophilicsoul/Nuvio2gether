@@ -37,6 +37,7 @@ import nuvio.composeapp.generated.resources.compose_settings_page_integrations
 import nuvio.composeapp.generated.resources.compose_settings_page_licenses_attributions
 import nuvio.composeapp.generated.resources.compose_settings_page_notifications
 import nuvio.composeapp.generated.resources.compose_settings_page_playback
+import nuvio.composeapp.generated.resources.compose_settings_page_nuvio2gether
 import nuvio.composeapp.generated.resources.compose_settings_page_privacy_policy
 import nuvio.composeapp.generated.resources.compose_settings_page_supporters_contributors
 import nuvio.composeapp.generated.resources.compose_settings_root_account_description
@@ -74,6 +75,7 @@ private const val PRIVACY_POLICY_URL = "https://nuvio.tv/privacy-policy"
 internal fun LazyListScope.settingsRootContent(
     isTablet: Boolean,
     onPlaybackClick: () -> Unit,
+    onNuvio2getherClick: () -> Unit,
     onAppearanceClick: () -> Unit,
     onAdvancedClick: () -> Unit,
     onNotificationsClick: () -> Unit,
@@ -173,6 +175,14 @@ internal fun LazyListScope.settingsRootContent(
                         icon = Icons.Rounded.PlayArrow,
                         isTablet = isTablet,
                         onClick = onPlaybackClick,
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.compose_settings_page_nuvio2gether),
+                        description = stringResource(Res.string.compose_settings_nuvio2gether_description),
+                        icon = Icons.Rounded.Tune,
+                        isTablet = isTablet,
+                        onClick = onNuvio2getherClick,
                     )
                     SettingsGroupDivider(isTablet = isTablet)
                     SettingsNavigationRow(
