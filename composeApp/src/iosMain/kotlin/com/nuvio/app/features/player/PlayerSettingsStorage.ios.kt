@@ -16,6 +16,8 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import platform.Foundation.NSUserDefaults
 
+actual fun isFrameRateMatchingSupported(): Boolean = false
+
 actual object PlayerSettingsStorage {
     private const val pendingExternalPlaybackKey = "pending_external_playback"
     private const val playbackBrightnessKey = "playback_brightness"
@@ -56,6 +58,8 @@ actual object PlayerSettingsStorage {
     private const val decoderPriorityKey = "decoder_priority"
     private const val mapDV7ToHevcKey = "map_dv7_to_hevc"
     private const val tunnelingEnabledKey = "tunneling_enabled"
+    private const val frameRateMatchingEnabledKey = "frame_rate_matching_enabled"
+    private const val skipSilenceEnabledKey = "skip_silence_enabled"
     private const val localFilePlaybackEnabledKey = "local_file_playback_enabled"
     private const val audioVideoDelayEnabledKey = "audio_video_delay_enabled"
     private const val audioVideoDelayMsKey = "audio_video_delay_ms"
@@ -662,6 +666,14 @@ actual object PlayerSettingsStorage {
     actual fun saveTunnelingEnabled(enabled: Boolean) {
         NSUserDefaults.standardUserDefaults.setBool(enabled, forKey = ProfileScopedKey.of(tunnelingEnabledKey))
     }
+
+    actual fun loadFrameRateMatchingEnabled(): Boolean? = loadBoolean(frameRateMatchingEnabledKey)
+
+    actual fun saveFrameRateMatchingEnabled(enabled: Boolean) = saveBoolean(frameRateMatchingEnabledKey, enabled)
+
+    actual fun loadSkipSilenceEnabled(): Boolean? = loadBoolean(skipSilenceEnabledKey)
+
+    actual fun saveSkipSilenceEnabled(enabled: Boolean) = saveBoolean(skipSilenceEnabledKey, enabled)
 
     actual fun loadLocalFilePlaybackEnabled(): Boolean? = loadBoolean(localFilePlaybackEnabledKey)
 

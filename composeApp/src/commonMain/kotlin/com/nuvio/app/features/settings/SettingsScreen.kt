@@ -700,6 +700,8 @@ private fun MobileSettingsScreen(
                         settingsRootContent(
                             isTablet = false,
                             onPlaybackClick = { onPageChange(SettingsPage.Playback) },
+                            onNuvio2getherClick = { onPageChange(SettingsPage.Nuvio2gether) },
+                            onNuvioEnhancedClick = { onPageChange(SettingsPage.NuvioEnhanced) },
                             onAppearanceClick = { onPageChange(SettingsPage.Appearance) },
                             onAdvancedClick = { onPageChange(SettingsPage.Advanced) },
                             onNotificationsClick = { onPageChange(SettingsPage.Notifications) },
@@ -854,6 +856,15 @@ private fun MobileSettingsScreen(
                     commentsEnabled = traktCommentsEnabled,
                     mdbListConnected = mdbListConnected,
                     onCommentsEnabledChange = TraktCommentsSettings::setEnabled,
+                ),
+                SettingsPage.Nuvio2gether -> nuvio2getherSettingsContent(
+                    isTablet = false,
+                    onPlaybackClick = { onPageChange(SettingsPage.Playback) },
+                )
+                SettingsPage.NuvioEnhanced -> nuvioEnhancedSettingsContent(
+                    isTablet = false,
+                    settings = playerSettingsUiState,
+                    onPlaybackClick = { onPageChange(SettingsPage.Playback) },
                 )
             }
         }
@@ -1132,6 +1143,8 @@ private fun TabletSettingsScreen(
                             settingsRootContent(
                                 isTablet = true,
                                 onPlaybackClick = { openInlinePage(SettingsPage.Playback) },
+                                onNuvio2getherClick = { openInlinePage(SettingsPage.Nuvio2gether) },
+                                onNuvioEnhancedClick = { openInlinePage(SettingsPage.NuvioEnhanced) },
                                 onAppearanceClick = { openInlinePage(SettingsPage.Appearance) },
                                 onAdvancedClick = { openInlinePage(SettingsPage.Advanced) },
                                 onNotificationsClick = { openInlinePage(SettingsPage.Notifications) },
@@ -1290,6 +1303,15 @@ private fun TabletSettingsScreen(
                         commentsEnabled = traktCommentsEnabled,
                         mdbListConnected = mdbListConnected,
                         onCommentsEnabledChange = TraktCommentsSettings::setEnabled,
+                    ),
+                    SettingsPage.Nuvio2gether -> nuvio2getherSettingsContent(
+                        isTablet = true,
+                        onPlaybackClick = { openInlinePage(SettingsPage.Playback) },
+                    )
+                    SettingsPage.NuvioEnhanced -> nuvioEnhancedSettingsContent(
+                        isTablet = true,
+                        settings = playerSettingsUiState,
+                        onPlaybackClick = { openInlinePage(SettingsPage.Playback) },
                     )
                 }
             }

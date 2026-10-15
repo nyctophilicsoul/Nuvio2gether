@@ -168,6 +168,16 @@ internal enum class SettingsPage(
         category = SettingsCategory.Account,
         parentPage = Root,
     ),
+    Nuvio2gether(
+        titleRes = Res.string.settings_nuvio2gether_title,
+        category = SettingsCategory.General,
+        parentPage = Root,
+    ),
+    NuvioEnhanced(
+        titleRes = Res.string.settings_nuvio_enhanced_title,
+        category = SettingsCategory.General,
+        parentPage = Root,
+    ),
 }
 
 internal val SettingsPage.opensInlineOnTablet: Boolean

@@ -57,6 +57,10 @@ import nuvio.composeapp.generated.resources.compose_settings_root_advanced_descr
 import nuvio.composeapp.generated.resources.compose_settings_root_advanced_section
 import nuvio.composeapp.generated.resources.compose_settings_page_content_discovery
 import nuvio.composeapp.generated.resources.compose_settings_page_tracking
+import nuvio.composeapp.generated.resources.settings_nuvio2gether_title
+import nuvio.composeapp.generated.resources.settings_nuvio2gether_description
+import nuvio.composeapp.generated.resources.settings_nuvio_enhanced_title
+import nuvio.composeapp.generated.resources.settings_nuvio_enhanced_description
 import nuvio.composeapp.generated.resources.settings_playback_subtitle
 import nuvio.composeapp.generated.resources.updates_debug_test_description
 import nuvio.composeapp.generated.resources.updates_debug_test_title
@@ -74,6 +78,8 @@ private const val PRIVACY_POLICY_URL = "https://nuvio.tv/privacy-policy"
 internal fun LazyListScope.settingsRootContent(
     isTablet: Boolean,
     onPlaybackClick: () -> Unit,
+    onNuvio2getherClick: () -> Unit,
+    onNuvioEnhancedClick: () -> Unit,
     onAppearanceClick: () -> Unit,
     onAdvancedClick: () -> Unit,
     onNotificationsClick: () -> Unit,
@@ -141,6 +147,32 @@ internal fun LazyListScope.settingsRootContent(
                     isTablet = isTablet,
                     onClick = WatchPartyManager::openJoinDialog,
                 )
+            }
+        }
+    }
+    if (showGeneralSection) {
+        item {
+            SettingsSection(
+                title = "Additional features",
+                isTablet = isTablet,
+            ) {
+                SettingsGroup(isTablet = isTablet) {
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_nuvio2gether_title),
+                        description = stringResource(Res.string.settings_nuvio2gether_description),
+                        icon = Icons.Rounded.Groups,
+                        isTablet = isTablet,
+                        onClick = onNuvio2getherClick,
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_nuvio_enhanced_title),
+                        description = stringResource(Res.string.settings_nuvio_enhanced_description),
+                        icon = Icons.Rounded.Tune,
+                        isTablet = isTablet,
+                        onClick = onNuvioEnhancedClick,
+                    )
+                }
             }
         }
     }
