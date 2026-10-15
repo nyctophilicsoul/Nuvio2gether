@@ -39,8 +39,10 @@ import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistAddCheckCircle
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TextButton
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -120,6 +122,8 @@ import com.nuvio.app.features.library.executeTrackingMembershipOperation
 import com.nuvio.app.features.library.showTrackingMembershipRewriteFeedback
 import com.nuvio.app.features.library.toLibraryItem
 import com.nuvio.app.features.player.PlayerSettingsRepository
+import com.nuvio.app.features.streams.StreamAutoPlayMode
+import com.nuvio.app.features.streams.StreamAutoPlayPreferredQuality
 import com.nuvio.app.features.shuffle.EpisodeShuffleRepository
 import com.nuvio.app.features.shuffle.EpisodeShuffleSheet
 import com.nuvio.app.features.shuffle.ShuffleSurface
@@ -189,6 +193,7 @@ fun MetaDetailsScreen(
     var shuffleVisit by remember(type, id, shuffleProfileId) { mutableStateOf(WatchProgressClock.nowEpochMs()) }
     var shuffleWasInactive by remember(type, id, shuffleProfileId) { mutableStateOf(false) }
     var showShuffle by remember(type, id, shuffleProfileId) { mutableStateOf(false) }
+    var showAutoPlayQualityPicker by remember(type, id, shuffleProfileId) { mutableStateOf(false) }
     ScreenActivityEffect(type, id, shuffleProfileId) { active ->
         if (active && shuffleWasInactive) shuffleVisit += 1
         shuffleWasInactive = !active
@@ -809,7 +814,7 @@ fun MetaDetailsScreen(
                         else -> playText
                     }
                 }
-                val onPrimaryPlayClick: () -> Unit = {
+                val launchPrimaryPlay: () -> Unit = {
                     when {
                         shufflePoolEmpty -> showShuffle = true
                         (meta.type == "series" || hasEpisodes) && seriesAction != null -> {
@@ -851,10 +856,17 @@ fun MetaDetailsScreen(
                         }
                     }
                 }
+                val onPrimaryPlayClick: () -> Unit = {
+                    if (shufflePoolEmpty) {
+                        showShuffle = true
+                    } else {
+                        showAutoPlayQualityPicker = true
+                    }
+                }
                 val manualPlayHandler = onPlayManually
                 val showManualPlayOption = manualPlayHandler != null && StreamAutoPlayPolicy.isEffectivelyEnabled(playerSettingsUiState)
                 val onPrimaryPlayLongClick: (() -> Unit)? = manualPlayHandler
-                    ?.takeIf { !shufflePoolEmpty && showManualPlayOption && playbackAvailability.canStream(meta.type, primaryVideoId) }
+                    ?.takeIf { !shufflePoolEmpty && playbackAvailability.canStream(meta.type, primaryVideoId) }
                     ?.let { manualPlay ->
                         {
                             when {
@@ -966,6 +978,43 @@ fun MetaDetailsScreen(
                         savedProgress?.lastPositionMs,
                     )
                 }
+                if (showAutoPlayQualityPicker) {
+                    AlertDialog(
+                        onDismissRequest = { showAutoPlayQualityPicker = false },
+                        title = { Text("Choose playback quality") },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("We'll try the selected quality first, then fall back to lower qualities if sources fail.")
+                                listOf(
+                                    StreamAutoPlayPreferredQuality.P2160 to "4K · 2160p",
+                                    StreamAutoPlayPreferredQuality.P1440 to "2K · 1440p",
+                                    StreamAutoPlayPreferredQuality.P1080 to "1080p",
+                                    StreamAutoPlayPreferredQuality.P720 to "720p",
+                                    StreamAutoPlayPreferredQuality.P480 to "480p",
+                                ).forEach { (quality, label) ->
+                                    TextButton(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        onClick = {
+                                            PlayerSettingsRepository.setStreamAutoPlayPreferredQuality(quality)
+                                            PlayerSettingsRepository.setStreamAutoPlayMode(StreamAutoPlayMode.FIRST_STREAM)
+                                            PlayerSettingsRepository.setStreamAutoPlaySmartSelectionEnabled(true)
+                                            showAutoPlayQualityPicker = false
+                                            launchPrimaryPlay()
+                                        },
+                                    ) {
+                                        Text(label, modifier = Modifier.fillMaxWidth())
+                                    }
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showAutoPlayQualityPicker = false }) {
+                                Text("Cancel")
+                            }
+                        },
+                    )
+                }
+
                 if (showShuffle && showShuffleButton) {
                     EpisodeShuffleSheet(
                         meta = meta,
