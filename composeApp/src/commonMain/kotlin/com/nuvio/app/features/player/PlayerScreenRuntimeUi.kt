@@ -33,11 +33,11 @@ import nuvio.composeapp.generated.resources.*
 internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
     val runtime = this
     val fallbackTimeoutAttempted = remember(args.launchId) { mutableStateOf(false) }
-    LaunchedEffect(args.launchId, playerSettingsUiState.streamAutoPlaySmartSelectionEnabled, playerSettingsUiState.streamAutoPlayFallbackTimeoutSeconds, activePlaybackKey) {
+    LaunchedEffect(args.launchId, playerSettingsUiState.streamAutoPlaySmartSelectionEnabled, playerSettingsUiState.streamAutoPlayFallbackTimeoutSeconds, activePlaybackKey, activeSourceUrl, errorMessage) {
         val timeoutSeconds = playerSettingsUiState.streamAutoPlayFallbackTimeoutSeconds
-        if (!playerSettingsUiState.streamAutoPlaySmartSelectionEnabled || args.onPlaybackFailure == null || initialLoadCompleted || timeoutSeconds !in 5..120) return@LaunchedEffect
+        if (!playerSettingsUiState.streamAutoPlaySmartSelectionEnabled || args.onPlaybackFailure == null || activeSourceUrl == null || initialLoadCompleted || errorMessage != null || timeoutSeconds !in 5..120) return@LaunchedEffect
         delay(timeoutSeconds * 1_000L)
-        if (!initialLoadCompleted && !fallbackTimeoutAttempted.value) {
+        if (!initialLoadCompleted && errorMessage == null && !fallbackTimeoutAttempted.value) {
             fallbackTimeoutAttempted.value = true
             args.onPlaybackFailure?.invoke(playbackSnapshot.positionMs)
         }

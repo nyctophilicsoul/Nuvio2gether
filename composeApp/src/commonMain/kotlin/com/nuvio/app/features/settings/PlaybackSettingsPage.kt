@@ -91,7 +91,6 @@ import com.nuvio.app.features.plugins.PluginsUiState
 import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.streams.StreamAutoPlayMode
 import com.nuvio.app.features.streams.StreamAutoPlaySource
-import com.nuvio.app.features.streams.StreamAutoPlayPreferredQuality
 import com.nuvio.app.isIos
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
@@ -161,17 +160,6 @@ private fun p2pProfileLabel(profile: P2pTorrentProfile): String = when (profile)
     P2pTorrentProfile.SOFT -> stringResource(Res.string.settings_p2p_profile_soft)
     P2pTorrentProfile.BALANCED -> stringResource(Res.string.settings_p2p_profile_balanced)
     P2pTorrentProfile.FAST -> stringResource(Res.string.settings_p2p_profile_fast)
-}
-
-@Composable
-private fun streamAutoPlayPreferredQualityLabel(quality: StreamAutoPlayPreferredQuality): String = when (quality) {
-    StreamAutoPlayPreferredQuality.ANY -> stringResource(Res.string.settings_playback_preferred_quality_any)
-    StreamAutoPlayPreferredQuality.P2160 -> stringResource(Res.string.settings_playback_preferred_quality_2160p)
-    StreamAutoPlayPreferredQuality.P1440 -> stringResource(Res.string.settings_playback_preferred_quality_1440p)
-    StreamAutoPlayPreferredQuality.P1080 -> stringResource(Res.string.settings_playback_preferred_quality_1080p)
-    StreamAutoPlayPreferredQuality.P720 -> stringResource(Res.string.settings_playback_preferred_quality_720p)
-    StreamAutoPlayPreferredQuality.P480 -> stringResource(Res.string.settings_playback_preferred_quality_480p)
-    StreamAutoPlayPreferredQuality.P360 -> stringResource(Res.string.settings_playback_preferred_quality_360p)
 }
 
 private fun p2pCacheSizeLabel(size: P2pCacheSize): String = when (size) {
@@ -362,8 +350,6 @@ private fun PlaybackSettingsSection(
     var showIosTargetTransferDialog by remember { mutableStateOf(false) }
     var showLibassRenderTypeDialog by remember { mutableStateOf(false) }
     var showAutoPlayModeDialog by remember { mutableStateOf(false) }
-    var showAutoPlayPreferredAddonDialog by remember { mutableStateOf(false) }
-    var showAutoPlayPreferredQualityDialog by remember { mutableStateOf(false) }
     var showAutoPlaySourceDialog by remember { mutableStateOf(false) }
     var showAutoPlayAddonSelectionDialog by remember { mutableStateOf(false) }
     var showAutoPlayPluginSelectionDialog by remember { mutableStateOf(false) }
@@ -919,20 +905,6 @@ private fun PlaybackSettingsSection(
                     description = stringResource(autoPlayPlayerSettings.streamAutoPlayMode.labelRes),
                     isTablet = isTablet,
                     onClick = { showAutoPlayModeDialog = true },
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.settings_playback_preferred_addon),
-                    description = if (autoPlayPlayerSettings.streamAutoPlayPreferredAddon.isBlank()) stringResource(Res.string.settings_playback_preferred_addon_none) else autoPlayPlayerSettings.streamAutoPlayPreferredAddon,
-                    isTablet = isTablet,
-                    onClick = { showAutoPlayPreferredAddonDialog = true },
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.settings_playback_preferred_quality),
-                    description = streamAutoPlayPreferredQualityLabel(autoPlayPlayerSettings.streamAutoPlayPreferredQuality),
-                    isTablet = isTablet,
-                    onClick = { showAutoPlayPreferredQualityDialog = true },
                 )
                 if (autoPlayPlayerSettings.streamAutoPlayMode == StreamAutoPlayMode.REGEX_MATCH) {
                     SettingsGroupDivider(isTablet = isTablet)
@@ -1994,38 +1966,6 @@ private fun PlaybackSettingsSection(
                 showLibassRenderTypeDialog = false
             },
             onDismiss = { showLibassRenderTypeDialog = false },
-        )
-    }
-
-    if (showAutoPlayPreferredAddonDialog) {
-        val addonNames = addonUiState.addons.enabledAddons()
-            .mapNotNull { it.manifest }
-            .filter { manifest -> manifest.resources.any { resource -> resource.name == "stream" } }
-            .map { it.name }.distinct().sorted()
-        IosEnumSelectionDialog(
-            title = stringResource(Res.string.settings_playback_preferred_addon),
-            options = listOf("") + addonNames,
-            selected = autoPlayPlayerSettings.streamAutoPlayPreferredAddon,
-            label = { value -> if (value.isBlank()) stringResource(Res.string.settings_playback_preferred_addon_none) else value },
-            onSelect = {
-                PlayerSettingsRepository.setStreamAutoPlayPreferredAddon(it)
-                showAutoPlayPreferredAddonDialog = false
-            },
-            onDismiss = { showAutoPlayPreferredAddonDialog = false },
-        )
-    }
-
-    if (showAutoPlayPreferredQualityDialog) {
-        IosEnumSelectionDialog(
-            title = stringResource(Res.string.settings_playback_preferred_quality),
-            options = StreamAutoPlayPreferredQuality.entries,
-            selected = autoPlayPlayerSettings.streamAutoPlayPreferredQuality,
-            label = { streamAutoPlayPreferredQualityLabel(it) },
-            onSelect = {
-                PlayerSettingsRepository.setStreamAutoPlayPreferredQuality(it)
-                showAutoPlayPreferredQualityDialog = false
-            },
-            onDismiss = { showAutoPlayPreferredQualityDialog = false },
         )
     }
 
