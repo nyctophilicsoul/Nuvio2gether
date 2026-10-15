@@ -5,6 +5,7 @@ import com.nuvio.app.features.player.skip.AutoSkipSegmentType
 import com.nuvio.app.features.player.skip.NextEpisodeThresholdMode
 import com.nuvio.app.features.streams.StreamAutoPlayMode
 import com.nuvio.app.features.streams.StreamAutoPlaySource
+import com.nuvio.app.features.streams.StreamAutoPlayPreferredQuality
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -77,6 +78,8 @@ data class PlayerSettingsUiState(
     val vodCacheSizeMode: VodCacheSizeMode = VodCacheSizeMode.AUTO,
     val vodCacheSizeMb: Int = VodCacheSizing.DEFAULT_SIZE_MB,
     val streamAutoPlayMode: StreamAutoPlayMode = StreamAutoPlayMode.MANUAL,
+    val streamAutoPlayPreferredAddon: String = "",
+    val streamAutoPlayPreferredQuality: StreamAutoPlayPreferredQuality = StreamAutoPlayPreferredQuality.ANY,
     val streamAutoPlaySource: StreamAutoPlaySource = StreamAutoPlaySource.ALL_SOURCES,
     val streamAutoPlaySelectedAddons: Set<String> = emptySet(),
     val streamAutoPlaySelectedPlugins: Set<String> = emptySet(),
@@ -164,6 +167,8 @@ object PlayerSettingsRepository {
     private var vodCacheSizeMode = VodCacheSizeMode.AUTO
     private var vodCacheSizeMb = VodCacheSizing.DEFAULT_SIZE_MB
     private var streamAutoPlayMode = StreamAutoPlayMode.MANUAL
+    private var streamAutoPlayPreferredAddon = ""
+    private var streamAutoPlayPreferredQuality = StreamAutoPlayPreferredQuality.ANY
     private var streamAutoPlaySource = StreamAutoPlaySource.ALL_SOURCES
     private var streamAutoPlaySelectedAddons: Set<String> = emptySet()
     private var streamAutoPlaySelectedPlugins: Set<String> = emptySet()
@@ -254,6 +259,8 @@ object PlayerSettingsRepository {
         vodCacheSizeMb = VodCacheSizing.DEFAULT_SIZE_MB
         applyExoPlayerNativeMemory(false)
         streamAutoPlayMode = StreamAutoPlayMode.MANUAL
+        streamAutoPlayPreferredAddon = ""
+        streamAutoPlayPreferredQuality = StreamAutoPlayPreferredQuality.ANY
         streamAutoPlaySource = StreamAutoPlaySource.ALL_SOURCES
         streamAutoPlaySelectedAddons = emptySet()
         streamAutoPlaySelectedPlugins = emptySet()
@@ -392,6 +399,10 @@ object PlayerSettingsRepository {
             ?: StreamAutoPlaySource.ALL_SOURCES
         streamAutoPlaySelectedAddons = PlayerSettingsStorage.loadStreamAutoPlaySelectedAddons() ?: emptySet()
         streamAutoPlaySelectedPlugins = PlayerSettingsStorage.loadStreamAutoPlaySelectedPlugins() ?: emptySet()
+        streamAutoPlayPreferredAddon = PlayerSettingsStorage.loadStreamAutoPlayPreferredAddon().orEmpty()
+        streamAutoPlayPreferredQuality = PlayerSettingsStorage.loadStreamAutoPlayPreferredQuality()
+            ?.let { runCatching { StreamAutoPlayPreferredQuality.valueOf(it) }.getOrNull() }
+            ?: StreamAutoPlayPreferredQuality.ANY
         if (!AppFeaturePolicy.pluginsEnabled) {
             val normalizedSource = normalizeStreamAutoPlaySource(streamAutoPlaySource)
             if (normalizedSource != streamAutoPlaySource) {
@@ -892,6 +903,23 @@ object PlayerSettingsRepository {
         PlayerSettingsStorage.saveStreamAutoPlaySelectedAddons(addons)
     }
 
+    fun setStreamAutoPlayPreferredAddon(addon: String) {
+        ensureLoaded()
+        val value = addon.trim()
+        if (streamAutoPlayPreferredAddon == value) return
+        streamAutoPlayPreferredAddon = value
+        publish()
+        PlayerSettingsStorage.saveStreamAutoPlayPreferredAddon(value)
+    }
+
+    fun setStreamAutoPlayPreferredQuality(quality: StreamAutoPlayPreferredQuality) {
+        ensureLoaded()
+        if (streamAutoPlayPreferredQuality == quality) return
+        streamAutoPlayPreferredQuality = quality
+        publish()
+        PlayerSettingsStorage.saveStreamAutoPlayPreferredQuality(quality.name)
+    }
+
     fun setStreamAutoPlaySelectedPlugins(plugins: Set<String>) {
         ensureLoaded()
         val normalizedPlugins = if (AppFeaturePolicy.pluginsEnabled) plugins else emptySet()
@@ -1257,6 +1285,8 @@ object PlayerSettingsRepository {
             vodCacheSizeMode = vodCacheSizeMode,
             vodCacheSizeMb = vodCacheSizeMb,
             streamAutoPlayMode = streamAutoPlayMode,
+            streamAutoPlayPreferredAddon = streamAutoPlayPreferredAddon,
+            streamAutoPlayPreferredQuality = streamAutoPlayPreferredQuality,
             streamAutoPlaySource = streamAutoPlaySource,
             streamAutoPlaySelectedAddons = streamAutoPlaySelectedAddons,
             streamAutoPlaySelectedPlugins = streamAutoPlaySelectedPlugins,

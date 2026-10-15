@@ -1,6 +1,7 @@
 package com.nuvio.app.features.streams
 
 import com.nuvio.app.core.build.AppFeaturePolicy
+import kotlin.math.abs
 
 object StreamAutoPlaySelector {
 
@@ -50,6 +51,8 @@ object StreamAutoPlaySelector {
         bingeGroupOnly: Boolean = false,
         debridEnabled: Boolean = true,
         activeResolverProviderId: String? = null,
+        preferredAddonName: String = "",
+        preferredQuality: StreamAutoPlayPreferredQuality = StreamAutoPlayPreferredQuality.ANY,
     ): StreamItem? =
         evaluateAutoPlayStream(
             streams = streams,
@@ -64,6 +67,8 @@ object StreamAutoPlaySelector {
             bingeGroupOnly = bingeGroupOnly,
             debridEnabled = debridEnabled,
             activeResolverProviderId = activeResolverProviderId,
+            preferredAddonName = preferredAddonName,
+            preferredQuality = preferredQuality,
         ).stream
 
     fun evaluateAutoPlayStream(
@@ -79,6 +84,8 @@ object StreamAutoPlaySelector {
         bingeGroupOnly: Boolean = false,
         debridEnabled: Boolean = true,
         activeResolverProviderId: String? = null,
+        preferredAddonName: String = "",
+        preferredQuality: StreamAutoPlayPreferredQuality = StreamAutoPlayPreferredQuality.ANY,
     ): StreamAutoPlayEvaluation {
         if (streams.isEmpty()) return StreamAutoPlayEvaluation()
 
@@ -178,11 +185,16 @@ object StreamAutoPlaySelector {
                 }
             }
         }
-        if (matchingStreams.isEmpty() && preferredStream == null) return StreamAutoPlayEvaluation()
+        val orderedMatchingStreams = prioritizeStreams(
+            streams = matchingStreams,
+            preferredAddonName = preferredAddonName,
+            preferredQuality = preferredQuality,
+        )
+        if (orderedMatchingStreams.isEmpty() && preferredStream == null) return StreamAutoPlayEvaluation()
 
         val readyStreams = buildList {
             preferredStream?.let(::add)
-            matchingStreams
+            orderedMatchingStreams
                 .filter { it.isAutoPlayable(debridEnabled, activeResolverProviderId) }
                 .filterNot { it == preferredStream }
                 .forEach(::add)
@@ -197,10 +209,70 @@ object StreamAutoPlaySelector {
 
         return StreamAutoPlayEvaluation(
             readyStreams = readyStreams,
-            hasPendingDebridCandidate = matchingStreams.any {
+            hasPendingDebridCandidate = orderedMatchingStreams.any {
                 it.isPendingDebridAutoPlay(debridEnabled, activeResolverProviderId)
             },
         )
+    }
+
+    private fun prioritizeStreams(
+        streams: List<StreamItem>,
+        preferredAddonName: String,
+        preferredQuality: StreamAutoPlayPreferredQuality,
+    ): List<StreamItem> {
+        if (streams.size < 2) return streams
+        val favourite = preferredAddonName.trim()
+        val targetHeight = preferredQuality.targetHeight
+        return streams.withIndex().sortedWith(
+            compareBy<IndexedValue<StreamItem>> { indexed ->
+                val stream = indexed.value
+                val height = stream.detectAutoPlayQualityHeight()
+                val isFavourite = favourite.isNotEmpty() && stream.addonName.equals(favourite, true)
+                if (targetHeight == null) {
+                    when {
+                        isFavourite && height != null -> 0
+                        isFavourite -> 1
+                        favourite.isEmpty() && height != null -> 0
+                        height != null -> 2
+                        favourite.isEmpty() -> 1
+                        else -> 3
+                    }
+                } else {
+                    when {
+                        height == targetHeight && isFavourite -> 0
+                        height == targetHeight -> 1
+                        height != null && isFavourite -> 2
+                        height != null -> 3
+                        isFavourite -> 4
+                        else -> 5
+                    }
+                }
+            }.thenBy { indexed ->
+                val height = indexed.value.detectAutoPlayQualityHeight()
+                when {
+                    height == null -> Int.MAX_VALUE
+                    targetHeight == null -> -height
+                    else -> abs(height - targetHeight) * 2 + if (height > targetHeight) 1 else 0
+                }
+            }.thenBy { it.index },
+        ).map { it.value }
+    }
+
+    private fun StreamItem.detectAutoPlayQualityHeight(): Int? {
+        val metadata = listOf(
+            name, title, description, url, behaviorHints.filename,
+            clientResolve?.parsed?.rawTitle, clientResolve?.parsed?.resolution, clientResolve?.parsed?.quality,
+        ).filterNotNull().joinToString(" ")
+        val markers = listOf(
+            Regex("""(?i)(?:\b4320p?\b|\b8k\b)""") to 4320,
+            Regex("""(?i)(?:\b2160p?\b|\b4k\b|\buhd\b)""") to 2160,
+            Regex("""(?i)\b1440p?\b""") to 1440,
+            Regex("""(?i)(?:\b1080p?\b|\bfhd\b|\bfull\s*hd\b)""") to 1080,
+            Regex("""(?i)(?:\b720p?\b|\bhd\b)""") to 720,
+            Regex("""(?i)\b480p?\b""") to 480,
+            Regex("""(?i)\b360p?\b""") to 360,
+        )
+        return markers.firstOrNull { (regex, _) -> regex.containsMatchIn(metadata) }?.second
     }
 
     private fun StreamItem.isAutoPlayable(

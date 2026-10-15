@@ -11,3 +11,7 @@ enum class StreamAutoPlaySource {
     INSTALLED_ADDONS_ONLY,
     ENABLED_PLUGINS_ONLY,
 }
+
+enum class StreamAutoPlayPreferredQuality(val targetHeight: Int?) {
+    ANY(null), P2160(2160), P1440(1440), P1080(1080), P720(720), P480(480), P360(360),
+}

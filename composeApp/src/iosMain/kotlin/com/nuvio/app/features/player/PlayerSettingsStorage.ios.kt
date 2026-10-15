@@ -75,6 +75,8 @@ actual object PlayerSettingsStorage {
     private const val streamAutoPlayModeKey = "stream_auto_play_mode"
     private const val streamAutoPlaySourceKey = "stream_auto_play_source"
     private const val streamAutoPlaySelectedAddonsKey = "stream_auto_play_selected_addons"
+    private const val streamAutoPlayPreferredAddonKey = "stream_auto_play_preferred_addon"
+    private const val streamAutoPlayPreferredQualityKey = "stream_auto_play_preferred_quality"
     private const val streamAutoPlaySelectedPluginsKey = "stream_auto_play_selected_plugins"
     private const val streamAutoPlayRegexKey = "stream_auto_play_regex"
     private const val streamAutoPlayTimeoutSecondsKey = "stream_auto_play_timeout_seconds"
@@ -153,6 +155,8 @@ actual object PlayerSettingsStorage {
         streamAutoPlayModeKey,
         streamAutoPlaySourceKey,
         streamAutoPlaySelectedAddonsKey,
+        streamAutoPlayPreferredAddonKey,
+        streamAutoPlayPreferredQualityKey,
         streamAutoPlaySelectedPluginsKey,
         streamAutoPlayRegexKey,
         streamAutoPlayTimeoutSecondsKey,
@@ -751,6 +755,20 @@ actual object PlayerSettingsStorage {
         NSUserDefaults.standardUserDefaults.setObject(source, forKey = ProfileScopedKey.of(streamAutoPlaySourceKey))
     }
 
+    actual fun loadStreamAutoPlayPreferredAddon(): String? =
+        NSUserDefaults.standardUserDefaults.stringForKey(ProfileScopedKey.of(streamAutoPlayPreferredAddonKey))
+
+    actual fun saveStreamAutoPlayPreferredAddon(addon: String) {
+        NSUserDefaults.standardUserDefaults.setObject(addon, forKey = ProfileScopedKey.of(streamAutoPlayPreferredAddonKey))
+    }
+
+    actual fun loadStreamAutoPlayPreferredQuality(): String? =
+        NSUserDefaults.standardUserDefaults.stringForKey(ProfileScopedKey.of(streamAutoPlayPreferredQualityKey))
+
+    actual fun saveStreamAutoPlayPreferredQuality(quality: String) {
+        NSUserDefaults.standardUserDefaults.setObject(quality, forKey = ProfileScopedKey.of(streamAutoPlayPreferredQualityKey))
+    }
+
     @Suppress("UNCHECKED_CAST")
     actual fun loadStreamAutoPlaySelectedAddons(): Set<String>? {
         val defaults = NSUserDefaults.standardUserDefaults
@@ -1146,6 +1164,8 @@ actual object PlayerSettingsStorage {
         loadStreamAutoPlayMode()?.let { put(streamAutoPlayModeKey, encodeSyncString(it)) }
         loadStreamAutoPlaySource()?.let { put(streamAutoPlaySourceKey, encodeSyncString(it)) }
         loadStreamAutoPlaySelectedAddons()?.let { put(streamAutoPlaySelectedAddonsKey, encodeSyncStringSet(it)) }
+        loadStreamAutoPlayPreferredAddon()?.let { put(streamAutoPlayPreferredAddonKey, encodeSyncString(it)) }
+        loadStreamAutoPlayPreferredQuality()?.let { put(streamAutoPlayPreferredQualityKey, encodeSyncString(it)) }
         loadStreamAutoPlaySelectedPlugins()?.let { put(streamAutoPlaySelectedPluginsKey, encodeSyncStringSet(it)) }
         loadStreamAutoPlayRegex()?.let { put(streamAutoPlayRegexKey, encodeSyncString(it)) }
         loadStreamAutoPlayTimeoutSeconds()?.let { put(streamAutoPlayTimeoutSecondsKey, encodeSyncInt(it)) }
@@ -1228,6 +1248,8 @@ actual object PlayerSettingsStorage {
         payload.decodeSyncString(streamAutoPlayModeKey)?.let(::saveStreamAutoPlayMode)
         payload.decodeSyncString(streamAutoPlaySourceKey)?.let(::saveStreamAutoPlaySource)
         payload.decodeSyncStringSet(streamAutoPlaySelectedAddonsKey)?.let(::saveStreamAutoPlaySelectedAddons)
+        payload.decodeSyncString(streamAutoPlayPreferredAddonKey)?.let(::saveStreamAutoPlayPreferredAddon)
+        payload.decodeSyncString(streamAutoPlayPreferredQualityKey)?.let(::saveStreamAutoPlayPreferredQuality)
         payload.decodeSyncStringSet(streamAutoPlaySelectedPluginsKey)?.let(::saveStreamAutoPlaySelectedPlugins)
         payload.decodeSyncString(streamAutoPlayRegexKey)?.let(::saveStreamAutoPlayRegex)
         payload.decodeSyncInt(streamAutoPlayTimeoutSecondsKey)?.let(::saveStreamAutoPlayTimeoutSeconds)

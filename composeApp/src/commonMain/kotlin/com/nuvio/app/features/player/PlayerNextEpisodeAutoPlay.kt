@@ -207,6 +207,8 @@ internal fun CoroutineScope.launchPlayerNextEpisodeAutoPlay(
                 bingeGroupOnly = bingeGroupOnlyManualMode,
                 debridEnabled = debridSettings.canResolvePlayableLinks,
                 activeResolverProviderId = debridSettings.activeResolverProviderId,
+                preferredAddonName = settings.streamAutoPlayPreferredAddon,
+                preferredQuality = settings.streamAutoPlayPreferredQuality,
             )
 
         fun tryBingeGroupOnly(streams: List<StreamItem>): StreamItem? {
@@ -224,6 +226,8 @@ internal fun CoroutineScope.launchPlayerNextEpisodeAutoPlay(
                 bingeGroupOnly = true,
                 debridEnabled = debridSettings.canResolvePlayableLinks,
                 activeResolverProviderId = debridSettings.activeResolverProviderId,
+                preferredAddonName = settings.streamAutoPlayPreferredAddon,
+                preferredQuality = settings.streamAutoPlayPreferredQuality,
             )
         }
 

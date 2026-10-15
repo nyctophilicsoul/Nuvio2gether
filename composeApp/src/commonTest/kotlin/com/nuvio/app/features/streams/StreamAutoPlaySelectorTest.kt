@@ -291,6 +291,34 @@ class StreamAutoPlaySelectorTest {
         assertEquals(stream, selected)
     }
 
+    @Test
+    fun `preferred quality from another addon beats a lower-quality favourite result`() {
+        val fav720 = stream(addonName = "Favourite", url = "https://example.com/fav-720.mp4", name = "Episode 720p")
+        val other1080 = stream(addonName = "Other", url = "https://example.com/other-1080.mp4", name = "Episode 1080p")
+        val other480 = stream(addonName = "Other", url = "https://example.com/other-480.mp4", name = "Episode 480p")
+        val evaluation = StreamAutoPlaySelector.evaluateAutoPlayStream(
+            streams = listOf(fav720, other1080, other480), mode = StreamAutoPlayMode.FIRST_STREAM,
+            regexPattern = "", source = StreamAutoPlaySource.ALL_SOURCES,
+            installedAddonNames = setOf("Favourite", "Other"), selectedAddons = emptySet(), selectedPlugins = emptySet(),
+            preferredAddonName = "Favourite", preferredQuality = StreamAutoPlayPreferredQuality.P1080,
+        )
+        assertEquals(other1080, evaluation.stream)
+        assertEquals(listOf(other1080, fav720, other480), evaluation.readyStreams)
+    }
+
+    @Test
+    fun `favourite addon wins when quality preference is best available`() {
+        val fav720 = stream(addonName = "Favourite", url = "https://example.com/fav-720.mp4", name = "Episode 720p")
+        val other2160 = stream(addonName = "Other", url = "https://example.com/other-2160.mp4", name = "Episode 2160p")
+        val selected = StreamAutoPlaySelector.selectAutoPlayStream(
+            streams = listOf(other2160, fav720), mode = StreamAutoPlayMode.FIRST_STREAM,
+            regexPattern = "", source = StreamAutoPlaySource.ALL_SOURCES,
+            installedAddonNames = setOf("Favourite", "Other"), selectedAddons = emptySet(), selectedPlugins = emptySet(),
+            preferredAddonName = "Favourite",
+        )
+        assertEquals(fav720, selected)
+    }
+
     private fun stream(
         addonName: String,
         url: String? = null,

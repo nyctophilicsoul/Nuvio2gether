@@ -1226,6 +1226,16 @@
     <string name="settings_playback_source_scope_installed_addons_only">Installed addons only</string>
     <string name="settings_playback_source_scope_installed_addons_only_description">Auto-play only considers streams coming from your installed addons.</string>
     <string name="settings_playback_stream_selection_mode">Auto Stream Selection</string>
+    <string name="settings_playback_preferred_addon">Favourite add-on</string>
+    <string name="settings_playback_preferred_addon_none">No preference</string>
+    <string name="settings_playback_preferred_quality">Preferred quality</string>
+    <string name="settings_playback_preferred_quality_any">Best available</string>
+    <string name="settings_playback_preferred_quality_2160p">4K / 2160p</string>
+    <string name="settings_playback_preferred_quality_1440p">1440p</string>
+    <string name="settings_playback_preferred_quality_1080p">1080p / Full HD</string>
+    <string name="settings_playback_preferred_quality_720p">720p / HD</string>
+    <string name="settings_playback_preferred_quality_480p">480p</string>
+    <string name="settings_playback_preferred_quality_360p">360p</string>
     <string name="settings_playback_stream_selection_mode_first_stream">Auto-play first source</string>
     <string name="settings_playback_stream_selection_mode_first_stream_description">Play the first available source automatically.</string>
     <string name="settings_playback_stream_selection_mode_manual">Manual (choose stream)</string>

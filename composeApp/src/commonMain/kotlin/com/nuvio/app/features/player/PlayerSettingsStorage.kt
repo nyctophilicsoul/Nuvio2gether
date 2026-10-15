@@ -119,6 +119,10 @@ internal expect object PlayerSettingsStorage {
     fun saveStreamAutoPlaySource(source: String)
     fun loadStreamAutoPlaySelectedAddons(): Set<String>?
     fun saveStreamAutoPlaySelectedAddons(addons: Set<String>)
+    fun loadStreamAutoPlayPreferredAddon(): String?
+    fun saveStreamAutoPlayPreferredAddon(addon: String)
+    fun loadStreamAutoPlayPreferredQuality(): String?
+    fun saveStreamAutoPlayPreferredQuality(quality: String)
     fun loadStreamAutoPlaySelectedPlugins(): Set<String>?
     fun saveStreamAutoPlaySelectedPlugins(plugins: Set<String>)
     fun loadStreamAutoPlayRegex(): String?
