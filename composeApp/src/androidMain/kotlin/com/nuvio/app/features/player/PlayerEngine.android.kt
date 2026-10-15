@@ -100,6 +100,7 @@ import java.io.File
 import java.net.URI
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 private const val TAG = "NuvioPlayer"
 private const val PLAYER_DIAGNOSTIC_TAG = "NuvioPlayerDiag"
@@ -288,6 +289,9 @@ private fun ExoPlayerSurface(
     var activeRouteDelayMs by remember(context) { mutableStateOf(activeAudioRoute?.let { AudioDelayRouteStore.loadDelayMs(context, it.key) } ?: 0) }
     val latestActiveRoute = rememberUpdatedState(activeAudioRoute)
     val latestRouteDelayMs = rememberUpdatedState(activeRouteDelayMs)
+    val activeSpeedAwareAudioSink = remember(playerSourceKey) {
+        AtomicReference<PlaybackSpeedAwareAudioSink?>(null)
+    }
     var forcePcmAudioFallback by remember(playerSourceKey) { mutableStateOf(false) }
     var audioDisabledAfterFallback by remember(playerSourceKey) { mutableStateOf(false) }
     var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
@@ -435,6 +439,7 @@ private fun ExoPlayerSurface(
             },
             forcePcmAudioProvider = { forcePcmAudioFallback },
             bluetoothForcePcmProvider = { latestActiveRoute.value?.isBluetooth == true },
+            onAudioSinkCreated = { activeSpeedAwareAudioSink.set(it) },
         )
             .setExtensionRendererMode(effectiveDecoderPriority)
             .setEnableDecoderFallback(true)
@@ -876,11 +881,13 @@ private fun ExoPlayerSurface(
                                 "to ${nextRoute?.label ?: "unknown"}; bluetooth=${nextRoute?.isBluetooth == true}",
                         )
 
-                        // Force track selection to reconsider passthrough vs PCM using the live
-                        // route provider. This updates the current player without rebuilding it.
-                        exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
-                            .buildUpon()
-                            .build()
+                        // Notify the live sink so Media3 re-evaluates passthrough vs PCM.
+                        // Assigning identical track-selection parameters is not a reliable refresh.
+                        activeSpeedAwareAudioSink.get()?.let { sink ->
+                            if (sink.setBluetoothForcePcm(nextRoute?.isBluetooth == true)) {
+                                sink.notifyAudioProcessingRequirementChanged()
+                            }
+                        }
                     }
                 }
             }
@@ -2446,6 +2453,7 @@ private class SubtitleOffsetRenderersFactory(
     private val videoBoundsFractionProvider: () -> RectF?,
     private val forcePcmAudioProvider: () -> Boolean,
     private val bluetoothForcePcmProvider: () -> Boolean,
+    private val onAudioSinkCreated: (PlaybackSpeedAwareAudioSink) -> Unit,
 ) : DefaultRenderersFactory(context) {
     override fun buildAudioSink(
         context: Context,
@@ -2461,7 +2469,7 @@ private class SubtitleOffsetRenderersFactory(
             initialForcePcm = forcePcmAudioProvider(),
             forcePcmForBluetooth = bluetoothForcePcmProvider(),
             bluetoothForcePcmProvider = bluetoothForcePcmProvider,
-        )
+        ).also(onAudioSinkCreated)
     }
 
     override fun buildAudioRenderers(
