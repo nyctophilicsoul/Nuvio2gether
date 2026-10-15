@@ -701,6 +701,7 @@ private fun MobileSettingsScreen(
                             isTablet = false,
                             onPlaybackClick = { onPageChange(SettingsPage.Playback) },
                             onNuvio2getherClick = { onPageChange(SettingsPage.Nuvio2gether) },
+                            onNuvioEnhancedClick = { onPageChange(SettingsPage.NuvioEnhanced) },
                             onAppearanceClick = { onPageChange(SettingsPage.Appearance) },
                             onAdvancedClick = { onPageChange(SettingsPage.Advanced) },
                             onNotificationsClick = { onPageChange(SettingsPage.Notifications) },
@@ -729,6 +730,11 @@ private fun MobileSettingsScreen(
                     isTablet = false,
                 )
                 SettingsPage.Nuvio2gether -> nuvio2getherSettingsContent(isTablet = false)
+                SettingsPage.NuvioEnhanced -> nuvioEnhancedSettingsContent(
+                    isTablet = false,
+                    settings = playerSettingsUiState,
+                    onPlaybackClick = { onPageChange(SettingsPage.Playback) },
+                )
                 SettingsPage.Playback -> playbackSettingsContent(
                     isTablet = false,
                     showLoadingOverlay = showLoadingOverlay,
@@ -1135,6 +1141,7 @@ private fun TabletSettingsScreen(
                                 isTablet = true,
                                 onPlaybackClick = { openInlinePage(SettingsPage.Playback) },
                                 onNuvio2getherClick = { openInlinePage(SettingsPage.Nuvio2gether) },
+                                onNuvioEnhancedClick = { openInlinePage(SettingsPage.NuvioEnhanced) },
                                 onAppearanceClick = { openInlinePage(SettingsPage.Appearance) },
                                 onAdvancedClick = { openInlinePage(SettingsPage.Advanced) },
                                 onNotificationsClick = { openInlinePage(SettingsPage.Notifications) },
@@ -1167,6 +1174,11 @@ private fun TabletSettingsScreen(
                         isTablet = true,
                     )
                     SettingsPage.Nuvio2gether -> nuvio2getherSettingsContent(isTablet = true)
+                    SettingsPage.NuvioEnhanced -> nuvioEnhancedSettingsContent(
+                        isTablet = true,
+                        settings = playerSettingsUiState,
+                        onPlaybackClick = { openInlinePage(SettingsPage.Playback) },
+                    )
                     SettingsPage.Playback -> playbackSettingsContent(
                         isTablet = true,
                         showLoadingOverlay = showLoadingOverlay,

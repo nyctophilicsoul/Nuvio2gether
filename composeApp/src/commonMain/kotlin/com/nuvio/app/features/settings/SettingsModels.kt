@@ -83,6 +83,11 @@ internal enum class SettingsPage(
         category = SettingsCategory.General,
         parentPage = Root,
     ),
+    NuvioEnhanced(
+        titleRes = Res.string.settings_nuvio_enhanced_title,
+        category = SettingsCategory.General,
+        parentPage = Root,
+    ),
     Appearance(
         titleRes = Res.string.compose_settings_page_appearance,
         category = SettingsCategory.General,

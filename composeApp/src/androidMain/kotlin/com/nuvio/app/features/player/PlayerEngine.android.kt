@@ -15,6 +15,8 @@ import android.graphics.Typeface
 import android.os.Build
 import android.os.SystemClock
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
+import android.view.Surface
+import android.view.SurfaceView
 import android.util.AttributeSet
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +39,7 @@ import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.C
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.Format
@@ -247,6 +250,7 @@ private fun ExoPlayerSurface(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val livePlayerSettings by PlayerSettingsRepository.uiState.collectAsStateWithLifecycle()
     val latestOnSnapshot = rememberUpdatedState(onSnapshot)
     val latestOnError = rememberUpdatedState(onError)
     val latestOnInitialPositionHandled = rememberUpdatedState(onInitialPositionHandled)
@@ -296,6 +300,7 @@ private fun ExoPlayerSurface(
     var audioDisabledAfterFallback by remember(playerSourceKey) { mutableStateOf(false) }
     var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
     var videoAspectRatio by remember(playerSourceKey) { mutableStateOf(0f) }
+    var videoFrameRate by remember(playerSourceKey) { mutableStateOf<Float?>(null) }
     val latestVideoAspectRatio = rememberUpdatedState(videoAspectRatio)
     var currentSubtitleStyle by remember { mutableStateOf(SubtitleStyleState.DEFAULT) }
     var decoderPriorityOverride by remember(playerSourceKey) { mutableStateOf<Int?>(null) }
@@ -761,6 +766,7 @@ private fun ExoPlayerSurface(
                         "terminalError=${exoPlayer.playerError?.errorCodeName ?: "none"}",
                 )
                 if (playbackState == Player.STATE_READY) {
+                    videoFrameRate = exoPlayer.videoFormat?.frameRate?.takeIf { it > 0f }
                     fallbackStartPositionMs = null
                     latestOnError.value(null)
                     exoPlayer.logCurrentTracks("STATE_READY")
@@ -798,6 +804,7 @@ private fun ExoPlayerSurface(
                 if (videoSize.width > 0 && videoSize.height > 0) {
                     videoAspectRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
                 }
+                videoFrameRate = exoPlayer.videoFormat?.frameRate?.takeIf { it > 0f }
             }
 
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
@@ -948,6 +955,18 @@ private fun ExoPlayerSurface(
                 VodCache.playheadBytesProvider = null
             }
         }
+    }
+
+    LaunchedEffect(exoPlayer, livePlayerSettings.skipSilenceEnabled) {
+        exoPlayer.skipSilenceEnabled = livePlayerSettings.skipSilenceEnabled
+    }
+
+    LaunchedEffect(exoPlayer, livePlayerSettings.androidFrameRateMatchingEnabled, playerViewRef, videoFrameRate) {
+        applyDisplayFrameRateHint(
+            playerView = playerViewRef,
+            frameRate = videoFrameRate,
+            enabled = livePlayerSettings.androidFrameRateMatchingEnabled,
+        )
     }
 
     LaunchedEffect(exoPlayer, playWhenReady) {
@@ -1524,6 +1543,29 @@ private fun LibmpvPlayerSurface(
             view.releaseMpv()
         },
     )
+}
+
+@androidx.annotation.OptIn(UnstableApi::class)
+private fun applyDisplayFrameRateHint(
+    playerView: PlayerView?,
+    frameRate: Float?,
+    enabled: Boolean,
+) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+    val surfaceView = playerView?.videoSurfaceView as? SurfaceView ?: return
+    val surface = surfaceView.holder.surface
+    if (!surface.isValid) return
+
+    val targetFrameRate = if (enabled) FrameRateMatchingPolicy.validSourceFrameRate(frameRate) else null
+    runCatching {
+        if (targetFrameRate != null) {
+            surface.setFrameRate(targetFrameRate, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE)
+        } else {
+            surface.setFrameRate(0f, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+        }
+    }.onFailure { error ->
+        Log.w(TAG, "Unable to update display frame-rate hint", error)
+    }
 }
 
 private tailrec fun Context.findActivity(): Activity? =

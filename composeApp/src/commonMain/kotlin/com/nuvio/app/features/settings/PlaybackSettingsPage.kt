@@ -59,6 +59,7 @@ import com.nuvio.app.features.player.VodCacheSizeMode
 import com.nuvio.app.features.player.VodCacheSizing
 import com.nuvio.app.features.player.exoNativeMemoryInfo
 import com.nuvio.app.features.player.isExoNativeMemorySupported
+import com.nuvio.app.features.player.isFrameRateMatchingSupported
 import com.nuvio.app.features.player.playbackCacheUsableSpaceBytes
 import com.nuvio.app.features.player.AndroidPlaybackEngine
 import com.nuvio.app.features.player.AudioLanguageOption
@@ -409,48 +410,6 @@ private fun PlaybackSettingsSection(
                     }
                 }
             }
-            SettingsSection(
-                title = stringResource(Res.string.settings_playback_section_av_delay),
-                isTablet = isTablet,
-            ) {
-                SettingsGroup(isTablet = isTablet) {
-                    SettingsSwitchRow(
-                        title = stringResource(Res.string.settings_playback_av_delay_enabled),
-                        description = stringResource(Res.string.settings_playback_av_delay_enabled_description),
-                        checked = autoPlayPlayerSettings.audioVideoDelayEnabled,
-                        enabled = !autoPlayPlayerSettings.externalPlayerEnabled &&
-                            autoPlayPlayerSettings.androidPlaybackEngine != AndroidPlaybackEngine.Libmpv,
-                        isTablet = isTablet,
-                        onCheckedChange = PlayerSettingsRepository::setAudioVideoDelayEnabled,
-                    )
-                    if (autoPlayPlayerSettings.audioVideoDelayEnabled) {
-                        SettingsGroupDivider(isTablet = isTablet)
-                        SettingsSliderRow(
-                            title = stringResource(Res.string.settings_playback_av_delay_ms),
-                            value = autoPlayPlayerSettings.audioVideoDelayMs.coerceIn(-500, 500),
-                            valueText = { delayMs -> stringResource(Res.string.settings_playback_av_delay_value, delayMs) },
-                            valueRange = -500..500,
-                            step = 25,
-                            isTablet = isTablet,
-                            enabled = !autoPlayPlayerSettings.externalPlayerEnabled &&
-                                autoPlayPlayerSettings.androidPlaybackEngine != AndroidPlaybackEngine.Libmpv,
-                            onValueChange = PlayerSettingsRepository::setAudioVideoDelayMs,
-                        )
-                    }
-                    if (autoPlayPlayerSettings.audioVideoDelayEnabled &&
-                        autoPlayPlayerSettings.androidPlaybackEngine != AndroidPlaybackEngine.Libmpv &&
-                        !autoPlayPlayerSettings.externalPlayerEnabled) {
-                        SettingsGroupDivider(isTablet = isTablet)
-                        SettingsSwitchRow(
-                            title = stringResource(Res.string.settings_playback_remember_audio_delay_per_device),
-                            description = stringResource(Res.string.settings_playback_remember_audio_delay_per_device_description),
-                            checked = autoPlayPlayerSettings.rememberAudioDelayPerDeviceEnabled,
-                            isTablet = isTablet,
-                            onCheckedChange = PlayerSettingsRepository::setRememberAudioDelayPerDeviceEnabled,
-                        )
-                    }
-                }
-            }
         }
         SettingsSection(
             title = stringResource(Res.string.settings_playback_section_player),
@@ -487,14 +446,6 @@ private fun PlaybackSettingsSection(
                     checked = autoPlayPlayerSettings.pauseOverlayEnabled,
                     isTablet = isTablet,
                     onCheckedChange = PlayerSettingsRepository::setPauseOverlayEnabled,
-                )
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsSwitchRow(
-                    title = stringResource(Res.string.settings_playback_show_diagnostics),
-                    description = stringResource(Res.string.settings_playback_show_diagnostics_description),
-                    checked = autoPlayPlayerSettings.showPlaybackDiagnostics,
-                    isTablet = isTablet,
-                    onCheckedChange = PlayerSettingsRepository::setShowPlaybackDiagnostics,
                 )
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsSwitchRow(
@@ -614,6 +565,17 @@ private fun PlaybackSettingsSection(
                     isTablet = isTablet,
                     onClick = { showSecondaryAudioDialog = true },
                 )
+                if (!isIos) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_playback_skip_silence),
+                        description = stringResource(Res.string.settings_playback_skip_silence_description),
+                        checked = autoPlayPlayerSettings.skipSilenceEnabled,
+                        enabled = !isExternalPlayer && androidPlaybackEngine != AndroidPlaybackEngine.Libmpv,
+                        isTablet = isTablet,
+                        onCheckedChange = PlayerSettingsRepository::setSkipSilenceEnabled,
+                    )
+                }
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_playback_preferred_subtitle_language),
@@ -1089,6 +1051,15 @@ private fun PlaybackSettingsSection(
                         enabled = exoOptionsEnabled && decoderPriority != 2,
                         isTablet = isTablet,
                         onCheckedChange = PlayerSettingsRepository::setTunnelingEnabled,
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_playback_frame_rate_matching),
+                        description = stringResource(Res.string.settings_playback_frame_rate_matching_description),
+                        checked = autoPlayPlayerSettings.androidFrameRateMatchingEnabled,
+                        enabled = exoOptionsEnabled && isFrameRateMatchingSupported(),
+                        isTablet = isTablet,
+                        onCheckedChange = PlayerSettingsRepository::setFrameRateMatchingEnabled,
                     )
                     SettingsGroupDivider(isTablet = isTablet)
                     val nativeMemorySupported = isExoNativeMemorySupported()

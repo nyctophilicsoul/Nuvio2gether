@@ -49,6 +49,7 @@ data class PlayerSettingsUiState(
     val externalPlayerId: String? = ExternalPlayerPlatform.defaultPlayerId(),
     val preferredAudioLanguage: String = AudioLanguageOption.DEVICE,
     val secondaryPreferredAudioLanguage: String? = null,
+    val skipSilenceEnabled: Boolean = false,
     val preferredSubtitleLanguage: String = SubtitleLanguageOption.NONE,
     val secondaryPreferredSubtitleLanguage: String? = null,
     val subtitleStyle: SubtitleStyleState = SubtitleStyleState.DEFAULT,
@@ -61,6 +62,7 @@ data class PlayerSettingsUiState(
     val decoderPriority: Int = 1,
     val mapDV7ToHevc: Boolean = false,
     val tunnelingEnabled: Boolean = false,
+    val androidFrameRateMatchingEnabled: Boolean = false,
     val localFilePlaybackEnabled: Boolean = true,
     val audioVideoDelayEnabled: Boolean = false,
     val audioVideoDelayMs: Int = 0,
@@ -140,6 +142,7 @@ object PlayerSettingsRepository {
     private var externalPlayerId: String? = ExternalPlayerPlatform.defaultPlayerId()
     private var preferredAudioLanguage = AudioLanguageOption.DEVICE
     private var secondaryPreferredAudioLanguage: String? = null
+    private var skipSilenceEnabled = false
     private var preferredSubtitleLanguage = SubtitleLanguageOption.NONE
     private var secondaryPreferredSubtitleLanguage: String? = null
     private var subtitleStyle = SubtitleStyleState.DEFAULT
@@ -152,6 +155,7 @@ object PlayerSettingsRepository {
     private var decoderPriority = 1
     private var mapDV7ToHevc = false
     private var tunnelingEnabled = false
+    private var androidFrameRateMatchingEnabled = false
     private var localFilePlaybackEnabled = true
     private var audioVideoDelayEnabled = false
     private var audioVideoDelayMs = 0
@@ -236,6 +240,7 @@ object PlayerSettingsRepository {
         externalPlayerId = ExternalPlayerPlatform.defaultPlayerId()
         preferredAudioLanguage = AudioLanguageOption.DEVICE
         secondaryPreferredAudioLanguage = null
+        skipSilenceEnabled = false
         preferredSubtitleLanguage = SubtitleLanguageOption.NONE
         secondaryPreferredSubtitleLanguage = null
         subtitleStyle = SubtitleStyleState.DEFAULT
@@ -248,6 +253,7 @@ object PlayerSettingsRepository {
         decoderPriority = 1
         mapDV7ToHevc = false
         tunnelingEnabled = false
+        androidFrameRateMatchingEnabled = false
         rememberAudioDelayPerDeviceEnabled = false
         showPlaybackDiagnostics = false
         exoNativeMemoryEnabled = false
@@ -329,6 +335,7 @@ object PlayerSettingsRepository {
                 ?: AudioLanguageOption.DEVICE
         secondaryPreferredAudioLanguage =
             normalizeLanguageCode(PlayerSettingsStorage.loadSecondaryPreferredAudioLanguage())
+        skipSilenceEnabled = PlayerSettingsStorage.loadSkipSilenceEnabled() ?: false
         preferredSubtitleLanguage =
             normalizeLanguageCode(PlayerSettingsStorage.loadPreferredSubtitleLanguage())
                 ?: SubtitleLanguageOption.NONE
@@ -371,6 +378,7 @@ object PlayerSettingsRepository {
         decoderPriority = PlayerSettingsStorage.loadDecoderPriority() ?: 1
         mapDV7ToHevc = PlayerSettingsStorage.loadMapDV7ToHevc() ?: false
         tunnelingEnabled = PlayerSettingsStorage.loadTunnelingEnabled() ?: false
+        androidFrameRateMatchingEnabled = PlayerSettingsStorage.loadFrameRateMatchingEnabled() ?: false
         localFilePlaybackEnabled = PlayerSettingsStorage.loadLocalFilePlaybackEnabled() ?: true
         audioVideoDelayEnabled = PlayerSettingsStorage.loadAudioVideoDelayEnabled() ?: false
         audioVideoDelayMs = (PlayerSettingsStorage.loadAudioVideoDelayMs() ?: 0).coerceIn(-1_000, 1_000)
@@ -604,6 +612,14 @@ object PlayerSettingsRepository {
         PlayerSettingsStorage.savePreferredAudioLanguage(normalized)
     }
 
+    fun setSkipSilenceEnabled(enabled: Boolean) {
+        ensureLoaded()
+        if (skipSilenceEnabled == enabled) return
+        skipSilenceEnabled = enabled
+        publish()
+        PlayerSettingsStorage.saveSkipSilenceEnabled(enabled)
+    }
+
     fun setSecondaryPreferredAudioLanguage(language: String?) {
         ensureLoaded()
         val normalized = normalizeLanguageCode(language)
@@ -720,6 +736,15 @@ object PlayerSettingsRepository {
         tunnelingEnabled = enabled
         publish()
         PlayerSettingsStorage.saveTunnelingEnabled(enabled)
+    }
+
+    fun setFrameRateMatchingEnabled(enabled: Boolean) {
+        ensureLoaded()
+        val supportedValue = enabled && isFrameRateMatchingSupported()
+        if (androidFrameRateMatchingEnabled == supportedValue) return
+        androidFrameRateMatchingEnabled = supportedValue
+        publish()
+        PlayerSettingsStorage.saveFrameRateMatchingEnabled(supportedValue)
     }
 
     fun setLocalFilePlaybackEnabled(enabled: Boolean) {
@@ -1281,6 +1306,7 @@ object PlayerSettingsRepository {
             externalPlayerId = externalPlayerId,
             preferredAudioLanguage = preferredAudioLanguage,
             secondaryPreferredAudioLanguage = secondaryPreferredAudioLanguage,
+            skipSilenceEnabled = skipSilenceEnabled,
             preferredSubtitleLanguage = preferredSubtitleLanguage,
             secondaryPreferredSubtitleLanguage = secondaryPreferredSubtitleLanguage,
             subtitleStyle = subtitleStyle,
@@ -1293,6 +1319,7 @@ object PlayerSettingsRepository {
             decoderPriority = decoderPriority,
             mapDV7ToHevc = mapDV7ToHevc,
             tunnelingEnabled = tunnelingEnabled,
+            androidFrameRateMatchingEnabled = androidFrameRateMatchingEnabled,
             localFilePlaybackEnabled = localFilePlaybackEnabled,
             audioVideoDelayEnabled = audioVideoDelayEnabled,
             audioVideoDelayMs = audioVideoDelayMs,

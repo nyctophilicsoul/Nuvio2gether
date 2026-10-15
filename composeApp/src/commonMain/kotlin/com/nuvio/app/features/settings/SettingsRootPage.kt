@@ -69,6 +69,8 @@ import com.nuvio.app.features.watchparty.WatchPartyManager
 import nuvio.composeapp.generated.resources.watch_party_join_title
 import nuvio.composeapp.generated.resources.watch_party_settings_description
 import nuvio.composeapp.generated.resources.watch_party_title
+import nuvio.composeapp.generated.resources.settings_nuvio_enhanced_title
+import nuvio.composeapp.generated.resources.settings_nuvio_enhanced_description
 
 private const val PRIVACY_POLICY_URL = "https://nuvio.tv/privacy-policy"
 
@@ -76,6 +78,7 @@ internal fun LazyListScope.settingsRootContent(
     isTablet: Boolean,
     onPlaybackClick: () -> Unit,
     onNuvio2getherClick: () -> Unit,
+    onNuvioEnhancedClick: () -> Unit,
     onAppearanceClick: () -> Unit,
     onAdvancedClick: () -> Unit,
     onNotificationsClick: () -> Unit,
@@ -183,6 +186,14 @@ internal fun LazyListScope.settingsRootContent(
                         icon = Icons.Rounded.Tune,
                         isTablet = isTablet,
                         onClick = onNuvio2getherClick,
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_nuvio_enhanced_title),
+                        description = stringResource(Res.string.settings_nuvio_enhanced_description),
+                        icon = Icons.Rounded.PlayArrow,
+                        isTablet = isTablet,
+                        onClick = onNuvioEnhancedClick,
                     )
                     SettingsGroupDivider(isTablet = isTablet)
                     SettingsNavigationRow(

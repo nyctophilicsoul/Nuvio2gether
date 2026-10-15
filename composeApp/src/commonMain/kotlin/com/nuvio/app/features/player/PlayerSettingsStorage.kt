@@ -37,6 +37,8 @@ internal expect object PlayerSettingsStorage {
     fun savePreferredAudioLanguage(language: String)
     fun loadSecondaryPreferredAudioLanguage(): String?
     fun saveSecondaryPreferredAudioLanguage(language: String?)
+    fun loadSkipSilenceEnabled(): Boolean?
+    fun saveSkipSilenceEnabled(enabled: Boolean)
     fun loadPreferredSubtitleLanguage(): String?
     fun savePreferredSubtitleLanguage(language: String)
     fun loadSecondaryPreferredSubtitleLanguage(): String?
@@ -81,6 +83,8 @@ internal expect object PlayerSettingsStorage {
     fun saveMapDV7ToHevc(enabled: Boolean)
     fun loadTunnelingEnabled(): Boolean?
     fun saveTunnelingEnabled(enabled: Boolean)
+    fun loadFrameRateMatchingEnabled(): Boolean?
+    fun saveFrameRateMatchingEnabled(enabled: Boolean)
     fun loadLocalFilePlaybackEnabled(): Boolean?
     fun saveLocalFilePlaybackEnabled(enabled: Boolean)
     fun loadAudioVideoDelayEnabled(): Boolean?

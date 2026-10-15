@@ -2503,4 +2503,16 @@
     <string name="stream_info_subtitle_source_embedded">Embedded</string>
     <string name="stream_info_player_engine">Player Engine</string>
     <string name="stream_info_server">Server</string>
+<string name="settings_playback_frame_rate_matching">Match display refresh rate</string>
+    <string name="settings_playback_skip_silence">Skip silence</string>
+    <string name="settings_playback_skip_silence_description">Skip silent sections in supported audio tracks. Best for lectures and spoken content; may change pacing in films.</string>
+    <string name="settings_playback_frame_rate_matching_description">On supported Android 11+ displays, hint the display to match the video’s frame rate. The device may ignore the hint; disable if it causes flicker.</string>
+    <string name="settings_nuvio2gether_title">Nuvio2gether Settings</string>
+    <string name="settings_nuvio2gether_description">Features added specifically to Nuvio2gether</string>
+    <string name="settings_nuvio_enhanced_title">Nuvio Enhanced Settings</string>
+    <string name="settings_nuvio_enhanced_description">Compatible enhancements ported from Nuvio Enhanced</string>
+    <string name="settings_fork_watchparty_title">WatchParty</string>
+    <string name="settings_fork_watchparty_description">Join a synchronized watch session</string>
+    <string name="settings_fork_playback_title">Playback and synchronization</string>
+    <string name="settings_fork_playback_description">Open the existing player settings for engine, decoding and playback options</string>
 </resources>
