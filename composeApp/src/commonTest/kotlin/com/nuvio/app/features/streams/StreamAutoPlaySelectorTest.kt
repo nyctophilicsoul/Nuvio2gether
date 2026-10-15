@@ -319,6 +319,143 @@ class StreamAutoPlaySelectorTest {
         assertEquals(fav720, selected)
     }
 
+    @Test
+    fun `preferred quality selects exact tier then lower fallback without jumping above it`() {
+        val stream4k = stream(
+            addonName = "FourK",
+            url = "https://example.com/2160.mp4",
+            name = "Movie 2160p",
+        )
+        val stream1080 = stream(
+            addonName = "FullHD",
+            url = "https://example.com/1080.mp4",
+            name = "Movie 1080p",
+        )
+        val stream720 = stream(
+            addonName = "HD",
+            url = "https://example.com/720.mp4",
+            name = "Movie 720p",
+        )
+
+        val selected = StreamAutoPlaySelector.selectAutoPlayStream(
+            streams = listOf(stream4k, stream720, stream1080),
+            mode = StreamAutoPlayMode.FIRST_STREAM,
+            regexPattern = "",
+            source = StreamAutoPlaySource.ALL_SOURCES,
+            installedAddonNames = setOf("FourK", "FullHD", "HD"),
+            selectedAddons = emptySet(),
+            selectedPlugins = emptySet(),
+            preferredQuality = StreamAutoPlayPreferredQuality.P1080,
+        )
+
+        assertEquals(stream1080, selected)
+    }
+
+    @Test
+    fun `preferred quality falls back to the best lower tier when exact tier is absent`() {
+        val stream4k = stream(addonName = "FourK", url = "https://example.com/2160.mp4", name = "Movie 2160p")
+        val stream720 = stream(addonName = "HD", url = "https://example.com/720.mp4", name = "Movie 720p")
+        val selected = StreamAutoPlaySelector.selectAutoPlayStream(
+            streams = listOf(stream4k, stream720),
+            mode = StreamAutoPlayMode.FIRST_STREAM,
+            regexPattern = "",
+            source = StreamAutoPlaySource.ALL_SOURCES,
+            installedAddonNames = setOf("FourK", "HD"),
+            selectedAddons = emptySet(),
+            selectedPlugins = emptySet(),
+            preferredQuality = StreamAutoPlayPreferredQuality.P1080,
+        )
+        assertEquals(stream720, selected)
+    }
+
+    @Test
+    fun `preferred quality does not auto select a stream above the requested ceiling`() {
+        val only4k = stream(addonName = "4K source", url = "https://example.com/2160.mp4", name = "Movie 2160p")
+        val selected = StreamAutoPlaySelector.selectAutoPlayStream(
+            streams = listOf(only4k),
+            mode = StreamAutoPlayMode.FIRST_STREAM,
+            regexPattern = "",
+            source = StreamAutoPlaySource.ALL_SOURCES,
+            installedAddonNames = setOf("4K source"),
+            selectedAddons = emptySet(),
+            selectedPlugins = emptySet(),
+            preferredQuality = StreamAutoPlayPreferredQuality.P1080,
+        )
+        assertNull(selected)
+    }
+
+    @Test
+    fun `configured source priority breaks ties between equal quality streams`() {
+        val lowerPriority = stream(addonName = "Addon B", url = "https://example.com/b.mp4", name = "Episode 1080p")
+        val higherPriority = stream(addonName = "Addon A", url = "https://example.com/a.mp4", name = "Episode 1080p")
+
+        val selected = StreamAutoPlaySelector.selectAutoPlayStream(
+            streams = listOf(lowerPriority, higherPriority),
+            mode = StreamAutoPlayMode.FIRST_STREAM,
+            regexPattern = "",
+            source = StreamAutoPlaySource.ALL_SOURCES,
+            installedAddonNames = setOf("Addon A", "Addon B"),
+            selectedAddons = emptySet(),
+            selectedPlugins = emptySet(),
+            preferredQuality = StreamAutoPlayPreferredQuality.P1080,
+            preferredSourceOrder = listOf("Addon A", "Addon B"),
+        )
+
+        assertEquals(higherPriority, selected)
+    }
+
+    @Test
+    fun `preferred quality ceiling also applies to binge-group selection`() {
+        val stream4k = stream(
+            addonName = "FourK",
+            url = "https://example.com/2160.mp4",
+            name = "Episode 2160p",
+            bingeGroup = "series",
+        )
+        val stream720 = stream(
+            addonName = "HD",
+            url = "https://example.com/720.mp4",
+            name = "Episode 720p",
+            bingeGroup = "series",
+        )
+
+        val selected = StreamAutoPlaySelector.selectAutoPlayStream(
+            streams = listOf(stream4k, stream720),
+            mode = StreamAutoPlayMode.FIRST_STREAM,
+            regexPattern = "",
+            source = StreamAutoPlaySource.ALL_SOURCES,
+            installedAddonNames = setOf("FourK", "HD"),
+            selectedAddons = emptySet(),
+            selectedPlugins = emptySet(),
+            preferredBingeGroup = "series",
+            preferBingeGroupInSelection = true,
+            preferredQuality = StreamAutoPlayPreferredQuality.P1080,
+        )
+
+        assertEquals(stream720, selected)
+    }
+
+    @Test
+    fun `early threshold requires more than ten distinct streams of one quality from top three add-ons`() {
+        val groups = listOf(
+            AddonStreamGroup("A", "a", streams = (1..4).map { stream(addonName = "A", url = "https://a.example/$it.mp4", name = "Episode 1080p") }, isLoading = false),
+            AddonStreamGroup("B", "b", streams = (1..4).map { stream(addonName = "B", url = "https://b.example/$it.mp4", name = "Episode 1080p") }, isLoading = false),
+            AddonStreamGroup("C", "c", streams = (1..3).map { stream(addonName = "C", url = "https://c.example/$it.mp4", name = "Episode 1080p") }, isLoading = false),
+            AddonStreamGroup("D", "d", streams = (1..20).map { stream(addonName = "D", url = "https://d.example/$it.mp4", name = "Episode 1080p") }, isLoading = false),
+        )
+        assertTrue(StreamAutoPlaySelector.hasEarlySelectionThreshold(groups, listOf("A", "B", "C", "D")))
+    }
+
+    @Test
+    fun `early threshold does not combine qualities or count duplicate links`() {
+        val groups = listOf(
+            AddonStreamGroup("A", "a", streams = (1..6).map { stream(addonName = "A", url = "https://shared.example/$it.mp4", name = "Episode 1080p") }, isLoading = false),
+            AddonStreamGroup("B", "b", streams = (1..5).map { stream(addonName = "B", url = "https://shared.example/$it.mp4", name = "Episode 720p") }, isLoading = false),
+            AddonStreamGroup("C", "c", streams = (1..5).map { stream(addonName = "C", url = "https://shared.example/$it.mp4", name = "Episode 1080p") }, isLoading = false),
+        )
+        assertFalse(StreamAutoPlaySelector.hasEarlySelectionThreshold(groups, listOf("A", "B", "C")))
+    }
+
     private fun stream(
         addonName: String,
         url: String? = null,

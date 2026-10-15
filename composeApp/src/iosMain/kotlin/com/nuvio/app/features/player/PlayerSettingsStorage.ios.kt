@@ -77,12 +77,16 @@ actual object PlayerSettingsStorage {
     private const val backBufferDurationMsKey = "back_buffer_duration_ms"
     private const val targetBufferSizeMbKey = "target_buffer_size_mb"
     private const val streamAutoPlayModeKey = "stream_auto_play_mode"
+    private const val streamAutoPlayAdvancedRulesEnabledKey = "stream_auto_play_advanced_rules_enabled"
     private const val streamAutoPlaySmartSelectionEnabledKey = "stream_auto_play_smart_selection_enabled"
     private const val streamAutoPlayFallbackTimeoutSecondsKey = "stream_auto_play_fallback_timeout_seconds"
     private const val streamAutoPlaySourceKey = "stream_auto_play_source"
     private const val streamAutoPlaySelectedAddonsKey = "stream_auto_play_selected_addons"
     private const val streamAutoPlayPreferredAddonKey = "stream_auto_play_preferred_addon"
+    private const val streamAutoPlayFavoriteAddonsKey = "stream_auto_play_favorite_addons"
     private const val streamAutoPlayPreferredQualityKey = "stream_auto_play_preferred_quality"
+    private const val streamAutoPlayAddonPriorityKey = "stream_auto_play_addon_priority"
+    private const val streamAutoPlayPluginPriorityKey = "stream_auto_play_plugin_priority"
     private const val streamAutoPlaySelectedPluginsKey = "stream_auto_play_selected_plugins"
     private const val streamAutoPlayRegexKey = "stream_auto_play_regex"
     private const val streamAutoPlayTimeoutSecondsKey = "stream_auto_play_timeout_seconds"
@@ -761,6 +765,16 @@ actual object PlayerSettingsStorage {
         NSUserDefaults.standardUserDefaults.setObject(mode, forKey = ProfileScopedKey.of(streamAutoPlayModeKey))
     }
 
+    actual fun loadStreamAutoPlayAdvancedRulesEnabled(): Boolean? {
+        val defaults = NSUserDefaults.standardUserDefaults
+        val key = ProfileScopedKey.of(streamAutoPlayAdvancedRulesEnabledKey)
+        return if (defaults.objectForKey(key) == null) null else defaults.boolForKey(key)
+    }
+
+    actual fun saveStreamAutoPlayAdvancedRulesEnabled(enabled: Boolean) {
+        NSUserDefaults.standardUserDefaults.setBool(enabled, forKey = ProfileScopedKey.of(streamAutoPlayAdvancedRulesEnabledKey))
+    }
+
     actual fun loadStreamAutoPlaySmartSelectionEnabled(): Boolean? {
         val key = ProfileScopedKey.of(streamAutoPlaySmartSelectionEnabledKey)
         return if (NSUserDefaults.standardUserDefaults.objectForKey(key) == null) null else NSUserDefaults.standardUserDefaults.boolForKey(key)
@@ -796,11 +810,38 @@ actual object PlayerSettingsStorage {
         NSUserDefaults.standardUserDefaults.setObject(addon, forKey = ProfileScopedKey.of(streamAutoPlayPreferredAddonKey))
     }
 
+    actual fun loadStreamAutoPlayFavoriteAddons(): Set<String>? =
+        NSUserDefaults.standardUserDefaults.stringForKey(ProfileScopedKey.of(streamAutoPlayFavoriteAddonsKey))
+            ?.split("\\n")?.filter { it.isNotBlank() }?.take(5)?.toSet()
+
+    actual fun saveStreamAutoPlayFavoriteAddons(addons: Set<String>) {
+        NSUserDefaults.standardUserDefaults.setObject(
+            addons.take(5).joinToString("\\n"),
+            forKey = ProfileScopedKey.of(streamAutoPlayFavoriteAddonsKey),
+        )
+    }
+
     actual fun loadStreamAutoPlayPreferredQuality(): String? =
         NSUserDefaults.standardUserDefaults.stringForKey(ProfileScopedKey.of(streamAutoPlayPreferredQualityKey))
 
     actual fun saveStreamAutoPlayPreferredQuality(quality: String) {
         NSUserDefaults.standardUserDefaults.setObject(quality, forKey = ProfileScopedKey.of(streamAutoPlayPreferredQualityKey))
+    }
+
+    actual fun loadStreamAutoPlayAddonPriority(): List<String>? =
+        NSUserDefaults.standardUserDefaults.stringForKey(ProfileScopedKey.of(streamAutoPlayAddonPriorityKey))
+            ?.split("\\n")?.filter { it.isNotBlank() }
+
+    actual fun saveStreamAutoPlayAddonPriority(priority: List<String>) {
+        NSUserDefaults.standardUserDefaults.setObject(priority.joinToString("\\n"), forKey = ProfileScopedKey.of(streamAutoPlayAddonPriorityKey))
+    }
+
+    actual fun loadStreamAutoPlayPluginPriority(): List<String>? =
+        NSUserDefaults.standardUserDefaults.stringForKey(ProfileScopedKey.of(streamAutoPlayPluginPriorityKey))
+            ?.split("\\n")?.filter { it.isNotBlank() }
+
+    actual fun saveStreamAutoPlayPluginPriority(priority: List<String>) {
+        NSUserDefaults.standardUserDefaults.setObject(priority.joinToString("\\n"), forKey = ProfileScopedKey.of(streamAutoPlayPluginPriorityKey))
     }
 
     @Suppress("UNCHECKED_CAST")

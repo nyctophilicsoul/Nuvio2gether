@@ -80,12 +80,16 @@ actual object PlayerSettingsStorage {
     private const val backBufferDurationMsKey = "back_buffer_duration_ms"
     private const val targetBufferSizeMbKey = "target_buffer_size_mb"
     private const val streamAutoPlayModeKey = "stream_auto_play_mode"
+    private const val streamAutoPlayAdvancedRulesEnabledKey = "stream_auto_play_advanced_rules_enabled"
     private const val streamAutoPlaySmartSelectionEnabledKey = "stream_auto_play_smart_selection_enabled"
     private const val streamAutoPlayFallbackTimeoutSecondsKey = "stream_auto_play_fallback_timeout_seconds"
     private const val streamAutoPlaySourceKey = "stream_auto_play_source"
     private const val streamAutoPlaySelectedAddonsKey = "stream_auto_play_selected_addons"
     private const val streamAutoPlayPreferredAddonKey = "stream_auto_play_preferred_addon"
+    private const val streamAutoPlayFavoriteAddonsKey = "stream_auto_play_favorite_addons"
     private const val streamAutoPlayPreferredQualityKey = "stream_auto_play_preferred_quality"
+    private const val streamAutoPlayAddonPriorityKey = "stream_auto_play_addon_priority"
+    private const val streamAutoPlayPluginPriorityKey = "stream_auto_play_plugin_priority"
     private const val streamAutoPlaySelectedPluginsKey = "stream_auto_play_selected_plugins"
     private const val streamAutoPlayRegexKey = "stream_auto_play_regex"
     private const val streamAutoPlayTimeoutSecondsKey = "stream_auto_play_timeout_seconds"
@@ -934,6 +938,13 @@ actual object PlayerSettingsStorage {
     actual fun loadStreamAutoPlayMode(): String? =
         preferences?.getString(ProfileScopedKey.of(streamAutoPlayModeKey), null)
 
+    actual fun loadStreamAutoPlayAdvancedRulesEnabled(): Boolean? =
+        preferences?.getBoolean(ProfileScopedKey.of(streamAutoPlayAdvancedRulesEnabledKey), false)
+
+    actual fun saveStreamAutoPlayAdvancedRulesEnabled(enabled: Boolean) {
+        preferences?.edit()?.putBoolean(ProfileScopedKey.of(streamAutoPlayAdvancedRulesEnabledKey), enabled)?.apply()
+    }
+
     actual fun saveStreamAutoPlayMode(mode: String) {
         preferences
             ?.edit()
@@ -972,11 +983,37 @@ actual object PlayerSettingsStorage {
         preferences?.edit()?.putString(ProfileScopedKey.of(streamAutoPlayPreferredAddonKey), addon)?.apply()
     }
 
+    actual fun loadStreamAutoPlayFavoriteAddons(): Set<String>? =
+        preferences?.getString(ProfileScopedKey.of(streamAutoPlayFavoriteAddonsKey), null)
+            ?.split("\\n")?.filter { it.isNotBlank() }?.take(5)?.toSet()
+
+    actual fun saveStreamAutoPlayFavoriteAddons(addons: Set<String>) {
+        preferences?.edit()
+            ?.putString(ProfileScopedKey.of(streamAutoPlayFavoriteAddonsKey), addons.take(5).joinToString("\\n"))
+            ?.apply()
+    }
+
     actual fun loadStreamAutoPlayPreferredQuality(): String? =
         preferences?.getString(ProfileScopedKey.of(streamAutoPlayPreferredQualityKey), null)
 
     actual fun saveStreamAutoPlayPreferredQuality(quality: String) {
         preferences?.edit()?.putString(ProfileScopedKey.of(streamAutoPlayPreferredQualityKey), quality)?.apply()
+    }
+
+    actual fun loadStreamAutoPlayAddonPriority(): List<String>? =
+        preferences?.getString(ProfileScopedKey.of(streamAutoPlayAddonPriorityKey), null)
+            ?.split("\\n")?.filter { it.isNotBlank() }
+
+    actual fun saveStreamAutoPlayAddonPriority(priority: List<String>) {
+        preferences?.edit()?.putString(ProfileScopedKey.of(streamAutoPlayAddonPriorityKey), priority.joinToString("\\n"))?.apply()
+    }
+
+    actual fun loadStreamAutoPlayPluginPriority(): List<String>? =
+        preferences?.getString(ProfileScopedKey.of(streamAutoPlayPluginPriorityKey), null)
+            ?.split("\\n")?.filter { it.isNotBlank() }
+
+    actual fun saveStreamAutoPlayPluginPriority(priority: List<String>) {
+        preferences?.edit()?.putString(ProfileScopedKey.of(streamAutoPlayPluginPriorityKey), priority.joinToString("\\n"))?.apply()
     }
 
     actual fun loadStreamAutoPlaySelectedAddons(): Set<String>? =

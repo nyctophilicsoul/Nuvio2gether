@@ -1,9 +1,24 @@
 package com.nuvio.app
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -15,10 +30,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.features.debrid.DebridSettingsRepository
 import com.nuvio.app.features.debrid.DirectDebridPlayableResult
 import com.nuvio.app.features.debrid.DirectDebridPlaybackResolver
 import com.nuvio.app.features.debrid.toastMessage
@@ -33,6 +50,9 @@ import com.nuvio.app.features.player.sanitizePlaybackHeaders
 import com.nuvio.app.features.player.sanitizePlaybackResponseHeaders
 import com.nuvio.app.features.servers.ServerPlayback
 import com.nuvio.app.features.servers.serverPlaybackMessage
+import com.nuvio.app.features.streams.QualityFirstAutoPlayPolicy
+import com.nuvio.app.features.streams.StreamAutoPlayPreferredQuality
+import com.nuvio.app.features.streams.StreamAutoPlaySelector
 import com.nuvio.app.features.streams.StreamBehaviorHints
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamLaunchStore
@@ -46,6 +66,7 @@ import com.nuvio.app.features.streams.YouTubeStreamResolver
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
 import com.nuvio.app.navigation.*
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -82,6 +103,11 @@ internal fun StreamDestination(
     val pauseDescription = launch.pauseDescription
     val streamRouteScope = rememberCoroutineScope()
     var autoPlayNavigationStarted by remember(route.launchId) { mutableStateOf(false) }
+    var qualityPickerDismissed by rememberSaveable(route.launchId) { mutableStateOf(false) }
+    var pendingQualitySelection by rememberSaveable(route.launchId) { mutableStateOf<String?>(null) }
+    var fallbackQualityAfterWait by rememberSaveable(route.launchId) { mutableStateOf<String?>(null) }
+    var qualitySelectionInProgress by rememberSaveable(route.launchId) { mutableStateOf(false) }
+    var qualitySelectionStarted by rememberSaveable(route.launchId) { mutableStateOf(false) }
     var resolvingDebridStream by rememberSaveable(route.launchId) { mutableStateOf(false) }
     var resolvingYouTubeStream by rememberSaveable(route.launchId) { mutableStateOf(false) }
     var preparingServerStream by remember(route.launchId) { mutableStateOf(false) }
@@ -237,7 +263,11 @@ internal fun StreamDestination(
 
         autoPlayNavigationStarted = replaceStreamRoute
         val launchId = PlayerLaunchStore.put(playerLaunch)
-        StreamsRepository.cancelLoading()
+        // Semi-auto quality mode keeps provider fetches running until playback is actually
+        // playing; PlayerScreenRuntimeEffects cancels the remaining fetches on first play.
+        if (!launch.qualitySelectionMode || launch.manualSelection) {
+            StreamsRepository.cancelLoading()
+        }
         navController.navigate(PlayerRoute(launchId = launchId, title = playerLaunch.title)) {
             if (replaceStreamRoute) {
                 popUpTo<StreamRoute> { inclusive = true }
@@ -282,11 +312,11 @@ internal fun StreamDestination(
 
     var reuseHandled by rememberSaveable(launch.videoId, effectiveVideoId) { mutableStateOf(false) }
     var reuseNavigated by remember { mutableStateOf(false) }
-    LaunchedEffect(effectiveVideoId, hasResolvedVideoId, playerSettings.streamReuseLastLinkEnabled, launch.manualSelection) {
+    LaunchedEffect(effectiveVideoId, hasResolvedVideoId, playerSettings.streamReuseLastLinkEnabled, launch.manualSelection, launch.qualitySelectionMode) {
         if (!hasResolvedVideoId) return@LaunchedEffect
         if (reuseHandled) return@LaunchedEffect
         reuseHandled = true
-        if (launch.manualSelection) return@LaunchedEffect
+        if (launch.manualSelection || launch.qualitySelectionMode) return@LaunchedEffect
         if (!playerSettings.streamReuseLastLinkEnabled) return@LaunchedEffect
         val cacheKey = StreamLinkCacheRepository.contentKey(
             type = launch.type,
@@ -377,17 +407,124 @@ internal fun StreamDestination(
         season = launch.seasonNumber,
         episode = launch.episodeNumber,
         manualSelection = launch.manualSelection,
+        qualitySelectionMode = launch.qualitySelectionMode,
     )
-    val showLoadingScreen = autoPlayNavigationStarted || resolvingDebridStream || resolvingYouTubeStream || preparingServerStream || streamsUiState.shouldShowAutoPlayLoading(
-        expectedRequestToken = expectedStreamsRequestToken,
-        settings = playerSettings,
-        manualSelection = launch.manualSelection,
-    )
-    val useLandscapeLoading = autoPlayNavigationStarted || streamsUiState.shouldUseLandscapeAutoPlayLoading(
-        expectedRequestToken = expectedStreamsRequestToken,
-        settings = playerSettings,
-        manualSelection = launch.manualSelection,
-    )
+    val qualityFlowEnabled = launch.qualitySelectionMode && !launch.manualSelection
+    val debridEnabledForQualitySelection = DebridSettingsRepository.snapshot().canResolvePlayableLinks
+    val allQualityStreams = remember(streamsUiState.groups) { streamsUiState.groups.flatMap { it.streams } }
+    val qualityPreferredSourceOrder = buildList {
+        addAll(playerSettings.streamAutoPlayFavoriteAddons)
+        if (playerSettings.streamAutoPlayAdvancedRulesEnabled) {
+            addAll(playerSettings.streamAutoPlayAddonPriority)
+            addAll(playerSettings.streamAutoPlayPluginPriority)
+        }
+    }.distinct()
+    // Top-three early start is based on configured addon order, not plugin priority.
+    val qualityPreferredAddonOrder = buildList {
+        addAll(playerSettings.streamAutoPlayFavoriteAddons)
+        if (playerSettings.streamAutoPlayAdvancedRulesEnabled) {
+            addAll(playerSettings.streamAutoPlayAddonPriority)
+        }
+        addAll(streamsUiState.groups.map { it.addonName })
+    }.distinct()
+    val topThreeQualityAddonNames = qualityPreferredAddonOrder.take(3).toSet()
+    val qualitySearchFinished = streamsUiState.requestToken == expectedStreamsRequestToken &&
+        !streamsUiState.isAnyLoading && streamsUiState.groups.none { it.isLoading }
+    // Show the profile selector immediately; all provider requests continue in the background.
+    val showQualityPicker = qualityFlowEnabled &&
+        !qualityPickerDismissed && !qualitySelectionStarted &&
+        !autoPlayNavigationStarted && !reuseNavigated
+    val qualityAutoPlayLoading = qualityFlowEnabled && qualitySelectionStarted &&
+        streamsUiState.showDirectAutoPlayOverlay
+
+    // Exact matches start immediately. After 6.5 seconds, use the best available fallback
+    // rather than making the user wait for slow addons or network probes.
+    LaunchedEffect(pendingQualitySelection) {
+        val selectedName = pendingQualitySelection ?: return@LaunchedEffect
+        delay(6_500)
+        if (pendingQualitySelection == selectedName) {
+            fallbackQualityAfterWait = selectedName
+        }
+    }
+    LaunchedEffect(
+        pendingQualitySelection,
+        fallbackQualityAfterWait,
+        allQualityStreams,
+        qualitySearchFinished,
+        streamsUiState.requestToken,
+        expectedStreamsRequestToken,
+    ) {
+        val selectedName = pendingQualitySelection ?: return@LaunchedEffect
+        if (streamsUiState.requestToken != expectedStreamsRequestToken) return@LaunchedEffect
+        val requestedQuality = runCatching {
+            StreamAutoPlayPreferredQuality.valueOf(selectedName)
+        }.getOrNull() ?: return@LaunchedEffect
+        val rankedCandidates = QualityFirstAutoPlayPolicy.rankCandidates(
+            streams = allQualityStreams,
+            requestedQuality = requestedQuality,
+            debridEnabled = debridEnabledForQualitySelection,
+            preferredSourceOrder = qualityPreferredSourceOrder,
+        )
+        val targetHeight = requestedQuality.targetHeight
+        val topThreeStreams = allQualityStreams.filter { it.addonName in topThreeQualityAddonNames }
+        val rankedTopThreeCandidates = QualityFirstAutoPlayPolicy.rankCandidates(
+            streams = topThreeStreams,
+            requestedQuality = requestedQuality,
+            debridEnabled = debridEnabledForQualitySelection,
+            preferredSourceOrder = qualityPreferredSourceOrder,
+        )
+        // For a requested tier, only an exact match from the top three may trigger early start.
+        // "Best available" can start as soon as the top three yield any playable candidate.
+        val earlyStartCandidates = if (targetHeight == null) {
+            rankedTopThreeCandidates
+        } else {
+            rankedTopThreeCandidates.filter {
+                QualityFirstAutoPlayPolicy.detectQualityHeight(it) == targetHeight
+            }
+        }
+        val canStartEarlyFromTopThree = earlyStartCandidates.isNotEmpty()
+        if (rankedCandidates.isNotEmpty() &&
+            (canStartEarlyFromTopThree || qualitySearchFinished || fallbackQualityAfterWait == selectedName)
+        ) {
+            // Put an exact requested-quality stream from a top-three addon first, then retain
+            // the ranked alternatives for automatic fallback if the first stream fails.
+            val orderedCandidates = (earlyStartCandidates + rankedCandidates)
+                .distinct()
+            val started = StreamsRepository.beginQualityFirstAutoPlay(
+                expectedRequestToken = expectedStreamsRequestToken,
+                candidates = orderedCandidates,
+            )
+            pendingQualitySelection = null
+            fallbackQualityAfterWait = null
+            if (started) {
+                qualitySelectionStarted = true
+                qualitySelectionInProgress = false
+            } else {
+                NuvioToastController.show("Sources changed; please choose a quality again.")
+            }
+        } else if (qualitySearchFinished) {
+            pendingQualitySelection = null
+            fallbackQualityAfterWait = null
+            NuvioToastController.show("No playable links were found. Choose another quality or try again.")
+        }
+    }
+
+    val showLoadingScreen = autoPlayNavigationStarted || resolvingDebridStream ||
+        resolvingYouTubeStream || preparingServerStream ||
+        (!qualityFlowEnabled && qualitySelectionInProgress) || qualityAutoPlayLoading ||
+        (!qualityFlowEnabled && streamsUiState.shouldShowAutoPlayLoading(
+            expectedRequestToken = expectedStreamsRequestToken,
+            settings = playerSettings,
+            manualSelection = launch.manualSelection,
+        ))
+    // Keep the selector in the screen's existing orientation; only playback loading may rotate.
+    val useLandscapeLoading = autoPlayNavigationStarted ||
+        (qualityFlowEnabled && qualitySelectionStarted && qualityAutoPlayLoading) ||
+        (!qualityFlowEnabled && streamsUiState.shouldUseLandscapeAutoPlayLoading(
+            expectedRequestToken = expectedStreamsRequestToken,
+            settings = playerSettings,
+            manualSelection = launch.manualSelection,
+        ))
     SideEffect { onLandscapeLoadingChanged(useLandscapeLoading) }
     var autoPlayHandled by rememberSaveable(launch.videoId, effectiveVideoId) { mutableStateOf(false) }
     LaunchedEffect(
@@ -519,7 +656,7 @@ internal fun StreamDestination(
                 .drop(1)
                 .filter { it.playableDirectUrl != null && it.playableDirectUrl != sourceUrl }
                 .distinctBy { it.playableDirectUrl }
-                .takeIf { playerSettings.streamAutoPlaySmartSelectionEnabled }
+                .takeIf { launch.qualitySelectionMode || playerSettings.streamAutoPlaySmartSelectionEnabled }
                 .orEmpty(),
         )
         if (playerSettings.externalPlayerEnabled && stream.serverTarget == null) {
@@ -756,6 +893,7 @@ internal fun StreamDestination(
             resumePositionMs = launch.resumePositionMs,
             resumeProgressFraction = launch.resumeProgressFraction,
             manualSelection = launch.manualSelection,
+            qualitySelectionMode = launch.qualitySelectionMode,
             startFromBeginning = launch.startFromBeginning,
             onStreamSelected = { stream, resolvedResumePositionMs, resolvedResumeProgressFraction ->
                 openSelectedStream(
@@ -809,6 +947,149 @@ internal fun StreamDestination(
                 onBack = onBack,
                 preparingPlayback = preparingServerStream,
             )
+        }
+    }
+
+    if (showQualityPicker) {
+        fun qualityLabel(quality: StreamAutoPlayPreferredQuality): String = when (quality) {
+            StreamAutoPlayPreferredQuality.ANY -> "Best available"
+            StreamAutoPlayPreferredQuality.P2160 -> "4K (2160p)"
+            StreamAutoPlayPreferredQuality.P1440 -> "2K (1440p)"
+            StreamAutoPlayPreferredQuality.P1080 -> "1080p"
+            StreamAutoPlayPreferredQuality.P720 -> "720p"
+            StreamAutoPlayPreferredQuality.P480 -> "480p"
+            StreamAutoPlayPreferredQuality.P360 -> "360p"
+        }
+        fun profileGlyph(quality: StreamAutoPlayPreferredQuality): String = when (quality) {
+            StreamAutoPlayPreferredQuality.ANY -> "✦"
+            StreamAutoPlayPreferredQuality.P2160 -> "4K"
+            StreamAutoPlayPreferredQuality.P1440 -> "2K"
+            StreamAutoPlayPreferredQuality.P1080 -> "HD"
+            StreamAutoPlayPreferredQuality.P720 -> "HD"
+            StreamAutoPlayPreferredQuality.P480 -> "SD"
+            StreamAutoPlayPreferredQuality.P360 -> "SD"
+        }
+        // Semi-automatic mode offers only the four requested quality tiers.
+        val options = listOf(
+            StreamAutoPlayPreferredQuality.P2160,
+            StreamAutoPlayPreferredQuality.P1080,
+            StreamAutoPlayPreferredQuality.P720,
+            StreamAutoPlayPreferredQuality.P480,
+        )
+        val fetching = !qualitySearchFinished
+        val streamCount = allQualityStreams.size
+        val sourceStatus = when {
+            fetching && streamCount == 0 -> "Searching addons in the background…"
+            fetching -> "$streamCount links found · searching in the background…"
+            streamCount == 0 -> "Search complete · no links found"
+            else -> "$streamCount links fetched"
+        }
+
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.74f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            val landscape = maxWidth > maxHeight
+            Surface(
+                modifier = Modifier
+                     .fillMaxWidth(if (landscape) 0.92f else 0.90f)
+                    .widthIn(max = if (landscape) 760.dp else 440.dp)
+                    .heightIn(max = maxHeight * 0.92f),
+                shape = RoundedCornerShape(30.dp),
+                tonalElevation = 8.dp,
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text("Select playback quality", style = MaterialTheme.typography.headlineSmall)
+                    Text(
+                        sourceStatus,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    // Floating quality tiles: each tile updates its link count as addons respond.
+                    options.chunked(2).forEach { rowQualities ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.Top,
+                        ) {
+                            rowQualities.forEach { quality ->
+                                val targetHeight = quality.targetHeight
+                                val count = if (targetHeight == null) {
+                                    allQualityStreams.size
+                                } else {
+                                    allQualityStreams.count { stream ->
+                                        QualityFirstAutoPlayPolicy.detectQualityHeight(stream) == targetHeight
+                                    }
+                                }
+                                TextButton(
+                                    onClick = {
+                                        pendingQualitySelection = quality.name
+                                        fallbackQualityAfterWait = null
+                                    },
+                                    modifier = Modifier.weight(1f).heightIn(min = 124.dp),
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(5.dp),
+                                    ) {
+                                        Surface(
+                                            modifier = Modifier.size(if (landscape) 58.dp else 68.dp),
+                                            shape = CircleShape,
+                                            color = if (pendingQualitySelection == quality.name)
+                                                MaterialTheme.colorScheme.primaryContainer
+                                            else MaterialTheme.colorScheme.secondaryContainer,
+                                            contentColor = if (pendingQualitySelection == quality.name)
+                                                MaterialTheme.colorScheme.onPrimaryContainer
+                                            else MaterialTheme.colorScheme.onSecondaryContainer,
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Text(profileGlyph(quality), style = MaterialTheme.typography.titleMedium)
+                                            }
+                                        }
+                                        Text(
+                                            qualityLabel(quality),
+                                            style = MaterialTheme.typography.labelLarge,
+                                            maxLines = 1,
+                                        )
+                                        Text(
+                                            "$count links",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                        )
+                                    }
+                                }
+                            }
+                            repeat(2 - rowQualities.size) {
+                                Spacer(Modifier.weight(1f))
+                            }
+                        }
+                    }
+                    if (pendingQualitySelection != null) {
+                        val pendingLabel = runCatching {
+                            qualityLabel(StreamAutoPlayPreferredQuality.valueOf(pendingQualitySelection!!))
+                        }.getOrDefault("selected quality")
+                        Text(
+                            "Looking for $pendingLabel. A lower available quality may be tried after about 7 seconds if no exact match arrives.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    TextButton(
+                        onClick = {
+                            pendingQualitySelection = null
+                            fallbackQualityAfterWait = null
+                            qualityPickerDismissed = true
+                        },
+                    ) { Text("Cancel") }
+                }
+            }
         }
     }
 }

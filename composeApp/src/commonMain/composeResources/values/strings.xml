@@ -740,8 +740,8 @@
     <string name="settings_hide_secret">Hide value</string>
     <string name="settings_playback_subtitle">Player, subtitles, and auto-play</string>
     <string name="compose_settings_nuvio2gether_description">Smart stream selection and fallback behavior</string>
-    <string name="settings_nuvio2gether_smart_selection">Smart Stream Selection</string>
-    <string name="settings_nuvio2gether_smart_selection_description">Automatically choose a stream using your preferences and try another candidate if playback fails or never starts.</string>
+    <string name="settings_nuvio2gether_smart_selection">Completely Automatic</string>
+    <string name="settings_nuvio2gether_smart_selection_description">Automatically choose the preferred quality and source priority, then fall back to another playable stream if needed.</string>
     <string name="settings_nuvio2gether_favourite_addon">Favourite stream add-on</string>
     <string name="settings_nuvio2gether_favourite_addon_none">No favourite selected</string>
     <string name="settings_nuvio2gether_preferred_quality">Preferred quality</string>

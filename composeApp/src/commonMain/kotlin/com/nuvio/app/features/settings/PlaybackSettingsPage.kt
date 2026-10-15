@@ -1,5 +1,6 @@
 package com.nuvio.app.features.settings
 
+import com.nuvio.app.features.settings.nuvio2getherSettingsContent
 import com.nuvio.app.core.build.AppFeaturePolicy
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -858,129 +859,8 @@ private fun PlaybackSettingsSection(
             }
         }
 
-        SettingsSection(
-            title = stringResource(Res.string.settings_playback_section_stream_auto_play),
-            isTablet = isTablet,
-        ) {
-            SettingsGroup(isTablet = isTablet) {
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.settings_playback_stream_selection_mode),
-                    description = stringResource(autoPlayPlayerSettings.streamAutoPlayMode.labelRes),
-                    isTablet = isTablet,
-                    onClick = { showAutoPlayModeDialog = true },
-                )
-                if (autoPlayPlayerSettings.streamAutoPlayMode == StreamAutoPlayMode.REGEX_MATCH) {
-                    SettingsGroupDivider(isTablet = isTablet)
-                    val notSetLabel = stringResource(Res.string.settings_playback_not_set)
-                    SettingsNavigationRow(
-                        title = stringResource(Res.string.settings_playback_regex_pattern),
-                        description = autoPlayPlayerSettings.streamAutoPlayRegex.ifBlank { notSetLabel },
-                        isTablet = isTablet,
-                        onClick = { showAutoPlayRegexDialog = true },
-                    )
-                }
-                SettingsGroupDivider(isTablet = isTablet)
-                val timeoutSec = autoPlayPlayerSettings.streamAutoPlayTimeoutSeconds
-                val timeoutLabel = when (timeoutSec) {
-                    0 -> stringResource(Res.string.settings_playback_timeout_instant)
-                    Int.MAX_VALUE -> stringResource(Res.string.settings_playback_timeout_unlimited)
-                    else -> stringResource(Res.string.settings_playback_timeout_seconds, timeoutSec)
-                }
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = if (isTablet) 18.dp else 16.dp, vertical = 10.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                            Text(
-                                text = stringResource(Res.string.settings_playback_stream_timeout),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                            Text(
-                                text = stringResource(Res.string.settings_playback_stream_timeout_description),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        ValueBox(text = timeoutLabel, modifier = Modifier.wrapContentWidth())
-                    }
-                    val timeoutIndex = STREAM_AUTO_PLAY_TIMEOUT_VALUES.indexOf(timeoutSec)
-                        .coerceAtLeast(0)
-                    val maxIndex = (STREAM_AUTO_PLAY_TIMEOUT_VALUES.size - 1).toFloat()
-                    var sliderValue by remember(timeoutIndex) { mutableFloatStateOf(timeoutIndex.toFloat()) }
-                    var lastHapticStep by remember(timeoutIndex) { mutableStateOf(timeoutIndex.toFloat()) }
-                    Slider(
-                        value = sliderValue,
-                        onValueChange = {
-                            val snapped = snapToStep(it, 1f)
-                            sliderValue = snapped
-
-                            if (snapped != lastHapticStep) {
-                                lastHapticStep = snapped
-                                hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            }
-                        },
-                        onValueChangeFinished = {
-                            val index = sliderValue.toInt().coerceIn(0, STREAM_AUTO_PLAY_TIMEOUT_VALUES.size - 1)
-                            PlayerSettingsRepository.setStreamAutoPlayTimeoutSeconds(STREAM_AUTO_PLAY_TIMEOUT_VALUES[index])
-                        },
-                        valueRange = 0f..maxIndex,
-                        steps = calculateSteps(0f, maxIndex, 1f),
-                        colors = SliderDefaults.colors(
-                            thumbColor = MaterialTheme.colorScheme.primary,
-                            activeTrackColor = MaterialTheme.colorScheme.primary,
-                        ),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.settings_playback_source_scope),
-                    description = stringResource(autoPlayPlayerSettings.streamAutoPlaySource.labelRes(pluginsEnabled)),
-                    isTablet = isTablet,
-                    onClick = { showAutoPlaySourceDialog = true },
-                )
-                if (autoPlayPlayerSettings.streamAutoPlaySource != StreamAutoPlaySource.ENABLED_PLUGINS_ONLY) {
-                    SettingsGroupDivider(isTablet = isTablet)
-                    val addonSubtitle = if (autoPlayPlayerSettings.streamAutoPlaySelectedAddons.isEmpty()) {
-                        stringResource(Res.string.settings_playback_all_addons)
-                    } else {
-                        stringResource(
-                            Res.string.settings_playback_selected_count,
-                            autoPlayPlayerSettings.streamAutoPlaySelectedAddons.size,
-                        )
-                    }
-                    SettingsNavigationRow(
-                        title = stringResource(Res.string.settings_playback_allowed_addons),
-                        description = addonSubtitle,
-                        isTablet = isTablet,
-                        onClick = { showAutoPlayAddonSelectionDialog = true },
-                    )
-                }
-                if (pluginsEnabled && autoPlayPlayerSettings.streamAutoPlaySource != StreamAutoPlaySource.INSTALLED_ADDONS_ONLY) {
-                    SettingsGroupDivider(isTablet = isTablet)
-                    val pluginSubtitle = if (autoPlayPlayerSettings.streamAutoPlaySelectedPlugins.isEmpty()) {
-                        stringResource(Res.string.settings_playback_all_plugins)
-                    } else {
-                        stringResource(
-                            Res.string.settings_playback_selected_count,
-                            autoPlayPlayerSettings.streamAutoPlaySelectedPlugins.size,
-                        )
-                    }
-                    SettingsNavigationRow(
-                        title = stringResource(Res.string.settings_playback_allowed_plugins),
-                        description = pluginSubtitle,
-                        isTablet = isTablet,
-                        onClick = { showAutoPlayPluginSelectionDialog = true },
-                    )
-                }
-            }
-        }
+        // Nuvio2gether owns stream-selection mode now; avoid competing original autoplay controls.
+        nuvio2getherSettingsContent(isTablet)
 
         if (!isIos) {
             val decoderEnabled = !autoPlayPlayerSettings.externalPlayerEnabled
@@ -2957,6 +2837,7 @@ private fun StreamAutoPlaySource.labelRes(pluginsEnabled: Boolean): StringResour
 private val StreamAutoPlayMode.labelRes: StringResource
     get() = when (this) {
         StreamAutoPlayMode.MANUAL -> Res.string.settings_playback_stream_selection_mode_manual
+        StreamAutoPlayMode.AUTOMATIC, StreamAutoPlayMode.SEMI_AUTOMATIC,
         StreamAutoPlayMode.FIRST_STREAM -> Res.string.settings_playback_stream_selection_mode_first_stream
         StreamAutoPlayMode.REGEX_MATCH -> Res.string.settings_playback_stream_selection_mode_regex
     }

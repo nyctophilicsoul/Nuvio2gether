@@ -45,10 +45,12 @@ object StreamsRepository {
         season: Int? = null,
         episode: Int? = null,
         manualSelection: Boolean = false,
+        qualitySelectionMode: Boolean = false,
     ): String =
-        "$type::$videoId::$season::$episode::$manualSelection"
+        if (qualitySelectionMode) "$type::$videoId::$season::$episode::$manualSelection::quality-first"
+        else "$type::$videoId::$season::$episode::$manualSelection"
 
-    fun load(type: String, videoId: String, parentMetaId: String? = null, season: Int? = null, episode: Int? = null, manualSelection: Boolean = false) {
+    fun load(type: String, videoId: String, parentMetaId: String? = null, season: Int? = null, episode: Int? = null, manualSelection: Boolean = false, qualitySelectionMode: Boolean = false) {
         PluginRepository.setLocalPluginSearchPaused(false)
         load(
             type = type,
@@ -58,10 +60,11 @@ object StreamsRepository {
             episode = episode,
             manualSelection = manualSelection,
             forceRefresh = false,
+            qualitySelectionMode = qualitySelectionMode,
         )
     }
 
-    fun reload(type: String, videoId: String, parentMetaId: String? = null, season: Int? = null, episode: Int? = null, manualSelection: Boolean = false) {
+    fun reload(type: String, videoId: String, parentMetaId: String? = null, season: Int? = null, episode: Int? = null, manualSelection: Boolean = false, qualitySelectionMode: Boolean = false) {
         PluginRepository.setLocalPluginSearchPaused(false)
         load(
             type = type,
@@ -71,10 +74,11 @@ object StreamsRepository {
             episode = episode,
             manualSelection = manualSelection,
             forceRefresh = true,
+            qualitySelectionMode = qualitySelectionMode,
         )
     }
 
-    private fun load(type: String, videoId: String, parentMetaId: String?, season: Int?, episode: Int?, manualSelection: Boolean, forceRefresh: Boolean) {
+    private fun load(type: String, videoId: String, parentMetaId: String?, season: Int?, episode: Int?, manualSelection: Boolean, forceRefresh: Boolean, qualitySelectionMode: Boolean) {
         val pluginUiState = if (AppFeaturePolicy.pluginsEnabled) {
             PluginRepository.initialize()
             PluginRepository.uiState.value
@@ -87,6 +91,7 @@ object StreamsRepository {
             season = season,
             episode = episode,
             manualSelection = manualSelection,
+            qualitySelectionMode = qualitySelectionMode,
         )
         val requestKey = "$requestToken::pluginsGrouped=${pluginUiState.groupStreamsByRepository}"
         val currentState = _uiState.value
@@ -111,7 +116,8 @@ object StreamsRepository {
         val autoPlayMode = if (playerSettings.streamAutoPlaySmartSelectionEnabled && configuredAutoPlayMode == StreamAutoPlayMode.MANUAL) {
             StreamAutoPlayMode.FIRST_STREAM
         } else configuredAutoPlayMode
-        val isAutoPlayEnabled = !manualSelection && autoPlayMode != StreamAutoPlayMode.MANUAL &&
+        val qualityFirstMode = qualitySelectionMode && !manualSelection
+        val isAutoPlayEnabled = !qualityFirstMode && !manualSelection && autoPlayMode != StreamAutoPlayMode.MANUAL &&
             !(autoPlayMode == StreamAutoPlayMode.REGEX_MATCH &&
                 !StreamAutoPlayPolicy.isRegexSelectionConfigured(playerSettings.streamAutoPlayRegex))
 
@@ -125,7 +131,7 @@ object StreamsRepository {
 
         // Enable direct auto-play flow if normal auto-play is enabled,
         // OR if we have a persisted binge group in MANUAL mode
-        val bingeGroupDirectFlow = !manualSelection &&
+        val bingeGroupDirectFlow = !qualityFirstMode && !manualSelection &&
             persistedBingeGroup != null &&
             autoPlayMode == StreamAutoPlayMode.MANUAL
         val isDirectAutoPlayFlow = isAutoPlayEnabled || bingeGroupDirectFlow
@@ -268,8 +274,14 @@ object StreamsRepository {
                     bingeGroupOnly = bingeGroupOnly,
                     debridEnabled = debridSettings.canResolvePlayableLinks,
                     activeResolverProviderId = debridSettings.activeResolverProviderId,
-                    preferredAddonName = playerSettings.streamAutoPlayPreferredAddon.takeIf { playerSettings.streamAutoPlaySmartSelectionEnabled }.orEmpty(),
+                    preferredAddonName = playerSettings.streamAutoPlayFavoriteAddons.firstOrNull()
+                        ?: playerSettings.streamAutoPlayPreferredAddon.takeIf { playerSettings.streamAutoPlaySmartSelectionEnabled }.orEmpty(),
                     preferredQuality = if (playerSettings.streamAutoPlaySmartSelectionEnabled) playerSettings.streamAutoPlayPreferredQuality else com.nuvio.app.features.streams.StreamAutoPlayPreferredQuality.ANY,
+                    preferredSourceOrder = if (playerSettings.streamAutoPlaySmartSelectionEnabled) {
+                        playerSettings.streamAutoPlayFavoriteAddons.toList() +
+                            playerSettings.streamAutoPlayAddonPriority +
+                            playerSettings.streamAutoPlayPluginPriority
+                    } else emptyList(),
                 )
 
             fun settleAutoPlay(evaluation: StreamAutoPlayEvaluation) {
@@ -294,6 +306,26 @@ object StreamsRepository {
 
             fun updateAutoPlayAfterStreamsChanged() {
                 if (!isDirectAutoPlayFlow || autoSelectTriggered) return
+
+                // Start early only when one quality independently crosses the threshold
+                // across the user's top three add-ons. Fetch jobs remain active in background.
+                val earlyAddonOrder = (
+                    playerSettings.streamAutoPlayAddonPriority + installedAddonOrder
+                ).distinct().take(3)
+                if (
+                    playerSettings.streamAutoPlaySmartSelectionEnabled &&
+                    StreamAutoPlaySelector.hasEarlySelectionThreshold(
+                        groups = _uiState.value.groups,
+                        preferredAddonOrder = earlyAddonOrder,
+                        minimumCountExclusive = 10,
+                    )
+                ) {
+                    val evaluation = evaluateAutoPlay()
+                    if (evaluation.stream != null) {
+                        settleAutoPlay(evaluation)
+                        return
+                    }
+                }
 
                 val earlyEvaluation = when {
                     timeoutElapsed -> evaluateAutoPlay()
@@ -611,6 +643,35 @@ object StreamsRepository {
         _uiState.update { it.copy(selectedFilter = addonId) }
     }
 
+    /**
+     * Starts quality-first autoplay from the sources currently available.
+     * Additional provider requests may still be loading; candidates are a safe
+     * snapshot and playback fallback uses the ranked candidates supplied here.
+     */
+    fun beginQualityFirstAutoPlay(
+        expectedRequestToken: String,
+        candidates: List<StreamItem>,
+    ): Boolean {
+        if (candidates.isEmpty()) return false
+        var started = false
+        _uiState.update { current ->
+            if (current.requestToken != expectedRequestToken) {
+                current
+            } else {
+                started = true
+                current.copy(
+                    autoPlayDecided = true,
+                    autoPlayStream = candidates.first(),
+                    autoPlayCandidates = candidates,
+                    isDirectAutoPlayFlow = true,
+                    showDirectAutoPlayOverlay = true,
+                    overlayMessage = null,
+                )
+            }
+        }
+        return started
+    }
+
     fun consumeAutoPlay() {
         activeRequestKey = null
         _uiState.update {
@@ -642,6 +703,19 @@ object StreamsRepository {
             )
         }
         return hasNext
+    }
+
+    /**
+     * Stop only a quality-first background search after playback has started.
+     * Other/manual stream searches retain their existing lifecycle.
+     */
+    fun cancelQualitySearchAfterPlaybackStarted() {
+        if (
+            _uiState.value.requestToken?.contains("::quality-first") == true &&
+            activeJob?.isActive == true
+        ) {
+            cancelLoading()
+        }
     }
 
     fun cancelLoading() {

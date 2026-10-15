@@ -80,10 +80,14 @@ data class PlayerSettingsUiState(
     val vodCacheSizeMode: VodCacheSizeMode = VodCacheSizeMode.AUTO,
     val vodCacheSizeMb: Int = VodCacheSizing.DEFAULT_SIZE_MB,
     val streamAutoPlayMode: StreamAutoPlayMode = StreamAutoPlayMode.MANUAL,
+    val streamAutoPlayAdvancedRulesEnabled: Boolean = false,
     val streamAutoPlaySmartSelectionEnabled: Boolean = false,
     val streamAutoPlayFallbackTimeoutSeconds: Int = 20,
     val streamAutoPlayPreferredAddon: String = "",
+    val streamAutoPlayFavoriteAddons: Set<String> = emptySet(),
     val streamAutoPlayPreferredQuality: StreamAutoPlayPreferredQuality = StreamAutoPlayPreferredQuality.ANY,
+    val streamAutoPlayAddonPriority: List<String> = emptyList(),
+    val streamAutoPlayPluginPriority: List<String> = emptyList(),
     val streamAutoPlaySource: StreamAutoPlaySource = StreamAutoPlaySource.ALL_SOURCES,
     val streamAutoPlaySelectedAddons: Set<String> = emptySet(),
     val streamAutoPlaySelectedPlugins: Set<String> = emptySet(),
@@ -173,10 +177,14 @@ object PlayerSettingsRepository {
     private var vodCacheSizeMode = VodCacheSizeMode.AUTO
     private var vodCacheSizeMb = VodCacheSizing.DEFAULT_SIZE_MB
     private var streamAutoPlayMode = StreamAutoPlayMode.MANUAL
+    private var streamAutoPlayAdvancedRulesEnabled = false
     private var streamAutoPlaySmartSelectionEnabled = false
     private var streamAutoPlayFallbackTimeoutSeconds = 20
     private var streamAutoPlayPreferredAddon = ""
+    private var streamAutoPlayFavoriteAddons: Set<String> = emptySet()
     private var streamAutoPlayPreferredQuality = StreamAutoPlayPreferredQuality.ANY
+    private var streamAutoPlayAddonPriority: List<String> = emptyList()
+    private var streamAutoPlayPluginPriority: List<String> = emptyList()
     private var streamAutoPlaySource = StreamAutoPlaySource.ALL_SOURCES
     private var streamAutoPlaySelectedAddons: Set<String> = emptySet()
     private var streamAutoPlaySelectedPlugins: Set<String> = emptySet()
@@ -408,7 +416,11 @@ object PlayerSettingsRepository {
         streamAutoPlayMode = PlayerSettingsStorage.loadStreamAutoPlayMode()
             ?.let { runCatching { StreamAutoPlayMode.valueOf(it) }.getOrNull() }
             ?: StreamAutoPlayMode.MANUAL
-        streamAutoPlaySmartSelectionEnabled = PlayerSettingsStorage.loadStreamAutoPlaySmartSelectionEnabled() ?: false
+        // Migrate legacy toggle state to the explicit mode model. The mode is
+        // authoritative so stale legacy values cannot make Manual auto-play.
+        streamAutoPlaySmartSelectionEnabled = streamAutoPlayMode != StreamAutoPlayMode.MANUAL
+        streamAutoPlayAdvancedRulesEnabled = PlayerSettingsStorage.loadStreamAutoPlayAdvancedRulesEnabled() ?: false
+        PlayerSettingsStorage.saveStreamAutoPlaySmartSelectionEnabled(streamAutoPlaySmartSelectionEnabled)
         streamAutoPlayFallbackTimeoutSeconds = (PlayerSettingsStorage.loadStreamAutoPlayFallbackTimeoutSeconds() ?: 20).coerceIn(5, 120)
         streamAutoPlaySource = PlayerSettingsStorage.loadStreamAutoPlaySource()
             ?.let { runCatching { StreamAutoPlaySource.valueOf(it) }.getOrNull() }
@@ -416,9 +428,12 @@ object PlayerSettingsRepository {
         streamAutoPlaySelectedAddons = PlayerSettingsStorage.loadStreamAutoPlaySelectedAddons() ?: emptySet()
         streamAutoPlaySelectedPlugins = PlayerSettingsStorage.loadStreamAutoPlaySelectedPlugins() ?: emptySet()
         streamAutoPlayPreferredAddon = PlayerSettingsStorage.loadStreamAutoPlayPreferredAddon().orEmpty()
+        streamAutoPlayFavoriteAddons = PlayerSettingsStorage.loadStreamAutoPlayFavoriteAddons().orEmpty().take(5).toSet()
         streamAutoPlayPreferredQuality = PlayerSettingsStorage.loadStreamAutoPlayPreferredQuality()
             ?.let { runCatching { StreamAutoPlayPreferredQuality.valueOf(it) }.getOrNull() }
             ?: StreamAutoPlayPreferredQuality.ANY
+        streamAutoPlayAddonPriority = PlayerSettingsStorage.loadStreamAutoPlayAddonPriority().orEmpty()
+        streamAutoPlayPluginPriority = PlayerSettingsStorage.loadStreamAutoPlayPluginPriority().orEmpty()
         if (!AppFeaturePolicy.pluginsEnabled) {
             val normalizedSource = normalizeStreamAutoPlaySource(streamAutoPlaySource)
             if (normalizedSource != streamAutoPlaySource) {
@@ -930,10 +945,24 @@ object PlayerSettingsRepository {
 
     fun setStreamAutoPlayMode(mode: StreamAutoPlayMode) {
         ensureLoaded()
-        if (streamAutoPlayMode == mode) return
+        val smartSelectionEnabled = mode != StreamAutoPlayMode.MANUAL
+        if (streamAutoPlayMode == mode && streamAutoPlaySmartSelectionEnabled == smartSelectionEnabled) return
+
+        // Keep the mode as the source of truth. Manual must never leave the legacy
+        // smart-selection flag enabled, and Automatic/Semi-Automatic must enable it.
         streamAutoPlayMode = mode
+        streamAutoPlaySmartSelectionEnabled = smartSelectionEnabled
         publish()
         PlayerSettingsStorage.saveStreamAutoPlayMode(mode.name)
+        PlayerSettingsStorage.saveStreamAutoPlaySmartSelectionEnabled(smartSelectionEnabled)
+    }
+
+    fun setStreamAutoPlayAdvancedRulesEnabled(enabled: Boolean) {
+        ensureLoaded()
+        if (streamAutoPlayAdvancedRulesEnabled == enabled) return
+        streamAutoPlayAdvancedRulesEnabled = enabled
+        publish()
+        PlayerSettingsStorage.saveStreamAutoPlayAdvancedRulesEnabled(enabled)
     }
 
     fun setStreamAutoPlaySource(source: StreamAutoPlaySource) {
@@ -962,12 +991,39 @@ object PlayerSettingsRepository {
         PlayerSettingsStorage.saveStreamAutoPlayPreferredAddon(value)
     }
 
+    fun setStreamAutoPlayFavoriteAddons(addons: Set<String>) {
+        ensureLoaded()
+        val normalized = addons.map(String::trim).filter(String::isNotEmpty).distinct().take(5).toSet()
+        if (streamAutoPlayFavoriteAddons == normalized) return
+        streamAutoPlayFavoriteAddons = normalized
+        publish()
+        PlayerSettingsStorage.saveStreamAutoPlayFavoriteAddons(normalized)
+    }
+
     fun setStreamAutoPlayPreferredQuality(quality: StreamAutoPlayPreferredQuality) {
         ensureLoaded()
         if (streamAutoPlayPreferredQuality == quality) return
         streamAutoPlayPreferredQuality = quality
         publish()
         PlayerSettingsStorage.saveStreamAutoPlayPreferredQuality(quality.name)
+    }
+
+    fun setStreamAutoPlayAddonPriority(priority: List<String>) {
+        ensureLoaded()
+        val normalized = priority.map(String::trim).filter(String::isNotEmpty).distinct()
+        if (streamAutoPlayAddonPriority == normalized) return
+        streamAutoPlayAddonPriority = normalized
+        publish()
+        PlayerSettingsStorage.saveStreamAutoPlayAddonPriority(normalized)
+    }
+
+    fun setStreamAutoPlayPluginPriority(priority: List<String>) {
+        ensureLoaded()
+        val normalized = if (AppFeaturePolicy.pluginsEnabled) priority.map(String::trim).filter(String::isNotEmpty).distinct() else emptyList()
+        if (streamAutoPlayPluginPriority == normalized) return
+        streamAutoPlayPluginPriority = normalized
+        publish()
+        PlayerSettingsStorage.saveStreamAutoPlayPluginPriority(normalized)
     }
 
     fun setStreamAutoPlaySelectedPlugins(plugins: Set<String>) {
@@ -1337,10 +1393,14 @@ object PlayerSettingsRepository {
             vodCacheSizeMode = vodCacheSizeMode,
             vodCacheSizeMb = vodCacheSizeMb,
             streamAutoPlayMode = streamAutoPlayMode,
+            streamAutoPlayAdvancedRulesEnabled = streamAutoPlayAdvancedRulesEnabled,
             streamAutoPlaySmartSelectionEnabled = streamAutoPlaySmartSelectionEnabled,
             streamAutoPlayFallbackTimeoutSeconds = streamAutoPlayFallbackTimeoutSeconds,
             streamAutoPlayPreferredAddon = streamAutoPlayPreferredAddon,
+            streamAutoPlayFavoriteAddons = streamAutoPlayFavoriteAddons,
             streamAutoPlayPreferredQuality = streamAutoPlayPreferredQuality,
+            streamAutoPlayAddonPriority = streamAutoPlayAddonPriority,
+            streamAutoPlayPluginPriority = streamAutoPlayPluginPriority,
             streamAutoPlaySource = streamAutoPlaySource,
             streamAutoPlaySelectedAddons = streamAutoPlaySelectedAddons,
             streamAutoPlaySelectedPlugins = streamAutoPlaySelectedPlugins,

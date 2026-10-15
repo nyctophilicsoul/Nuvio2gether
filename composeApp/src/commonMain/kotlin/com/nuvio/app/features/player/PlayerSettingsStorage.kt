@@ -119,6 +119,8 @@ internal expect object PlayerSettingsStorage {
     fun saveTargetBufferSizeMb(value: Int)
     fun loadStreamAutoPlayMode(): String?
     fun saveStreamAutoPlayMode(mode: String)
+    fun loadStreamAutoPlayAdvancedRulesEnabled(): Boolean?
+    fun saveStreamAutoPlayAdvancedRulesEnabled(enabled: Boolean)
     fun loadStreamAutoPlaySmartSelectionEnabled(): Boolean?
     fun saveStreamAutoPlaySmartSelectionEnabled(enabled: Boolean)
     fun loadStreamAutoPlayFallbackTimeoutSeconds(): Int?
@@ -129,8 +131,14 @@ internal expect object PlayerSettingsStorage {
     fun saveStreamAutoPlaySelectedAddons(addons: Set<String>)
     fun loadStreamAutoPlayPreferredAddon(): String?
     fun saveStreamAutoPlayPreferredAddon(addon: String)
+    fun loadStreamAutoPlayFavoriteAddons(): Set<String>?
+    fun saveStreamAutoPlayFavoriteAddons(addons: Set<String>)
     fun loadStreamAutoPlayPreferredQuality(): String?
     fun saveStreamAutoPlayPreferredQuality(quality: String)
+    fun loadStreamAutoPlayAddonPriority(): List<String>?
+    fun saveStreamAutoPlayAddonPriority(priority: List<String>)
+    fun loadStreamAutoPlayPluginPriority(): List<String>?
+    fun saveStreamAutoPlayPluginPriority(priority: List<String>)
     fun loadStreamAutoPlaySelectedPlugins(): Set<String>?
     fun saveStreamAutoPlaySelectedPlugins(plugins: Set<String>)
     fun loadStreamAutoPlayRegex(): String?

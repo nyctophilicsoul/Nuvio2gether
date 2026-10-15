@@ -2,7 +2,11 @@ package com.nuvio.app.features.streams
 
 enum class StreamAutoPlayMode {
     MANUAL,
+    AUTOMATIC,
+    SEMI_AUTOMATIC,
+    /** Legacy mode retained for saved settings compatibility. */
     FIRST_STREAM,
+    /** Legacy mode retained for saved settings compatibility. */
     REGEX_MATCH,
 }
 

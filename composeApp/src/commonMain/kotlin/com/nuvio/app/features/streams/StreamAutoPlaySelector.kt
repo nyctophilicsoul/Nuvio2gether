@@ -38,6 +38,34 @@ object StreamAutoPlaySelector {
         return directDebridEntries + orderedAddons + pluginEntries
     }
 
+    /**
+     * Starts early selection when the top three configured add-ons have returned
+     * more than [minimumCountExclusive] distinct playable streams for one known quality.
+     * Unknown-quality links and non-playable/external links do not inflate the threshold.
+     */
+    fun hasEarlySelectionThreshold(
+        groups: List<AddonStreamGroup>,
+        preferredAddonOrder: List<String>,
+        minimumCountExclusive: Int = 10,
+    ): Boolean {
+        val topThree = preferredAddonOrder.distinct().take(3).toSet()
+        if (topThree.isEmpty()) return false
+
+        val uniqueStreamsByQuality = mutableMapOf<Int, MutableSet<String>>()
+        groups.asSequence()
+            .filter { it.addonName in topThree }
+            .flatMap { it.streams.asSequence() }
+            .forEach { stream ->
+                val height = stream.detectAutoPlayQualityHeight() ?: return@forEach
+                val directUrl = stream.playableDirectUrl ?: return@forEach
+                val normalizedUrl = directUrl.trim().substringBefore('#')
+                if (normalizedUrl.isBlank()) return@forEach
+                uniqueStreamsByQuality.getOrPut(height) { mutableSetOf() }.add(normalizedUrl)
+            }
+
+        return uniqueStreamsByQuality.values.any { it.size > minimumCountExclusive }
+    }
+
     fun selectAutoPlayStream(
         streams: List<StreamItem>,
         mode: StreamAutoPlayMode,
@@ -53,6 +81,7 @@ object StreamAutoPlaySelector {
         activeResolverProviderId: String? = null,
         preferredAddonName: String = "",
         preferredQuality: StreamAutoPlayPreferredQuality = StreamAutoPlayPreferredQuality.ANY,
+        preferredSourceOrder: List<String> = emptyList(),
     ): StreamItem? =
         evaluateAutoPlayStream(
             streams = streams,
@@ -69,6 +98,7 @@ object StreamAutoPlaySelector {
             activeResolverProviderId = activeResolverProviderId,
             preferredAddonName = preferredAddonName,
             preferredQuality = preferredQuality,
+            preferredSourceOrder = preferredSourceOrder,
         ).stream
 
     fun evaluateAutoPlayStream(
@@ -86,6 +116,7 @@ object StreamAutoPlaySelector {
         activeResolverProviderId: String? = null,
         preferredAddonName: String = "",
         preferredQuality: StreamAutoPlayPreferredQuality = StreamAutoPlayPreferredQuality.ANY,
+        preferredSourceOrder: List<String> = emptyList(),
     ): StreamAutoPlayEvaluation {
         if (streams.isEmpty()) return StreamAutoPlayEvaluation()
 
@@ -115,7 +146,13 @@ object StreamAutoPlaySelector {
         } else {
             emptyList()
         }
-        val preferredReadyStream = bingeGroupCandidates.firstOrNull { stream ->
+        val orderedBingeGroupCandidates = prioritizeStreams(
+            streams = bingeGroupCandidates,
+            preferredAddonName = preferredAddonName,
+            preferredQuality = preferredQuality,
+            preferredSourceOrder = preferredSourceOrder,
+        )
+        val preferredReadyStream = orderedBingeGroupCandidates.firstOrNull { stream ->
             stream.isAutoPlayable(debridEnabled, activeResolverProviderId)
         }
         if (bingeGroupOnly) {
@@ -124,7 +161,7 @@ object StreamAutoPlaySelector {
                 stream = preferredReadyStream,
                 readyStreams = readyStreams,
                 hasPendingDebridCandidate = preferredReadyStream == null &&
-                    bingeGroupCandidates.any {
+                    orderedBingeGroupCandidates.any {
                         it.isPendingDebridAutoPlay(debridEnabled, activeResolverProviderId)
                     },
             )
@@ -132,16 +169,12 @@ object StreamAutoPlaySelector {
         if (mode == StreamAutoPlayMode.MANUAL) {
             return StreamAutoPlayEvaluation()
         }
-        val preferredStream = if (preferBingeGroupInSelection && targetBingeGroup.isNotEmpty()) {
-            candidateStreams.firstOrNull { stream ->
-                stream.behaviorHints.bingeGroup == targetBingeGroup &&
-                    stream.isAutoPlayable(debridEnabled, activeResolverProviderId)
-            }
-        } else {
-            null
+        val preferredStream = orderedBingeGroupCandidates.firstOrNull { stream ->
+            stream.isAutoPlayable(debridEnabled, activeResolverProviderId)
         }
         val matchingStreams = when (mode) {
             StreamAutoPlayMode.MANUAL -> emptyList()
+            StreamAutoPlayMode.AUTOMATIC, StreamAutoPlayMode.SEMI_AUTOMATIC,
             StreamAutoPlayMode.FIRST_STREAM -> candidateStreams
             StreamAutoPlayMode.REGEX_MATCH -> {
                 val pattern = regexPattern.trim()
@@ -189,6 +222,7 @@ object StreamAutoPlaySelector {
             streams = matchingStreams,
             preferredAddonName = preferredAddonName,
             preferredQuality = preferredQuality,
+            preferredSourceOrder = preferredSourceOrder,
         )
         if (orderedMatchingStreams.isEmpty() && preferredStream == null) return StreamAutoPlayEvaluation()
 
@@ -219,11 +253,18 @@ object StreamAutoPlaySelector {
         streams: List<StreamItem>,
         preferredAddonName: String,
         preferredQuality: StreamAutoPlayPreferredQuality,
+        preferredSourceOrder: List<String>,
     ): List<StreamItem> {
-        if (streams.size < 2) return streams
         val favourite = preferredAddonName.trim()
         val targetHeight = preferredQuality.targetHeight
-        return streams.withIndex().sortedWith(
+        val eligibleStreams = if (targetHeight == null) streams else streams.filter { stream ->
+            val height = stream.detectAutoPlayQualityHeight()
+            height == null || height <= targetHeight
+        }
+        if (eligibleStreams.isEmpty()) return emptyList()
+        if (eligibleStreams.size < 2) return eligibleStreams
+        val sourceRank = preferredSourceOrder.withIndex().associate { it.value to it.index }
+        return eligibleStreams.withIndex().sortedWith(
             compareBy<IndexedValue<StreamItem>> { indexed ->
                 val stream = indexed.value
                 val height = stream.detectAutoPlayQualityHeight()
@@ -238,13 +279,15 @@ object StreamAutoPlaySelector {
                         else -> 3
                     }
                 } else {
+                    // Prefer the exact tier, then lower qualities; unknown quality is last resort.
                     when {
                         height == targetHeight && isFavourite -> 0
                         height == targetHeight -> 1
-                        height != null && isFavourite -> 2
-                        height != null -> 3
-                        isFavourite -> 4
-                        else -> 5
+                        height != null && height < targetHeight && isFavourite -> 2
+                        height != null && height < targetHeight -> 3
+                        height == null && isFavourite -> 4
+                        height == null -> 5
+                        else -> 6
                     }
                 }
             }.thenBy { indexed ->
@@ -252,9 +295,11 @@ object StreamAutoPlaySelector {
                 when {
                     height == null -> Int.MAX_VALUE
                     targetHeight == null -> -height
-                    else -> abs(height - targetHeight) * 2 + if (height > targetHeight) 1 else 0
+                    height >= targetHeight -> Int.MAX_VALUE
+                    else -> -height
                 }
-            }.thenBy { it.index },
+            }.thenBy { sourceRank[it.value.addonName] ?: Int.MAX_VALUE }
+                .thenBy { it.index },
         ).map { it.value }
     }
 
