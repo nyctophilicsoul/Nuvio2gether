@@ -84,6 +84,7 @@ actual object PlayerSettingsStorage {
     private const val streamAutoPlayFallbackTimeoutSecondsKey = "stream_auto_play_fallback_timeout_seconds"
     private const val streamAutoPlaySourceKey = "stream_auto_play_source"
     private const val streamAutoPlaySelectedAddonsKey = "stream_auto_play_selected_addons"
+    private const val streamAutoPlayProviderPriorityOrderKey = "stream_auto_play_provider_priority_order"
     private const val streamAutoPlayPreferredAddonKey = "stream_auto_play_preferred_addon"
     private const val streamAutoPlayPreferredQualityKey = "stream_auto_play_preferred_quality"
     private const val streamAutoPlaySelectedPluginsKey = "stream_auto_play_selected_plugins"
@@ -963,6 +964,13 @@ actual object PlayerSettingsStorage {
             ?.edit()
             ?.putString(ProfileScopedKey.of(streamAutoPlaySourceKey), source)
             ?.apply()
+    }
+
+    actual fun loadStreamAutoPlayProviderPriorityOrder(): String? =
+        preferences?.getString(ProfileScopedKey.of(streamAutoPlayProviderPriorityOrderKey), null)
+
+    actual fun saveStreamAutoPlayProviderPriorityOrder(order: String) {
+        preferences?.edit()?.putString(ProfileScopedKey.of(streamAutoPlayProviderPriorityOrderKey), order)?.apply()
     }
 
     actual fun loadStreamAutoPlayPreferredAddon(): String? =
