@@ -77,6 +77,27 @@ object AutoPlaySelectionFramework {
             .map { it.value }
     }
 
+    /**
+     * Ranks already-probed sources by quality first, then by measured startup latency
+     * within that quality tier. Missing/failed probes sort after successful probes.
+     * A caller must probe sources and pass only latency measurements it actually observed.
+     */
+    fun <T> rankByQualityThenLatency(
+        candidates: List<AutoPlaySourceCandidate<T>>,
+        target: AutoPlayTargetQuality,
+        latencyMillisBySourceId: Map<String, Long>,
+    ): List<AutoPlaySourceCandidate<T>> =
+        orderCandidates(candidates, target)
+            .groupBy { it.qualityHeight }
+            .values
+            .flatMap { tier ->
+                tier.sortedWith(
+                    compareBy<AutoPlaySourceCandidate<T>> {
+                        latencyMillisBySourceId[it.sourceId] ?: Long.MAX_VALUE
+                    }.thenBy { it.providerOrder },
+                )
+            }
+
     /** Converts current stream metadata into the common candidate model. */
     fun candidatesFor(
         streams: List<StreamItem>,
