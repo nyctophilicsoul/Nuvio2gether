@@ -798,11 +798,15 @@ actual object PlayerSettingsStorage {
 
     actual fun loadFrameRateMatchingEnabled(): Boolean? = loadStoredBooleanCompat(frameRateMatchingEnabledKey)
 
-    actual fun saveFrameRateMatchingEnabled(enabled: Boolean) = saveStoredBoolean(frameRateMatchingEnabledKey, enabled)
+    actual fun saveFrameRateMatchingEnabled(enabled: Boolean) {
+        preferences?.edit()?.putBoolean(ProfileScopedKey.of(frameRateMatchingEnabledKey), enabled)?.apply()
+    }
 
     actual fun loadSkipSilenceEnabled(): Boolean? = loadStoredBooleanCompat(skipSilenceEnabledKey)
 
-    actual fun saveSkipSilenceEnabled(enabled: Boolean) = saveStoredBoolean(skipSilenceEnabledKey, enabled)
+    actual fun saveSkipSilenceEnabled(enabled: Boolean) {
+        preferences?.edit()?.putBoolean(ProfileScopedKey.of(skipSilenceEnabledKey), enabled)?.apply()
+    }
 
     actual fun loadLocalFilePlaybackEnabled(): Boolean? = loadStoredBooleanCompat(localFilePlaybackEnabledKey)
 
@@ -827,9 +831,13 @@ actual object PlayerSettingsStorage {
     actual fun saveAudioVideoDelayMs(delayMs: Int) = saveStoredInt(audioVideoDelayMsKey, delayMs.coerceIn(-1_000, 1_000))
 
     actual fun loadRememberAudioDelayPerDeviceEnabled(): Boolean? = loadStoredBooleanCompat(rememberAudioDelayPerDeviceEnabledKey)
-    actual fun saveRememberAudioDelayPerDeviceEnabled(enabled: Boolean) = saveStoredBoolean(rememberAudioDelayPerDeviceEnabledKey, enabled)
+    actual fun saveRememberAudioDelayPerDeviceEnabled(enabled: Boolean) {
+        preferences?.edit()?.putBoolean(ProfileScopedKey.of(rememberAudioDelayPerDeviceEnabledKey), enabled)?.apply()
+    }
     actual fun loadShowPlaybackDiagnostics(): Boolean? = loadStoredBooleanCompat(showPlaybackDiagnosticsKey)
-    actual fun saveShowPlaybackDiagnostics(enabled: Boolean) = saveStoredBoolean(showPlaybackDiagnosticsKey, enabled)
+    actual fun saveShowPlaybackDiagnostics(enabled: Boolean) {
+        preferences?.edit()?.putBoolean(ProfileScopedKey.of(showPlaybackDiagnosticsKey), enabled)?.apply()
+    }
 
     actual fun loadExoNativeMemoryEnabled(): Boolean? =
         preferences?.let { sharedPreferences ->
