@@ -199,12 +199,15 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
                         if (message != null && tryRefreshCredentialedSourceAfterError(message)) {
                             return@PlatformPlayerSurface
                         }
-                        errorMessage = message
                         if (message != null) {
                             scrubbingPositionMs = null
                             controlsVisible = !playerControlsLocked
                             removeFailedStreamFromCache()
+                            if (args.onPlaybackFailure?.invoke(playbackSnapshot.positionMs) == true) {
+                                return@PlatformPlayerSurface
+                            }
                         }
+                        errorMessage = message
                     },
                 )
             }

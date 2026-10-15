@@ -515,6 +515,10 @@ internal fun StreamDestination(
             initialPositionMs = serverResumeMs ?: launch.resumePositionMs ?: 0L,
             initialProgressFraction = launch.resumeProgressFraction.takeIf { serverResumeMs == null },
             contentLanguage = resolveLaunchContentLanguage(),
+            autoPlayFallbacks = streamsUiState.autoPlayCandidates
+                .drop(1)
+                .filter { it.playableDirectUrl != null && it.playableDirectUrl != sourceUrl }
+                .distinctBy { it.playableDirectUrl },
         )
         if (playerSettings.externalPlayerEnabled && stream.serverTarget == null) {
             openExternalPlayback(playerLaunch)

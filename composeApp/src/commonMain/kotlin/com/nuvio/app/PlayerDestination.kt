@@ -4,7 +4,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.features.player.ExternalPlayerIntentResult
@@ -38,6 +41,50 @@ internal fun PlayerDestination(
     }
     LaunchedEffect(launch.videoId) {
         launch.videoId?.let { ResumePromptRepository.markPlayerEntered(it) }
+    }
+    var fallbackAttempted by remember(route.launchId) { mutableStateOf(false) }
+    val onPlaybackFailure: (Long) -> Boolean = { positionMs ->
+        if (fallbackAttempted) false else {
+            val nextStream = launch.autoPlayFallbacks.firstOrNull { candidate ->
+                candidate.playableDirectUrl != null && candidate.playableDirectUrl != launch.sourceUrl
+            }
+            val nextUrl = nextStream?.playableDirectUrl
+            if (nextStream == null || nextUrl == null) {
+                false
+            } else {
+                fallbackAttempted = true
+                val remainingFallbacks = launch.autoPlayFallbacks
+                    .dropWhile { it != nextStream }
+                    .drop(1)
+                    .filter { it.playableDirectUrl != null && it.playableDirectUrl != nextUrl }
+                    .distinctBy { it.playableDirectUrl }
+                val nextLaunch = launch.copy(
+                    sourceUrl = nextUrl,
+                    sourceAudioUrl = null,
+                    sourceHeaders = nextStream.behaviorHints.proxyHeaders?.request.orEmpty(),
+                    sourceResponseHeaders = nextStream.behaviorHints.proxyHeaders?.response.orEmpty(),
+                    externalSubtitles = nextStream.externalSubtitles,
+                    streamType = nextStream.streamType,
+                    streamTitle = nextStream.streamLabel,
+                    streamSubtitle = nextStream.streamSubtitle,
+                    bingeGroup = nextStream.behaviorHints.bingeGroup,
+                    providerName = nextStream.addonName,
+                    providerAddonId = nextStream.addonId,
+                    torrentInfoHash = null,
+                    torrentFileIdx = null,
+                    torrentFilename = null,
+                    torrentTrackers = emptyList(),
+                    initialPositionMs = positionMs.coerceAtLeast(0L),
+                    initialProgressFraction = null,
+                    autoPlayFallbacks = remainingFallbacks,
+                )
+                val nextLaunchId = PlayerLaunchStore.put(nextLaunch)
+                navController.navigate(PlayerRoute(launchId = nextLaunchId, title = nextLaunch.title)) {
+                    popUpTo<PlayerRoute> { inclusive = true }
+                }
+                true
+            }
+        }
     }
     PlayerScreen(
         profileId = launch.profileId,
@@ -74,6 +121,7 @@ internal fun PlayerDestination(
         contentLanguage = launch.contentLanguage,
         launchId = route.launchId,
         onBack = onBack,
+        onPlaybackFailure = onPlaybackFailure,
         onOpenInExternalPlayer = { request ->
             val playerLaunch = PlayerLaunch(
                 profileId = launch.profileId,
