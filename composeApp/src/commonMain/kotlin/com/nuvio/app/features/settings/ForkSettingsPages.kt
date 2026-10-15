@@ -20,6 +20,14 @@ import com.nuvio.app.features.player.PlayerSettingsUiState
 import kotlin.math.roundToInt
 import org.jetbrains.compose.resources.stringResource
 import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.settings_playback_av_delay_enabled
+import nuvio.composeapp.generated.resources.settings_playback_av_delay_enabled_description
+import nuvio.composeapp.generated.resources.settings_playback_av_delay_ms
+import nuvio.composeapp.generated.resources.settings_playback_av_delay_value
+import nuvio.composeapp.generated.resources.settings_playback_remember_audio_delay_per_device
+import nuvio.composeapp.generated.resources.settings_playback_remember_audio_delay_per_device_description
+import nuvio.composeapp.generated.resources.settings_playback_show_diagnostics
+import nuvio.composeapp.generated.resources.settings_playback_show_diagnostics_description
 
 /**
  * Fork-specific settings stay separate from upstream Nuvio settings.
