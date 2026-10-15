@@ -82,6 +82,7 @@ data class PlayerSettingsUiState(
     val streamAutoPlayMode: StreamAutoPlayMode = StreamAutoPlayMode.MANUAL,
     val streamAutoPlaySmartSelectionEnabled: Boolean = false,
     val streamAutoPlayFallbackTimeoutSeconds: Int = 20,
+    val streamAutoPlayProviderPriorityOrder: List<String> = emptyList(),
     val streamAutoPlayPreferredAddon: String = "",
     val streamAutoPlayPreferredQuality: StreamAutoPlayPreferredQuality = StreamAutoPlayPreferredQuality.ANY,
     val streamAutoPlaySource: StreamAutoPlaySource = StreamAutoPlaySource.ALL_SOURCES,
@@ -175,6 +176,7 @@ object PlayerSettingsRepository {
     private var streamAutoPlayMode = StreamAutoPlayMode.MANUAL
     private var streamAutoPlaySmartSelectionEnabled = false
     private var streamAutoPlayFallbackTimeoutSeconds = 20
+    private var streamAutoPlayProviderPriorityOrder: List<String> = emptyList()
     private var streamAutoPlayPreferredAddon = ""
     private var streamAutoPlayPreferredQuality = StreamAutoPlayPreferredQuality.ANY
     private var streamAutoPlaySource = StreamAutoPlaySource.ALL_SOURCES
@@ -271,6 +273,7 @@ object PlayerSettingsRepository {
         streamAutoPlayMode = StreamAutoPlayMode.MANUAL
         streamAutoPlaySmartSelectionEnabled = false
         streamAutoPlayFallbackTimeoutSeconds = 20
+        streamAutoPlayProviderPriorityOrder = emptyList()
         streamAutoPlayPreferredAddon = ""
         streamAutoPlayPreferredQuality = StreamAutoPlayPreferredQuality.ANY
         streamAutoPlaySource = StreamAutoPlaySource.ALL_SOURCES
@@ -415,6 +418,8 @@ object PlayerSettingsRepository {
             ?: StreamAutoPlaySource.ALL_SOURCES
         streamAutoPlaySelectedAddons = PlayerSettingsStorage.loadStreamAutoPlaySelectedAddons() ?: emptySet()
         streamAutoPlaySelectedPlugins = PlayerSettingsStorage.loadStreamAutoPlaySelectedPlugins() ?: emptySet()
+        streamAutoPlayProviderPriorityOrder = PlayerSettingsStorage.loadStreamAutoPlayProviderPriorityOrder()
+            ?.split("\u001f")?.filter(String::isNotBlank).orEmpty()
         streamAutoPlayPreferredAddon = PlayerSettingsStorage.loadStreamAutoPlayPreferredAddon().orEmpty()
         streamAutoPlayPreferredQuality = PlayerSettingsStorage.loadStreamAutoPlayPreferredQuality()
             ?.let { runCatching { StreamAutoPlayPreferredQuality.valueOf(it) }.getOrNull() }
@@ -953,6 +958,15 @@ object PlayerSettingsRepository {
         PlayerSettingsStorage.saveStreamAutoPlaySelectedAddons(addons)
     }
 
+    fun setStreamAutoPlayProviderPriorityOrder(order: List<String>) {
+        ensureLoaded()
+        val normalized = order.map(String::trim).filter(String::isNotEmpty).distinct()
+        if (streamAutoPlayProviderPriorityOrder == normalized) return
+        streamAutoPlayProviderPriorityOrder = normalized
+        publish()
+        PlayerSettingsStorage.saveStreamAutoPlayProviderPriorityOrder(normalized.joinToString("\u001f"))
+    }
+
     fun setStreamAutoPlayPreferredAddon(addon: String) {
         ensureLoaded()
         val value = addon.trim()
@@ -1339,6 +1353,7 @@ object PlayerSettingsRepository {
             streamAutoPlayMode = streamAutoPlayMode,
             streamAutoPlaySmartSelectionEnabled = streamAutoPlaySmartSelectionEnabled,
             streamAutoPlayFallbackTimeoutSeconds = streamAutoPlayFallbackTimeoutSeconds,
+            streamAutoPlayProviderPriorityOrder = streamAutoPlayProviderPriorityOrder,
             streamAutoPlayPreferredAddon = streamAutoPlayPreferredAddon,
             streamAutoPlayPreferredQuality = streamAutoPlayPreferredQuality,
             streamAutoPlaySource = streamAutoPlaySource,
