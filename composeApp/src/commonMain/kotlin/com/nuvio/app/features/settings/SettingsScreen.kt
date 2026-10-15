@@ -733,7 +733,7 @@ private fun MobileSettingsScreen(
                 SettingsPage.LicensesAttributions -> licensesAttributionsContent(
                     isTablet = false,
                 )
-                SettingsPage.Nuvio2gether -> nuvio2getherSettingsContent(isTablet = false)
+                SettingsPage.Nuvio2gether -> item { nuvio2getherSettingsContent(isTablet = false) }
                 SettingsPage.NuvioEnhanced -> nuvioEnhancedSettingsContent(
                     isTablet = false,
                     settings = playerSettingsUiState,
@@ -1181,7 +1181,7 @@ private fun TabletSettingsScreen(
                     SettingsPage.LicensesAttributions -> licensesAttributionsContent(
                         isTablet = true,
                     )
-                    SettingsPage.Nuvio2gether -> nuvio2getherSettingsContent(isTablet = true)
+                    SettingsPage.Nuvio2gether -> item { nuvio2getherSettingsContent(isTablet = true) }
                     SettingsPage.NuvioEnhanced -> nuvioEnhancedSettingsContent(
                         isTablet = true,
                         settings = playerSettingsUiState,
