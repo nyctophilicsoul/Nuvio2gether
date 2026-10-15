@@ -80,6 +80,43 @@ class AutoPlaySelectionFrameworkTest {
     }
 
     @Test
+    fun `fastest measured source wins within requested quality before lower quality`() {
+        val candidates = listOf(
+            candidate("slow-1080p", 1080, 0),
+            candidate("fast-1080p", 1080, 1),
+            candidate("fast-720p", 720, 2),
+        )
+
+        val ordered = AutoPlaySelectionFramework.rankByQualityThenLatency(
+            candidates = candidates,
+            target = AutoPlayTargetQuality.FULL_HD_1080,
+            latencyMillisBySourceId = mapOf(
+                "slow-1080p" to 900,
+                "fast-1080p" to 120,
+                "fast-720p" to 40,
+            ),
+        )
+
+        assertEquals(listOf("fast-1080p", "slow-1080p", "fast-720p"), ordered.map { it.sourceId })
+    }
+
+    @Test
+    fun `failed or unmeasured sources sort after measured sources within a quality tier`() {
+        val candidates = listOf(
+            candidate("unmeasured", 1080, 0),
+            candidate("measured", 1080, 1),
+        )
+
+        val ordered = AutoPlaySelectionFramework.rankByQualityThenLatency(
+            candidates = candidates,
+            target = AutoPlayTargetQuality.FULL_HD_1080,
+            latencyMillisBySourceId = mapOf("measured" to 250),
+        )
+
+        assertEquals(listOf("measured", "unmeasured"), ordered.map { it.sourceId })
+    }
+
+    @Test
     fun `empty candidate list stays empty`() {
         assertEquals(
             emptyList(),
