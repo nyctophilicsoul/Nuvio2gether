@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 /**
  * Compact, engine-neutral playback diagnostics. It consumes the snapshot already emitted by
@@ -42,7 +43,7 @@ internal fun PlaybackDiagnosticsOverlay(
         )
         DiagnosticLine("engine", snapshot.videoCodec ?: "video pending")
         DiagnosticLine("audio", snapshot.audioCodec ?: "audio pending")
-        DiagnosticLine("speed", "${"%.2f".format(snapshot.playbackSpeed)}×")
+        DiagnosticLine("speed", "${${(snapshot.playbackSpeed * 100).roundToInt() / 100f}}×")
         DiagnosticLine("buffer", "${bufferAheadMs / 1000.0} s")
         DiagnosticLine(
             "resolution",
