@@ -354,6 +354,7 @@ private fun PlaybackSettingsSection(
     var showIosTargetTransferDialog by remember { mutableStateOf(false) }
     var showLibassRenderTypeDialog by remember { mutableStateOf(false) }
     var showAutoPlayModeDialog by remember { mutableStateOf(false) }
+    var showAutoPlayPriorityDialog by remember { mutableStateOf(false) }
     var showAutoPlayQualityDialog by remember { mutableStateOf(false) }
     var showAutoPlaySourceDialog by remember { mutableStateOf(false) }
     var showAutoPlayAddonSelectionDialog by remember { mutableStateOf(false) }
@@ -1008,6 +1009,17 @@ private fun PlaybackSettingsSection(
                         onClick = { showAutoPlayPluginSelectionDialog = true },
                     )
                 }
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsNavigationRow(
+                    title = "Addon and plugin priority",
+                    description = if (autoPlayPlayerSettings.streamAutoPlayProviderPriorityOrder.isEmpty()) {
+                        "Use the default provider order"
+                    } else {
+                        "${autoPlayPlayerSettings.streamAutoPlayProviderPriorityOrder.size} providers prioritized"
+                    },
+                    isTablet = isTablet,
+                    onClick = { showAutoPlayPriorityDialog = true },
+                )
             }
         }
 
@@ -2082,6 +2094,34 @@ private fun PlaybackSettingsSection(
         )
     }
 
+    if (showAutoPlayPriorityDialog) {
+        val availableProviderIds = buildList {
+            if (autoPlayPlayerSettings.streamAutoPlaySource != StreamAutoPlaySource.ENABLED_PLUGINS_ONLY) {
+                addonUiState.addons.enabledAddons()
+                    .filter { addon -> addon.manifest?.resources?.any { it.name == "stream" } == true }
+                    .mapNotNull { it.manifest?.name }
+                    .distinct()
+                    .sorted()
+                    .forEach { add("addon:$it") }
+            }
+            if (pluginsEnabled && autoPlayPlayerSettings.streamAutoPlaySource != StreamAutoPlaySource.INSTALLED_ADDONS_ONLY) {
+                pluginUiState.scrapers.filter { it.enabled }.map { it.name }.distinct().sorted()
+                    .forEach { add("plugin:$it") }
+            }
+        }
+        val currentOrder = autoPlayPlayerSettings.streamAutoPlayProviderPriorityOrder
+        val orderedProviders = (currentOrder.filter { it in availableProviderIds } +
+            availableProviderIds.filter { it !in currentOrder })
+        StreamAutoPlayPriorityDialog(
+            providers = orderedProviders,
+            onSave = {
+                PlayerSettingsRepository.setStreamAutoPlayProviderPriorityOrder(it)
+                showAutoPlayPriorityDialog = false
+            },
+            onDismiss = { showAutoPlayPriorityDialog = false },
+        )
+    }
+
     if (showAutoPlayRegexDialog) {
         StreamAutoPlayRegexDialog(
             initialRegex = autoPlayPlayerSettings.streamAutoPlayRegex,
@@ -2547,6 +2587,73 @@ private fun AutoPlayStrategyDialog(
             }
             DialogButtons(
                 primary = DialogButton(text = "Done", onClick = onDismiss, style = DialogButtonStyle.Primary),
+            )
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun StreamAutoPlayPriorityDialog(
+    providers: List<String>,
+    onSave: (List<String>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var order by remember(providers) { mutableStateOf(providers) }
+    DialogSurface(onDismissRequest = onDismiss, title = "Addon and plugin priority") {
+        Text(
+            "Move providers up or down. Higher entries are intended to be tried first in automatic selection.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            items(order, key = { it }) { provider ->
+                val index = order.indexOf(provider)
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("${index + 1}. ${provider.substringAfter(':')}", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            if (provider.startsWith("addon:")) "Addon" else "Plugin",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    DialogButton(
+                        text = "↑",
+                        enabled = index > 0,
+                        onClick = {
+                            if (index > 0) order = order.toMutableList().also {
+                                val item = it.removeAt(index)
+                                it.add(index - 1, item)
+                            }
+                        },
+                    )
+                    DialogButton(
+                        text = "↓",
+                        enabled = index < order.lastIndex,
+                        onClick = {
+                            if (index < order.lastIndex) order = order.toMutableList().also {
+                                val item = it.removeAt(index)
+                                it.add(index + 1, item)
+                            }
+                        },
+                    )
+                }
+            }
+        }
+        DialogButtons {
+            DialogButton(text = "Cancel", onClick = onDismiss)
+            DialogButton(
+                text = "Save",
+                onClick = { onSave(order) },
+                style = DialogButtonStyle.Primary,
             )
         }
     }
