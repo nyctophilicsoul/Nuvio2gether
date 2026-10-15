@@ -90,6 +90,8 @@ import com.nuvio.app.features.p2p.P2pStreamingState
 import com.nuvio.app.features.p2p.P2pTorrentProfile
 import com.nuvio.app.features.plugins.PluginsUiState
 import com.nuvio.app.features.plugins.PluginRepository
+import com.nuvio.app.features.streams.AutoPlayStrategy
+import com.nuvio.app.features.streams.StreamAutoPlayPreferredQuality
 import com.nuvio.app.features.streams.StreamAutoPlayMode
 import com.nuvio.app.features.streams.StreamAutoPlaySource
 import com.nuvio.app.isIos
@@ -352,6 +354,7 @@ private fun PlaybackSettingsSection(
     var showIosTargetTransferDialog by remember { mutableStateOf(false) }
     var showLibassRenderTypeDialog by remember { mutableStateOf(false) }
     var showAutoPlayModeDialog by remember { mutableStateOf(false) }
+    var showAutoPlayQualityDialog by remember { mutableStateOf(false) }
     var showAutoPlaySourceDialog by remember { mutableStateOf(false) }
     var showAutoPlayAddonSelectionDialog by remember { mutableStateOf(false) }
     var showAutoPlayPluginSelectionDialog by remember { mutableStateOf(false) }
@@ -863,12 +866,38 @@ private fun PlaybackSettingsSection(
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
+                val selectedAutoPlayStrategy = when {
+                    autoPlayPlayerSettings.streamAutoPlayMode == StreamAutoPlayMode.MANUAL -> AutoPlayStrategy.MANUAL
+                    autoPlayPlayerSettings.streamAutoPlaySmartSelectionEnabled -> AutoPlayStrategy.SMART_AUTO
+                    else -> AutoPlayStrategy.QUALITY_PICKER
+                }
                 SettingsNavigationRow(
-                    title = stringResource(Res.string.settings_playback_stream_selection_mode),
-                    description = stringResource(autoPlayPlayerSettings.streamAutoPlayMode.labelRes),
+                    title = "Autoplay strategy",
+                    description = when (selectedAutoPlayStrategy) {
+                        AutoPlayStrategy.SMART_AUTO -> "Smart Auto"
+                        AutoPlayStrategy.QUALITY_PICKER -> "Quality Picker"
+                        AutoPlayStrategy.MANUAL -> "Manual (choose stream)"
+                    },
                     isTablet = isTablet,
                     onClick = { showAutoPlayModeDialog = true },
                 )
+                if (selectedAutoPlayStrategy == AutoPlayStrategy.SMART_AUTO) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = "Preferred quality",
+                        description = when (autoPlayPlayerSettings.streamAutoPlayPreferredQuality) {
+                            StreamAutoPlayPreferredQuality.P2160 -> "4K · 2160p"
+                            StreamAutoPlayPreferredQuality.P1440 -> "2K · 1440p"
+                            StreamAutoPlayPreferredQuality.P1080 -> "1080p"
+                            StreamAutoPlayPreferredQuality.P720 -> "720p"
+                            StreamAutoPlayPreferredQuality.P480 -> "480p"
+                            StreamAutoPlayPreferredQuality.P360 -> "360p"
+                            StreamAutoPlayPreferredQuality.ANY -> "Highest available"
+                        },
+                        isTablet = isTablet,
+                        onClick = { showAutoPlayQualityDialog = true },
+                    )
+                }
                 if (autoPlayPlayerSettings.streamAutoPlayMode == StreamAutoPlayMode.REGEX_MATCH) {
                     SettingsGroupDivider(isTablet = isTablet)
                     val notSetLabel = stringResource(Res.string.settings_playback_not_set)
@@ -1942,13 +1971,62 @@ private fun PlaybackSettingsSection(
     }
 
     if (showAutoPlayModeDialog) {
-        StreamAutoPlayModeDialog(
-            selectedMode = autoPlayPlayerSettings.streamAutoPlayMode,
-            onModeSelected = {
-                PlayerSettingsRepository.setStreamAutoPlayMode(it)
+        AutoPlayStrategyDialog(
+            selectedStrategy = when {
+                autoPlayPlayerSettings.streamAutoPlayMode == StreamAutoPlayMode.MANUAL -> AutoPlayStrategy.MANUAL
+                autoPlayPlayerSettings.streamAutoPlaySmartSelectionEnabled -> AutoPlayStrategy.SMART_AUTO
+                else -> AutoPlayStrategy.QUALITY_PICKER
+            },
+            onStrategySelected = { strategy ->
+                when (strategy) {
+                    AutoPlayStrategy.SMART_AUTO -> {
+                        PlayerSettingsRepository.setStreamAutoPlayMode(StreamAutoPlayMode.FIRST_STREAM)
+                        PlayerSettingsRepository.setStreamAutoPlaySmartSelectionEnabled(true)
+                        if (autoPlayPlayerSettings.streamAutoPlayPreferredQuality == StreamAutoPlayPreferredQuality.ANY) {
+                            PlayerSettingsRepository.setStreamAutoPlayPreferredQuality(StreamAutoPlayPreferredQuality.P1080)
+                        }
+                    }
+                    AutoPlayStrategy.QUALITY_PICKER -> {
+                        PlayerSettingsRepository.setStreamAutoPlayMode(StreamAutoPlayMode.FIRST_STREAM)
+                        PlayerSettingsRepository.setStreamAutoPlaySmartSelectionEnabled(false)
+                    }
+                    AutoPlayStrategy.MANUAL -> {
+                        PlayerSettingsRepository.setStreamAutoPlayMode(StreamAutoPlayMode.MANUAL)
+                        PlayerSettingsRepository.setStreamAutoPlaySmartSelectionEnabled(false)
+                    }
+                }
                 showAutoPlayModeDialog = false
             },
             onDismiss = { showAutoPlayModeDialog = false },
+        )
+    }
+
+    if (showAutoPlayQualityDialog) {
+        IosEnumSelectionDialog(
+            title = "Preferred quality",
+            options = listOf(
+                StreamAutoPlayPreferredQuality.P2160,
+                StreamAutoPlayPreferredQuality.P1440,
+                StreamAutoPlayPreferredQuality.P1080,
+                StreamAutoPlayPreferredQuality.P720,
+                StreamAutoPlayPreferredQuality.P480,
+            ),
+            selected = autoPlayPlayerSettings.streamAutoPlayPreferredQuality,
+            label = {
+                when (it) {
+                    StreamAutoPlayPreferredQuality.P2160 -> "4K · 2160p"
+                    StreamAutoPlayPreferredQuality.P1440 -> "2K · 1440p"
+                    StreamAutoPlayPreferredQuality.P1080 -> "1080p"
+                    StreamAutoPlayPreferredQuality.P720 -> "720p"
+                    StreamAutoPlayPreferredQuality.P480 -> "480p"
+                    else -> "360p"
+                }
+            },
+            onSelect = {
+                PlayerSettingsRepository.setStreamAutoPlayPreferredQuality(it)
+                showAutoPlayQualityDialog = false
+            },
+            onDismiss = { showAutoPlayQualityDialog = false },
         )
     }
 
@@ -2437,6 +2515,38 @@ private fun SubtitleColorDialog(
             DialogButton(
                 text = stringResource(Res.string.action_done),
                 onClick = onDismiss,
+            )
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun AutoPlayStrategyDialog(
+    selectedStrategy: AutoPlayStrategy,
+    onStrategySelected: (AutoPlayStrategy) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val options = listOf(
+        Triple(AutoPlayStrategy.SMART_AUTO, "Smart Auto", "Use your preferred quality first, then try lower qualities when sources fail."),
+        Triple(AutoPlayStrategy.QUALITY_PICKER, "Quality Picker", "Choose a quality when you press Play."),
+        Triple(AutoPlayStrategy.MANUAL, "Manual (choose stream)", "Always show the source list and let you choose."),
+    )
+    DialogSurface(onDismissRequest = onDismiss, title = "Autoplay strategy") {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            options.forEach { (strategy, title, description) ->
+                DialogOption(
+                    text = title,
+                    description = description,
+                    selected = strategy == selectedStrategy,
+                    onClick = { onStrategySelected(strategy) },
+                )
+            }
+            DialogButtons(
+                primary = DialogButton(text = "Done", onClick = onDismiss, style = DialogButtonStyle.Primary),
             )
         }
     }
