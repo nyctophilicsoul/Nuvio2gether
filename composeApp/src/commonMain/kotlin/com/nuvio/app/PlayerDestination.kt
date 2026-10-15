@@ -15,6 +15,8 @@ import com.nuvio.app.features.player.ExternalPlayerPlatform
 import com.nuvio.app.features.player.PlayerLaunch
 import com.nuvio.app.features.player.PlayerLaunchStore
 import com.nuvio.app.features.player.PlayerScreen
+import com.nuvio.app.features.player.sanitizePlaybackHeaders
+import com.nuvio.app.features.player.sanitizePlaybackResponseHeaders
 import com.nuvio.app.features.watchprogress.ResumePromptRepository
 import com.nuvio.app.navigation.NuvioNavigator
 import com.nuvio.app.navigation.PlayerRoute
@@ -61,8 +63,8 @@ internal fun PlayerDestination(
                 val nextLaunch = launch.copy(
                     sourceUrl = nextUrl,
                     sourceAudioUrl = null,
-                    sourceHeaders = nextStream.behaviorHints.proxyHeaders?.request.orEmpty(),
-                    sourceResponseHeaders = nextStream.behaviorHints.proxyHeaders?.response.orEmpty(),
+                    sourceHeaders = sanitizePlaybackHeaders(nextStream.behaviorHints.proxyHeaders?.request),
+                    sourceResponseHeaders = sanitizePlaybackResponseHeaders(nextStream.behaviorHints.proxyHeaders?.response),
                     externalSubtitles = nextStream.externalSubtitles,
                     streamType = nextStream.streamType,
                     streamTitle = nextStream.streamLabel,
