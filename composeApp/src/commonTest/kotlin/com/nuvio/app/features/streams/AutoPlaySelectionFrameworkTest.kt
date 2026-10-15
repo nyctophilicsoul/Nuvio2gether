@@ -156,6 +156,32 @@ class AutoPlaySelectionFrameworkTest {
     }
 
     @Test
+    fun `quality picker groups actual sources and omits empty tiers`() {
+        val candidates = listOf(
+            candidate("4k", 2160, 0),
+            candidate("2k-a", 1440, 1),
+            candidate("1080-a", 1080, 2),
+            candidate("1080-b", 1080, 3),
+            candidate("720", 720, 4),
+            candidate("unknown", null, 5),
+        )
+
+        val options = AutoPlaySelectionFramework.qualityOptions(candidates)
+
+        assertEquals(
+            listOf(
+                AutoPlayQualityTier.P2160,
+                AutoPlayQualityTier.P1440,
+                AutoPlayQualityTier.P1080,
+                AutoPlayQualityTier.P720,
+                AutoPlayQualityTier.LOWER,
+            ),
+            options.map { it.tier },
+        )
+        assertEquals(listOf(1, 1, 2, 1, 1), options.map { it.count })
+    }
+
+    @Test
     fun `empty candidate list stays empty`() {
         assertEquals(
             emptyList(),
