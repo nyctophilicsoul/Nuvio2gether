@@ -36,6 +36,7 @@ import nuvio.composeapp.generated.resources.compose_settings_page_tmdb_enrichmen
 import nuvio.composeapp.generated.resources.compose_settings_page_trakt
 import nuvio.composeapp.generated.resources.compose_settings_page_tracking
 import nuvio.composeapp.generated.resources.settings_account
+import nuvio.composeapp.generated.resources.settings_nuvio_enhanced_title
 import org.jetbrains.compose.resources.StringResource
 
 internal enum class SettingsCategory(
