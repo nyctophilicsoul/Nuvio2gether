@@ -65,10 +65,11 @@ object AutoPlaySelectionFramework {
         var lower = 0
         candidates.forEach { candidate ->
             when (candidate.qualityHeight) {
-                4320, 2160, 1440 -> qhd1440++
+                1440 -> qhd1440++
                 1080 -> fullHd1080++
                 720 -> hd720++
                 null, in 1..719 -> lower++
+                2160, 4320 -> Unit
                 else -> Unit
             }
         }
