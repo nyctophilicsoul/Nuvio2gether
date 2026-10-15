@@ -164,7 +164,6 @@ private fun p2pProfileLabel(profile: P2pTorrentProfile): String = when (profile)
 }
 
 @Composable
-@Composable
 private fun streamAutoPlayPreferredQualityLabel(quality: StreamAutoPlayPreferredQuality): String = when (quality) {
     StreamAutoPlayPreferredQuality.ANY -> stringResource(Res.string.settings_playback_preferred_quality_any)
     StreamAutoPlayPreferredQuality.P2160 -> stringResource(Res.string.settings_playback_preferred_quality_2160p)

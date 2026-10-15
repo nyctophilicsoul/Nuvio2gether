@@ -261,7 +261,9 @@ object StreamAutoPlaySelector {
     private fun StreamItem.detectAutoPlayQualityHeight(): Int? {
         val metadata = listOf(
             name, title, description, url, behaviorHints.filename,
-            clientResolve?.parsed?.rawTitle, clientResolve?.parsed?.resolution, clientResolve?.parsed?.quality,
+            clientResolve?.stream?.raw?.parsed?.rawTitle,
+            clientResolve?.stream?.raw?.parsed?.resolution,
+            clientResolve?.stream?.raw?.parsed?.quality,
         ).filterNotNull().joinToString(" ")
         val markers = listOf(
             Regex("""(?i)(?:\b4320p?\b|\b8k\b)""") to 4320,
