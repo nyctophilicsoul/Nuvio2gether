@@ -220,40 +220,41 @@ object StreamAutoPlaySelector {
         preferredAddonName: String,
         preferredQuality: StreamAutoPlayPreferredQuality,
     ): List<StreamItem> {
-        if (streams.size < 2) return streams
+        if (streams.size < 2) {
+            return if (preferredQuality.targetHeight == null) streams else
+                AutoPlaySelectionFramework.candidatesFor(
+                    streams = streams,
+                    target = preferredQuality.toAutoPlayTargetQuality(),
+                ).map { it.value }
+        }
+
+        // A selected quality is a ceiling. Keep the exact quality first, then only
+        // lower-quality fallbacks; never silently switch to a higher quality.
+        if (preferredQuality.targetHeight != null) {
+            return AutoPlaySelectionFramework.candidatesFor(
+                streams = streams,
+                target = preferredQuality.toAutoPlayTargetQuality(),
+            ).map { it.value }
+        }
+
+        // Preserve legacy favourite-provider behavior only when the user has not
+        // selected a quality target.
         val favourite = preferredAddonName.trim()
-        val targetHeight = preferredQuality.targetHeight
         return streams.withIndex().sortedWith(
             compareBy<IndexedValue<StreamItem>> { indexed ->
                 val stream = indexed.value
                 val height = stream.detectAutoPlayQualityHeight()
                 val isFavourite = favourite.isNotEmpty() && stream.addonName.equals(favourite, true)
-                if (targetHeight == null) {
-                    when {
-                        isFavourite && height != null -> 0
-                        isFavourite -> 1
-                        favourite.isEmpty() && height != null -> 0
-                        height != null -> 2
-                        favourite.isEmpty() -> 1
-                        else -> 3
-                    }
-                } else {
-                    when {
-                        height == targetHeight && isFavourite -> 0
-                        height == targetHeight -> 1
-                        height != null && isFavourite -> 2
-                        height != null -> 3
-                        isFavourite -> 4
-                        else -> 5
-                    }
+                when {
+                    isFavourite && height != null -> 0
+                    isFavourite -> 1
+                    favourite.isEmpty() && height != null -> 0
+                    height != null -> 2
+                    favourite.isEmpty() -> 1
+                    else -> 3
                 }
             }.thenBy { indexed ->
-                val height = indexed.value.detectAutoPlayQualityHeight()
-                when {
-                    height == null -> Int.MAX_VALUE
-                    targetHeight == null -> -height
-                    else -> abs(height - targetHeight) * 2 + if (height > targetHeight) 1 else 0
-                }
+                indexed.value.detectAutoPlayQualityHeight()?.let { -it } ?: Int.MAX_VALUE
             }.thenBy { it.index },
         ).map { it.value }
     }
@@ -319,3 +320,15 @@ data class StreamAutoPlayEvaluation(
     val readyStreams: List<StreamItem> = emptyList(),
     val hasPendingDebridCandidate: Boolean = false,
 )
+
+
+private fun StreamAutoPlayPreferredQuality.toAutoPlayTargetQuality(): AutoPlayTargetQuality =
+    when (targetHeight) {
+        2160 -> AutoPlayTargetQuality.UHD_4K
+        1440 -> AutoPlayTargetQuality.QHD_1440
+        1080 -> AutoPlayTargetQuality.FULL_HD_1080
+        720 -> AutoPlayTargetQuality.HD_720
+        480 -> AutoPlayTargetQuality.SD_480
+        360 -> AutoPlayTargetQuality.SD_360
+        else -> AutoPlayTargetQuality.UHD_4K
+    }
