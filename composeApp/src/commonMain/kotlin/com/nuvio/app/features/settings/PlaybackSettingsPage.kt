@@ -1018,7 +1018,8 @@ private fun PlaybackSettingsSection(
                     onDismiss = { showAdvancedAutoPlaySettings = false },
                 )
             }
-
+            }
+        }
 
         if (!isIos) {
             val decoderEnabled = !autoPlayPlayerSettings.externalPlayerEnabled
