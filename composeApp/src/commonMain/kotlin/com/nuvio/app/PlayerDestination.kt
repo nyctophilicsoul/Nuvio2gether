@@ -44,48 +44,52 @@ internal fun PlayerDestination(
     LaunchedEffect(launch.videoId) {
         launch.videoId?.let { ResumePromptRepository.markPlayerEntered(it) }
     }
-    var fallbackAttempted by remember(route.launchId) { mutableStateOf(false) }
     val onPlaybackFailure: (Long) -> Boolean = { positionMs ->
-        if (fallbackAttempted) false else {
-            val nextStream = launch.autoPlayFallbacks.firstOrNull { candidate ->
-                candidate.playableDirectUrl != null && candidate.playableDirectUrl != launch.sourceUrl
-            }
-            val nextUrl = nextStream?.playableDirectUrl
-            if (nextStream == null || nextUrl == null) {
-                false
-            } else {
-                fallbackAttempted = true
-                val remainingFallbacks = launch.autoPlayFallbacks
-                    .dropWhile { it != nextStream }
-                    .drop(1)
-                    .filter { it.playableDirectUrl != null && it.playableDirectUrl != nextUrl }
-                    .distinctBy { it.playableDirectUrl }
-                val nextLaunch = launch.copy(
-                    sourceUrl = nextUrl,
-                    sourceAudioUrl = null,
-                    sourceHeaders = sanitizePlaybackHeaders(nextStream.behaviorHints.proxyHeaders?.request),
-                    sourceResponseHeaders = sanitizePlaybackResponseHeaders(nextStream.behaviorHints.proxyHeaders?.response),
-                    externalSubtitles = nextStream.externalSubtitles,
-                    streamType = nextStream.streamType,
-                    streamTitle = nextStream.streamLabel,
-                    streamSubtitle = nextStream.streamSubtitle,
-                    bingeGroup = nextStream.behaviorHints.bingeGroup,
-                    providerName = nextStream.addonName,
-                    providerAddonId = nextStream.addonId,
-                    torrentInfoHash = null,
-                    torrentFileIdx = null,
-                    torrentFilename = null,
-                    torrentTrackers = emptyList(),
-                    initialPositionMs = positionMs.coerceAtLeast(0L),
-                    initialProgressFraction = null,
-                    autoPlayFallbacks = remainingFallbacks,
-                )
-                val nextLaunchId = PlayerLaunchStore.put(nextLaunch)
-                navController.navigate(PlayerRoute(launchId = nextLaunchId, title = nextLaunch.title)) {
-                    popUpTo<PlayerRoute> { inclusive = true }
+        val attemptedUrls = launch.autoPlayFallbacks
+            .mapNotNull { it.playableDirectUrl }
+            .takeWhile { it != launch.sourceUrl }
+            .toSet() + launch.sourceUrl
+        val nextStream = launch.autoPlayFallbacks.firstOrNull { candidate ->
+            val url = candidate.playableDirectUrl
+            url != null && url !in attemptedUrls
+        }
+        val nextUrl = nextStream?.playableDirectUrl
+        if (nextStream == null || nextUrl == null) {
+            false
+        } else {
+            val remainingFallbacks = launch.autoPlayFallbacks
+                .dropWhile { it != nextStream }
+                .drop(1)
+                .filter { candidate ->
+                    val url = candidate.playableDirectUrl
+                    url != null && url != nextUrl && url != launch.sourceUrl
                 }
-                true
+                .distinctBy { it.playableDirectUrl }
+            val nextLaunch = launch.copy(
+                sourceUrl = nextUrl,
+                sourceAudioUrl = null,
+                sourceHeaders = sanitizePlaybackHeaders(nextStream.behaviorHints.proxyHeaders?.request),
+                sourceResponseHeaders = sanitizePlaybackResponseHeaders(nextStream.behaviorHints.proxyHeaders?.response),
+                externalSubtitles = nextStream.externalSubtitles,
+                streamType = nextStream.streamType,
+                streamTitle = nextStream.streamLabel,
+                streamSubtitle = nextStream.streamSubtitle,
+                bingeGroup = nextStream.behaviorHints.bingeGroup,
+                providerName = nextStream.addonName,
+                providerAddonId = nextStream.addonId,
+                torrentInfoHash = null,
+                torrentFileIdx = null,
+                torrentFilename = null,
+                torrentTrackers = emptyList(),
+                initialPositionMs = positionMs.coerceAtLeast(0L),
+                initialProgressFraction = null,
+                autoPlayFallbacks = remainingFallbacks,
+            )
+            val nextLaunchId = PlayerLaunchStore.put(nextLaunch)
+            navController.navigate(PlayerRoute(launchId = nextLaunchId, title = nextLaunch.title)) {
+                popUpTo<PlayerRoute> { inclusive = true }
             }
+            true
         }
     }
     PlayerScreen(
