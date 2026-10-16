@@ -960,46 +960,49 @@ private fun PlaybackSettingsSection(
                     }
                 }
                 if (autoPlayPlayerSettings.streamAutoPlayMode != StreamAutoPlayMode.ADVANCED) {
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.settings_playback_source_scope),
-                    description = stringResource(autoPlayPlayerSettings.streamAutoPlaySource.labelRes(pluginsEnabled)),
-                    isTablet = isTablet,
-                    onClick = { showAutoPlaySourceDialog = true },
-                )
-                if (autoPlayPlayerSettings.streamAutoPlaySource != StreamAutoPlaySource.ENABLED_PLUGINS_ONLY) {
-                    SettingsGroupDivider(isTablet = isTablet)
-                    val addonSubtitle = if (autoPlayPlayerSettings.streamAutoPlaySelectedAddons.isEmpty()) {
-                        stringResource(Res.string.settings_playback_all_addons)
-                    } else {
-                        stringResource(
-                            Res.string.settings_playback_selected_count,
-                            autoPlayPlayerSettings.streamAutoPlaySelectedAddons.size,
-                        )
-                    }
-                    SettingsNavigationRow(
-                        title = stringResource(Res.string.settings_playback_allowed_addons),
-                        description = addonSubtitle,
-                        isTablet = isTablet,
-                        onClick = { showAutoPlayAddonSelectionDialog = true },
-                    )
                 }
-                if (pluginsEnabled && autoPlayPlayerSettings.streamAutoPlaySource != StreamAutoPlaySource.INSTALLED_ADDONS_ONLY) {
+                if (autoPlayPlayerSettings.streamAutoPlayMode != StreamAutoPlayMode.ADVANCED) {
                     SettingsGroupDivider(isTablet = isTablet)
-                    val pluginSubtitle = if (autoPlayPlayerSettings.streamAutoPlaySelectedPlugins.isEmpty()) {
-                        stringResource(Res.string.settings_playback_all_plugins)
-                    } else {
-                        stringResource(
-                            Res.string.settings_playback_selected_count,
-                            autoPlayPlayerSettings.streamAutoPlaySelectedPlugins.size,
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_playback_source_scope),
+                        description = stringResource(autoPlayPlayerSettings.streamAutoPlaySource.labelRes(pluginsEnabled)),
+                        isTablet = isTablet,
+                        onClick = { showAutoPlaySourceDialog = true },
+                    )
+                    if (autoPlayPlayerSettings.streamAutoPlaySource != StreamAutoPlaySource.ENABLED_PLUGINS_ONLY) {
+                        SettingsGroupDivider(isTablet = isTablet)
+                        val addonSubtitle = if (autoPlayPlayerSettings.streamAutoPlaySelectedAddons.isEmpty()) {
+                            stringResource(Res.string.settings_playback_all_addons)
+                        } else {
+                            stringResource(
+                                Res.string.settings_playback_selected_count,
+                                autoPlayPlayerSettings.streamAutoPlaySelectedAddons.size,
+                            )
+                        }
+                        SettingsNavigationRow(
+                            title = stringResource(Res.string.settings_playback_allowed_addons),
+                            description = addonSubtitle,
+                            isTablet = isTablet,
+                            onClick = { showAutoPlayAddonSelectionDialog = true },
                         )
                     }
-                    SettingsNavigationRow(
-                        title = stringResource(Res.string.settings_playback_allowed_plugins),
-                        description = pluginSubtitle,
-                        isTablet = isTablet,
-                        onClick = { showAutoPlayPluginSelectionDialog = true },
-                    )
+                    if (pluginsEnabled && autoPlayPlayerSettings.streamAutoPlaySource != StreamAutoPlaySource.INSTALLED_ADDONS_ONLY) {
+                        SettingsGroupDivider(isTablet = isTablet)
+                        val pluginSubtitle = if (autoPlayPlayerSettings.streamAutoPlaySelectedPlugins.isEmpty()) {
+                            stringResource(Res.string.settings_playback_all_plugins)
+                        } else {
+                            stringResource(
+                                Res.string.settings_playback_selected_count,
+                                autoPlayPlayerSettings.streamAutoPlaySelectedPlugins.size,
+                            )
+                        }
+                        SettingsNavigationRow(
+                            title = stringResource(Res.string.settings_playback_allowed_plugins),
+                            description = pluginSubtitle,
+                            isTablet = isTablet,
+                            onClick = { showAutoPlayPluginSelectionDialog = true },
+                        )
+                    }
                 }
                 }
             }
