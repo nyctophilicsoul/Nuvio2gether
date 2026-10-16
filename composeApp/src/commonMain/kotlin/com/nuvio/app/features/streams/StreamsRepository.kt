@@ -270,6 +270,7 @@ object StreamsRepository {
                     activeResolverProviderId = debridSettings.activeResolverProviderId,
                     preferredAddonName = playerSettings.streamAutoPlayPreferredAddon.takeIf { playerSettings.streamAutoPlaySmartSelectionEnabled }.orEmpty(),
                     preferredQuality = if (playerSettings.streamAutoPlaySmartSelectionEnabled) playerSettings.streamAutoPlayPreferredQuality else com.nuvio.app.features.streams.StreamAutoPlayPreferredQuality.ANY,
+                    providerPriorityOrder = playerSettings.streamAutoPlayProviderPriorityOrder,
                 )
 
             fun settleAutoPlay(evaluation: StreamAutoPlayEvaluation) {
