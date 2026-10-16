@@ -960,8 +960,6 @@ private fun PlaybackSettingsSection(
                     }
                 }
                 if (autoPlayPlayerSettings.streamAutoPlayMode != StreamAutoPlayMode.ADVANCED) {
-                }
-                if (autoPlayPlayerSettings.streamAutoPlayMode != StreamAutoPlayMode.ADVANCED) {
                     SettingsGroupDivider(isTablet = isTablet)
                     SettingsNavigationRow(
                         title = stringResource(Res.string.settings_playback_source_scope),
@@ -1003,10 +1001,24 @@ private fun PlaybackSettingsSection(
                             onClick = { showAutoPlayPluginSelectionDialog = true },
                         )
                     }
-                }
-                }
             }
-        }
+            if (showAdvancedAutoPlaySettings) {
+                AdvancedAutoPlaySettingsFullScreen(
+                    isTablet = isTablet,
+                    currentMode = autoPlayPlayerSettings.streamAutoPlayMode,
+                    advanced = autoPlayPlayerSettings.advancedAutoPlaySettings,
+                    pluginsEnabled = pluginsEnabled,
+                    addonNames = addonUiState.addons.enabledAddons()
+                        .mapNotNull { it.manifest }
+                        .filter { manifest -> manifest.resources.any { resource -> resource.name == "stream" } }
+                        .map { it.name }.distinct().sorted(),
+                    pluginNames = pluginUiState.scrapers.filter { it.enabled }.map { it.name }.distinct().sorted(),
+                    onModeSelected = PlayerSettingsRepository::setStreamAutoPlayMode,
+                    onAdvancedChanged = PlayerSettingsRepository::setAdvancedAutoPlaySettings,
+                    onDismiss = { showAdvancedAutoPlaySettings = false },
+                )
+            }
+
 
         if (!isIos) {
             val decoderEnabled = !autoPlayPlayerSettings.externalPlayerEnabled
