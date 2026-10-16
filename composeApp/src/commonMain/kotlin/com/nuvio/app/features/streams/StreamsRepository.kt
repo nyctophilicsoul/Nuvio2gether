@@ -108,7 +108,9 @@ object StreamsRepository {
         val debridSettings = DebridSettingsRepository.snapshot()
         val streamBadgeRules = StreamBadgeSettingsRepository.snapshot()
         val autoPlayMode = playerSettings.streamAutoPlayMode
-        val isAutoPlayEnabled = !manualSelection && autoPlayMode != StreamAutoPlayMode.MANUAL &&
+        val isAutoPlayEnabled = !manualSelection &&
+            autoPlayMode != StreamAutoPlayMode.MANUAL &&
+            autoPlayMode != StreamAutoPlayMode.ADVANCED &&
             !(autoPlayMode == StreamAutoPlayMode.REGEX_MATCH &&
                 !StreamAutoPlayPolicy.isRegexSelectionConfigured(playerSettings.streamAutoPlayRegex))
 
@@ -605,6 +607,41 @@ object StreamsRepository {
     fun selectFilter(addonId: String?) {
         _uiState.update { it.copy(selectedFilter = addonId) }
     }
+
+    /** Starts the Advanced mode only after the user chooses a quality. */
+    fun startAdvancedAutoPlay(selectedQuality: AdvancedStreamQuality): Boolean {
+        PlayerSettingsRepository.ensureLoaded()
+        val advancedSettings = PlayerSettingsRepository.uiState.value.advancedAutoPlaySettings
+        val current = _uiState.value
+        val streams = current.groups.flatMap { it.streams }
+            .filter { it.hasPlayableSource && !it.shouldOpenExternally }
+        val candidates = advancedStreamCandidates(streams)
+        val plan = runCatching {
+            AdvancedStreamSelection.planForQuality(candidates, selectedQuality, advancedSettings)
+        }.getOrDefault(emptyList())
+        val orderedStreams = plan.mapNotNull { candidate -> streams.getOrNull(candidate.originalIndex) }
+            .distinctBy { it.playableDirectUrl ?: it.playerSelectionIdentity() }
+        if (orderedStreams.isEmpty()) {
+            _uiState.update { it.copy(autoPlayStream = null, autoPlayCandidates = emptyList(), isDirectAutoPlayFlow = false, showDirectAutoPlayOverlay = false) }
+            return false
+        }
+        _uiState.update {
+            it.copy(
+                autoPlayStream = orderedStreams.first(),
+                autoPlayCandidates = orderedStreams,
+                isDirectAutoPlayFlow = true,
+                autoPlayDecided = true,
+                showDirectAutoPlayOverlay = true,
+                overlayMessage = null,
+            )
+        }
+        return true
+    }
+
+    private fun StreamItem.playerSelectionIdentity(): String =
+        p2pInfoHash?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
+            ?.let { "torrent:$it:${p2pFileIdx ?: -1}" }
+            ?: listOf(addonId, addonName, streamLabel, streamSubtitle.orEmpty(), behaviorHints.filename.orEmpty()).joinToString("|")
 
     fun consumeAutoPlay() {
         activeRequestKey = null

@@ -39,11 +39,68 @@ import com.nuvio.app.features.watching.application.WatchingState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.time.TimeSource
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
 
 @Composable
 internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
+    // Advanced Auto Play owns its fallback queue for the lifetime of this PlayerLaunch.
+    // Monitor player state only: source/provider fetching occurs before the player route opens.
+    LaunchedEffect(args.launchId, activeSourceUrl, activeSourceIdentityKey, activeStream) {
+        val launchId = args.launchId ?: return@LaunchedEffect
+        val launchAtStart = PlayerLaunchStore.get(launchId) ?: return@LaunchedEffect
+        val advancedSettings = launchAtStart.advancedAutoPlaySettings ?: return@LaunchedEffect
+        if (launchAtStart.advancedAutoPlayFallbacks.isEmpty()) return@LaunchedEffect
+
+        val sourceAtStart = activeSourceUrl
+        val sourceIdentityAtStart = activeSourceIdentityKey
+        val startupTimer = TimeSource.Monotonic.markNow()
+        var playbackStartedAt: kotlin.time.TimeMark? = null
+        var previousLoading = playbackSnapshot.isLoading
+        var bufferEvents = 0
+        var stabilityWindowApplied = false
+
+        while (activeSourceUrl == sourceAtStart && activeSourceIdentityKey == sourceIdentityAtStart) {
+            if (errorMessage != null) {
+                tryNextAdvancedAutoPlayFallback()
+                return@LaunchedEffect
+            }
+
+            val isActuallyPlaying = playbackSnapshot.isPlaying && !playbackSnapshot.isLoading
+            if (playbackStartedAt == null && isActuallyPlaying) {
+                playbackStartedAt = TimeSource.Monotonic.markNow()
+            }
+
+            if (playbackStartedAt == null) {
+                val startupTimeoutMs = advancedSettings.playbackStartupTimeoutSeconds * 1_000L
+                if (startupTimeoutMs > 0L && startupTimer.elapsedNow().inWholeMilliseconds >= startupTimeoutMs) {
+                    tryNextAdvancedAutoPlayFallback()
+                    return@LaunchedEffect
+                }
+            } else {
+                val stableForMs = advancedSettings.stabilityWindowSeconds * 1_000L
+                if (!stabilityWindowApplied &&
+                    playbackStartedAt.elapsedNow().inWholeMilliseconds >= stableForMs
+                ) {
+                    // The stream is considered stable after this window; keep counting later rebuffer events.
+                    stabilityWindowApplied = true
+                }
+
+                val currentlyLoading = playbackSnapshot.isLoading
+                if (currentlyLoading && !previousLoading) {
+                    bufferEvents += 1
+                    if (bufferEvents > advancedSettings.maxBufferEvents) {
+                        tryNextAdvancedAutoPlayFallback()
+                        return@LaunchedEffect
+                    }
+                }
+                previousLoading = currentlyLoading
+            }
+            delay(150)
+        }
+    }
+
     val currentFeedback = liveGestureFeedback ?: gestureFeedback
     LaunchedEffect(currentFeedback) {
         if (currentFeedback != null) {
@@ -908,3 +965,20 @@ private fun findCredentialRefreshCandidate(
 
 private const val CREDENTIAL_REFRESH_POLL_COUNT = 30
 private const val CREDENTIAL_REFRESH_POLL_INTERVAL_MS = 500L
+
+
+/** Switches to the next pre-ranked Advanced Auto Play candidate exactly once. */
+private fun PlayerScreenRuntime.tryNextAdvancedAutoPlayFallback(): Boolean {
+    val launchId = args.launchId ?: return false
+    val launch = PlayerLaunchStore.get(launchId) ?: return false
+    val next = launch.advancedAutoPlayFallbacks.firstOrNull() ?: return false
+    PlayerLaunchStore.update(launchId) { current ->
+        current.copy(advancedAutoPlayFallbacks = current.advancedAutoPlayFallbacks.drop(1))
+    }
+    errorMessage = null
+    activeInitialPositionMs = playbackSnapshot.positionMs.coerceAtLeast(0L)
+    activeInitialProgressFraction = null
+    NuvioToastController.show("Auto play Advanced: trying ${next.addonName} — ${next.streamLabel}")
+    switchToSource(next, saveForReuse = false)
+    return true
+}

@@ -48,6 +48,8 @@ data class PlayerLaunch(
     val contentLanguage: String? = null,
     val sourceFilename: String? = null,
     val stream: com.nuvio.app.features.streams.StreamItem? = null,
+    val advancedAutoPlayFallbacks: List<com.nuvio.app.features.streams.StreamItem> = emptyList(),
+    val advancedAutoPlaySettings: com.nuvio.app.features.streams.AdvancedAutoPlaySettings? = null,
 )
 
 object PlayerLaunchStore {

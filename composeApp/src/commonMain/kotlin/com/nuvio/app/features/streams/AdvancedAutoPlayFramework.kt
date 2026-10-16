@@ -67,6 +67,22 @@ data class AdvancedStreamCandidate(
     val originalIndex: Int,
 )
 
+fun advancedStreamCandidates(streams: List<StreamItem>): List<AdvancedStreamCandidate> =
+    streams.mapIndexed { index, stream ->
+        AdvancedStreamCandidate(
+            id = index.toString(),
+            addonId = stream.addonId,
+            addonName = stream.addonName,
+            isPlugin = !stream.isInstalledAddonStream && stream.serverTarget == null,
+            quality = AdvancedStreamQuality.fromMetadata(
+                name = stream.streamLabel,
+                description = listOfNotNull(stream.title, stream.streamSubtitle, stream.behaviorHints.filename).joinToString(" "),
+                url = stream.playableDirectUrl,
+            ),
+            originalIndex = index,
+        )
+    }
+
 /** A deterministic plan that never silently upgrades above the requested quality. */
 object AdvancedStreamSelection {
     fun orderByProviderPriority(

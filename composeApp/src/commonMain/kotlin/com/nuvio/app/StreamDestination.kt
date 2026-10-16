@@ -4,6 +4,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -38,6 +44,9 @@ import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamLaunchStore
 import com.nuvio.app.features.streams.StreamLinkCacheRepository
 import com.nuvio.app.features.streams.StreamsRepository
+import com.nuvio.app.features.streams.AdvancedStreamSelection
+import com.nuvio.app.features.streams.AdvancedStreamQuality
+import com.nuvio.app.features.streams.advancedStreamCandidates
 import com.nuvio.app.features.streams.StreamsScreen
 import com.nuvio.app.features.streams.shouldShowAutoPlayLoading
 import com.nuvio.app.features.streams.shouldUseLandscapeAutoPlayLoading
@@ -46,6 +55,10 @@ import com.nuvio.app.features.streams.YouTubeStreamResolver
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
 import com.nuvio.app.navigation.*
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.snapshotFlow
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -242,6 +255,12 @@ internal fun StreamDestination(
             contentLanguage = resolveLaunchContentLanguage(),
             sourceFilename = stream.behaviorHints.filename,
             stream = stream,
+            advancedAutoPlayFallbacks = streamsUiState.autoPlayCandidates.drop(1)
+                .takeIf { playerSettings.streamAutoPlayMode == com.nuvio.app.features.streams.StreamAutoPlayMode.ADVANCED }
+                .orEmpty(),
+            advancedAutoPlaySettings = playerSettings.advancedAutoPlaySettings.takeIf {
+                playerSettings.streamAutoPlayMode == com.nuvio.app.features.streams.StreamAutoPlayMode.ADVANCED
+            },
         )
 
         autoPlayNavigationStarted = replaceStreamRoute
@@ -393,6 +412,7 @@ internal fun StreamDestination(
     }
 
     val streamsUiState by StreamsRepository.uiState.collectAsStateWithLifecycle()
+    var advancedQualityDialogVisible by remember(launch, effectiveVideoId) { mutableStateOf(false) }
     val expectedStreamsRequestToken = StreamsRepository.requestToken(
         type = launch.type,
         videoId = effectiveVideoId,
@@ -411,6 +431,41 @@ internal fun StreamDestination(
         manualSelection = launch.manualSelection,
     )
     SideEffect { onLandscapeLoadingChanged(useLandscapeLoading) }
+
+    // Advanced mode waits for all providers or the independent fetch deadline.
+    LaunchedEffect(expectedStreamsRequestToken, playerSettings.streamAutoPlayMode, launch.manualSelection, reuseHandled, reuseNavigated) {
+        if (!reuseHandled || reuseNavigated || launch.manualSelection || playerSettings.streamAutoPlayMode != com.nuvio.app.features.streams.StreamAutoPlayMode.ADVANCED) {
+            advancedQualityDialogVisible = false
+            return@LaunchedEffect
+        }
+        val fetchTimeoutMs = playerSettings.advancedAutoPlaySettings.addonFetchTimeoutSeconds * 1_000L
+        val settledState = {
+            val state = StreamsRepository.uiState.value
+            state.requestToken == expectedStreamsRequestToken &&
+                !state.isAnyLoading &&
+                (state.groups.isNotEmpty() || state.emptyStateReason != null)
+        }
+        if (fetchTimeoutMs > 0L) {
+            withTimeoutOrNull(fetchTimeoutMs) {
+                snapshotFlow { StreamsRepository.uiState.value }
+                    .first { settledState() }
+            }
+        } else {
+            // With no waiting deadline, show the chooser when any source returns,
+            // or when fetching ends with an empty result.
+            snapshotFlow { StreamsRepository.uiState.value }
+                .first {
+                    it.requestToken == expectedStreamsRequestToken &&
+                        (it.hasAnyStreams || (!it.isAnyLoading && (it.groups.isNotEmpty() || it.emptyStateReason != null)))
+                }
+        }
+        val current = StreamsRepository.uiState.value
+        if (current.requestToken == expectedStreamsRequestToken && current.hasAnyStreams) {
+            advancedQualityDialogVisible = true
+        } else if (current.requestToken == expectedStreamsRequestToken && !current.isAnyLoading) {
+            NuvioToastController.show("No streams are available to classify by quality.")
+        }
+    }
     var autoPlayHandled by rememberSaveable(launch.videoId, effectiveVideoId) { mutableStateOf(false) }
     LaunchedEffect(
         streamsUiState.autoPlayStream,
@@ -539,6 +594,12 @@ internal fun StreamDestination(
             contentLanguage = resolveLaunchContentLanguage(),
             sourceFilename = stream.behaviorHints.filename,
             stream = stream,
+            advancedAutoPlayFallbacks = streamsUiState.autoPlayCandidates.drop(1)
+                .takeIf { playerSettings.streamAutoPlayMode == com.nuvio.app.features.streams.StreamAutoPlayMode.ADVANCED }
+                .orEmpty(),
+            advancedAutoPlaySettings = playerSettings.advancedAutoPlaySettings.takeIf {
+                playerSettings.streamAutoPlayMode == com.nuvio.app.features.streams.StreamAutoPlayMode.ADVANCED
+            },
         )
         if (playerSettings.externalPlayerEnabled && stream.serverTarget == null) {
             openExternalPlayback(playerLaunch)
@@ -778,6 +839,39 @@ internal fun StreamDestination(
         partyStream
             ?.takeIf { !isHost && it.mediaKey == contentKey }
             ?.let { SharedStream(label = sharedLabel, stream = it.toStreamItem()) }
+    }
+
+    if (advancedQualityDialogVisible) {
+        val qualityStreams = streamsUiState.groups.flatMap { it.streams }
+        val qualityCounts = AdvancedStreamSelection.qualityCounts(advancedStreamCandidates(qualityStreams))
+        AlertDialog(
+            onDismissRequest = { advancedQualityDialogVisible = false },
+            title = { Text("Choose stream quality") },
+            text = {
+                Column {
+                    AdvancedStreamQuality.entries.forEach { quality ->
+                        val count = qualityCounts[quality] ?: 0
+                        val label = quality.height?.let { "${it}p" } ?: "Unknown resolution"
+                        TextButton(
+                            onClick = {
+                                advancedQualityDialogVisible = false
+                                if (quality != AdvancedStreamQuality.UNKNOWN && count > 0) {
+                                    if (!StreamsRepository.startAdvancedAutoPlay(quality)) {
+                                        NuvioToastController.show("No usable streams were found at the selected or lower qualities.")
+                                    }
+                                }
+                            },
+                            enabled = quality != AdvancedStreamQuality.UNKNOWN && count > 0,
+                        ) {
+                            Text("$label  ·  $count")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { advancedQualityDialogVisible = false }) { Text("Cancel") }
+            },
+        )
     }
 
     Box(modifier = Modifier.fillMaxSize()) {

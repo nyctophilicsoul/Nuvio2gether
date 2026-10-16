@@ -89,6 +89,7 @@ import com.nuvio.app.features.p2p.P2pTorrentProfile
 import com.nuvio.app.features.plugins.PluginsUiState
 import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.streams.StreamAutoPlayMode
+import com.nuvio.app.features.streams.AdvancedAutoPlaySettings
 import com.nuvio.app.features.streams.StreamAutoPlaySource
 import com.nuvio.app.isIos
 import kotlinx.coroutines.launch
@@ -354,6 +355,11 @@ private fun PlaybackSettingsSection(
     var showAutoPlayAddonSelectionDialog by remember { mutableStateOf(false) }
     var showAutoPlayPluginSelectionDialog by remember { mutableStateOf(false) }
     var showAutoPlayRegexDialog by remember { mutableStateOf(false) }
+    var showAdvancedFetchTimeoutDialog by remember { mutableStateOf(false) }
+    var showAdvancedStartupTimeoutDialog by remember { mutableStateOf(false) }
+    var showAdvancedBufferEventsDialog by remember { mutableStateOf(false) }
+    var showAdvancedAddonPriorityDialog by remember { mutableStateOf(false) }
+    var showAdvancedPluginPriorityDialog by remember { mutableStateOf(false) }
     var showP2pConsentDialog by remember { mutableStateOf(false) }
     var showP2pProfileDialog by remember { mutableStateOf(false) }
     var showP2pCacheSizeDialog by remember { mutableStateOf(false) }
@@ -841,8 +847,9 @@ private fun PlaybackSettingsSection(
                         onClick = { showAutoPlayRegexDialog = true },
                     )
                 }
-                SettingsGroupDivider(isTablet = isTablet)
-                val timeoutSec = autoPlayPlayerSettings.streamAutoPlayTimeoutSeconds
+                if (autoPlayPlayerSettings.streamAutoPlayMode != StreamAutoPlayMode.ADVANCED) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    val timeoutSec = autoPlayPlayerSettings.streamAutoPlayTimeoutSeconds
                 val timeoutLabel = when (timeoutSec) {
                     0 -> stringResource(Res.string.settings_playback_timeout_instant)
                     Int.MAX_VALUE -> stringResource(Res.string.settings_playback_timeout_unlimited)
@@ -899,6 +906,49 @@ private fun PlaybackSettingsSection(
                         ),
                         modifier = Modifier.fillMaxWidth(),
                     )
+                }
+                }
+                if (autoPlayPlayerSettings.streamAutoPlayMode == StreamAutoPlayMode.ADVANCED) {
+                    val advanced = autoPlayPlayerSettings.advancedAutoPlaySettings
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = "Add-on / plugin fetch timeout",
+                        description = "${advanced.addonFetchTimeoutSeconds} seconds before quality selection",
+                        isTablet = isTablet,
+                        onClick = { showAdvancedFetchTimeoutDialog = true },
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = "Playback startup timeout",
+                        description = "${advanced.playbackStartupTimeoutSeconds} seconds to start playback",
+                        isTablet = isTablet,
+                        onClick = { showAdvancedStartupTimeoutDialog = true },
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = "Buffer retry threshold",
+                        description = "Try another stream after more than ${advanced.maxBufferEvents} buffer events",
+                        isTablet = isTablet,
+                        onClick = { showAdvancedBufferEventsDialog = true },
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = "Add-on priority order",
+                        description = advanced.addonPriority.takeIf { it.isNotEmpty() }?.joinToString(" → ")
+                            ?: "Use default add-on order",
+                        isTablet = isTablet,
+                        onClick = { showAdvancedAddonPriorityDialog = true },
+                    )
+                    if (pluginsEnabled) {
+                        SettingsGroupDivider(isTablet = isTablet)
+                        SettingsNavigationRow(
+                            title = "Plugin priority order",
+                            description = advanced.pluginPriority.takeIf { it.isNotEmpty() }?.joinToString(" → ")
+                                ?: "Use default plugin order",
+                            isTablet = isTablet,
+                            onClick = { showAdvancedPluginPriorityDialog = true },
+                        )
+                    }
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsNavigationRow(
@@ -1959,6 +2009,78 @@ private fun PlaybackSettingsSection(
             onDismiss = { showAutoPlayRegexDialog = false },
         )
     }
+
+    if (showAdvancedFetchTimeoutDialog) {
+        AdvancedAutoPlayIntegerDialog(
+            title = "Add-on / plugin fetch timeout",
+            currentValue = autoPlayPlayerSettings.advancedAutoPlaySettings.addonFetchTimeoutSeconds,
+            options = listOf(0, 5, 10, 15, 20, 30, 45, 60, 90, 120),
+            suffix = "s",
+            onSelected = { value ->
+                PlayerSettingsRepository.setAdvancedAutoPlaySettings(
+                    autoPlayPlayerSettings.advancedAutoPlaySettings.copy(addonFetchTimeoutSeconds = value),
+                )
+                showAdvancedFetchTimeoutDialog = false
+            },
+            onDismiss = { showAdvancedFetchTimeoutDialog = false },
+        )
+    }
+    if (showAdvancedStartupTimeoutDialog) {
+        AdvancedAutoPlayIntegerDialog(
+            title = "Playback startup timeout",
+            currentValue = autoPlayPlayerSettings.advancedAutoPlaySettings.playbackStartupTimeoutSeconds,
+            options = listOf(0, 3, 5, 10, 15, 20, 30, 45, 60),
+            suffix = "s",
+            onSelected = { value ->
+                PlayerSettingsRepository.setAdvancedAutoPlaySettings(
+                    autoPlayPlayerSettings.advancedAutoPlaySettings.copy(playbackStartupTimeoutSeconds = value),
+                )
+                showAdvancedStartupTimeoutDialog = false
+            },
+            onDismiss = { showAdvancedStartupTimeoutDialog = false },
+        )
+    }
+    if (showAdvancedBufferEventsDialog) {
+        AdvancedAutoPlayIntegerDialog(
+            title = "Buffer retry threshold",
+            currentValue = autoPlayPlayerSettings.advancedAutoPlaySettings.maxBufferEvents,
+            options = listOf(0, 3, 5, 10, 15, 20, 30),
+            suffix = " events",
+            onSelected = { value ->
+                PlayerSettingsRepository.setAdvancedAutoPlaySettings(
+                    autoPlayPlayerSettings.advancedAutoPlaySettings.copy(maxBufferEvents = value),
+                )
+                showAdvancedBufferEventsDialog = false
+            },
+            onDismiss = { showAdvancedBufferEventsDialog = false },
+        )
+    }
+    if (showAdvancedAddonPriorityDialog) {
+        AdvancedAutoPlayProviderOrderDialog(
+            title = "Add-on priority order",
+            initialValue = autoPlayPlayerSettings.advancedAutoPlaySettings.addonPriority,
+            onSave = { values ->
+                PlayerSettingsRepository.setAdvancedAutoPlaySettings(
+                    autoPlayPlayerSettings.advancedAutoPlaySettings.copy(addonPriority = values),
+                )
+                showAdvancedAddonPriorityDialog = false
+            },
+            onDismiss = { showAdvancedAddonPriorityDialog = false },
+        )
+    }
+    if (showAdvancedPluginPriorityDialog) {
+        AdvancedAutoPlayProviderOrderDialog(
+            title = "Plugin priority order",
+            initialValue = autoPlayPlayerSettings.advancedAutoPlaySettings.pluginPriority,
+            onSave = { values ->
+                PlayerSettingsRepository.setAdvancedAutoPlaySettings(
+                    autoPlayPlayerSettings.advancedAutoPlaySettings.copy(pluginPriority = values),
+                )
+                showAdvancedPluginPriorityDialog = false
+            },
+            onDismiss = { showAdvancedPluginPriorityDialog = false },
+        )
+    }
 }
 
 @Composable
@@ -2931,3 +3053,69 @@ private fun libassRenderTypeRes(renderType: String): StringResource = when (rend
 
 @Composable
 private fun libassRenderTypeLabel(renderType: String): String = stringResource(libassRenderTypeRes(renderType))
+
+
+@Composable
+private fun AdvancedAutoPlayIntegerDialog(
+    title: String,
+    currentValue: Int,
+    options: List<Int>,
+    suffix: String,
+    onSelected: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    DialogSurface(onDismissRequest = onDismiss, title = title) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            options.forEach { value ->
+                DialogOption(
+                    text = "$value$suffix",
+                    selected = value == currentValue,
+                    onClick = { onSelected(value) },
+                )
+            }
+        }
+        DialogButtons {
+            DialogButton(text = "Cancel", onClick = onDismiss)
+        }
+    }
+}
+
+@Composable
+private fun AdvancedAutoPlayProviderOrderDialog(
+    title: String,
+    initialValue: List<String>,
+    onSave: (List<String>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var draft by remember(initialValue) { mutableStateOf(initialValue.joinToString("\n")) }
+    DialogSurface(onDismissRequest = onDismiss, title = title) {
+        Text(
+            text = "One provider name per line. The first line has the highest priority. Leave blank to use the default order.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        BasicTextField(
+            value = draft,
+            onValueChange = { draft = it },
+            modifier = Modifier.fillMaxWidth().heightIn(min = 140.dp).padding(vertical = 8.dp),
+            textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        )
+        DialogButtons {
+            DialogButton(text = "Cancel", onClick = onDismiss)
+            DialogButton(
+                text = "Save",
+                onClick = {
+                    val values = draft.lineSequence().map { it.trim() }
+                        .filter { it.isNotBlank() }
+                        .distinctBy { it.lowercase() }
+                        .toList()
+                    onSave(values)
+                },
+            )
+        }
+    }
+}
