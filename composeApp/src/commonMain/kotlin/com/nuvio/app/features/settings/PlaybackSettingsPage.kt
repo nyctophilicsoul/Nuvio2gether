@@ -2965,6 +2965,59 @@ private fun AdvancedAutoPlayIntegerDialog(
 }
 
 @Composable
+private fun AdvancedAutoPlayTimeoutSliderDialog(
+    currentValue: Int,
+    onSelected: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val values = listOf(0, 3, 5, 10, 15, 20, 30, 45, 60)
+    val currentIndex = values.indexOf(currentValue).coerceAtLeast(0)
+    var sliderValue by remember(currentIndex) { mutableFloatStateOf(currentIndex.toFloat()) }
+    var lastHapticStep by remember(currentIndex) { mutableStateOf(currentIndex.toFloat()) }
+    val haptics = LocalHapticFeedback.current
+    val selectedIndex = sliderValue.toInt().coerceIn(0, values.lastIndex)
+    val label = if (values[selectedIndex] == 0) "Disabled" else "${values[selectedIndex]} seconds"
+
+    DialogSurface(onDismissRequest = onDismiss, title = "Playback start-up timeout") {
+        Text(
+            text = "Wait this long for playback to actually start. If a link stays buffering, the fallback chain tries the next source.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(vertical = 8.dp),
+        )
+        Slider(
+            value = sliderValue,
+            onValueChange = { raw ->
+                val snapped = snapToStep(raw, 1f).coerceIn(0f, values.lastIndex.toFloat())
+                sliderValue = snapped
+                if (snapped != lastHapticStep) {
+                    lastHapticStep = snapped
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                }
+            },
+            onValueChangeFinished = {
+                onSelected(values[sliderValue.toInt().coerceIn(0, values.lastIndex)])
+            },
+            valueRange = 0f..values.lastIndex.toFloat(),
+            steps = calculateSteps(0f, values.lastIndex.toFloat(), 1f),
+            modifier = Modifier.fillMaxWidth(),
+            colors = SliderDefaults.colors(
+                thumbColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = MaterialTheme.colorScheme.primary,
+            ),
+        )
+        DialogButtons {
+            DialogButton(text = "Cancel", onClick = onDismiss)
+            DialogButton(text = "Apply", onClick = { onSelected(values[selectedIndex]) })
+        }
+    }
+}
+
+@Composable
 private fun AdvancedAutoPlaySettingsFullScreen(
     currentMode: StreamAutoPlayMode,
     advanced: AdvancedAutoPlaySettings,
@@ -3061,11 +3114,8 @@ private fun AdvancedAutoPlaySettingsFullScreen(
         onSelected = { onAdvancedChanged(advanced.copy(addonFetchTimeoutSeconds = it)); showFetchTimeout = false },
         onDismiss = { showFetchTimeout = false },
     )
-    if (showStartupTimeout) AdvancedAutoPlayIntegerDialog(
-        title = "Playback start-up timeout",
+    if (showStartupTimeout) AdvancedAutoPlayTimeoutSliderDialog(
         currentValue = advanced.playbackStartupTimeoutSeconds,
-        options = listOf(0, 3, 5, 10, 15, 20, 30, 45, 60),
-        suffix = "s",
         onSelected = { onAdvancedChanged(advanced.copy(playbackStartupTimeoutSeconds = it)); showStartupTimeout = false },
         onDismiss = { showStartupTimeout = false },
     )
