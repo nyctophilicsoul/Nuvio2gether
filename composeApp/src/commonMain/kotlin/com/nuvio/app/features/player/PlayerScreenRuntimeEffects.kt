@@ -45,58 +45,74 @@ import org.jetbrains.compose.resources.getString
 
 @Composable
 internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
-    // Advanced Auto Play owns its fallback queue for the lifetime of this PlayerLaunch.
-    // Monitor player state only: source/provider fetching occurs before the player route opens.
+    // Advanced Auto Play has a separate playback-start watchdog. Its clock starts
+    // here, inside the player route, never while add-ons/plugins are still fetching.
     LaunchedEffect(args.launchId, activeSourceUrl, activeSourceIdentityKey, activeStream) {
         val launchId = args.launchId ?: return@LaunchedEffect
         val launchAtStart = PlayerLaunchStore.get(launchId) ?: return@LaunchedEffect
         val advancedSettings = launchAtStart.advancedAutoPlaySettings ?: return@LaunchedEffect
-        if (launchAtStart.advancedAutoPlayFallbacks.isEmpty()) return@LaunchedEffect
 
         val sourceAtStart = activeSourceUrl
         val sourceIdentityAtStart = activeSourceIdentityKey
         val startupTimer = TimeSource.Monotonic.markNow()
-        var playbackStartedAt: kotlin.time.TimeMark? = null
-        var previousLoading = playbackSnapshot.isLoading
+        var playbackStarted = false
         var bufferEvents = 0
+        var previousLoading = playbackSnapshot.isLoading
         var stabilityWindowApplied = false
+        var stablePlaybackMs = 0L
+        var lastTick = TimeSource.Monotonic.markNow()
+        var wasActuallyPlaying = false
 
         while (activeSourceUrl == sourceAtStart && activeSourceIdentityKey == sourceIdentityAtStart) {
+            val elapsedSinceTickMs = lastTick.elapsedNow().inWholeMilliseconds.coerceAtLeast(0L)
+            lastTick = TimeSource.Monotonic.markNow()
+            if (wasActuallyPlaying) stablePlaybackMs += elapsedSinceTickMs
+
             if (errorMessage != null) {
                 tryNextAdvancedAutoPlayFallback()
                 return@LaunchedEffect
             }
 
             val isActuallyPlaying = playbackSnapshot.isPlaying && !playbackSnapshot.isLoading
-            if (playbackStartedAt == null && isActuallyPlaying) {
-                playbackStartedAt = TimeSource.Monotonic.markNow()
-            }
+            if (isActuallyPlaying) playbackStarted = true
 
-            if (playbackStartedAt == null) {
+            if (!playbackStarted) {
                 val startupTimeoutMs = advancedSettings.playbackStartupTimeoutSeconds * 1_000L
-                if (startupTimeoutMs > 0L && startupTimer.elapsedNow().inWholeMilliseconds >= startupTimeoutMs) {
-                    tryNextAdvancedAutoPlayFallback()
+                // Zero disables this watchdog; it does not change any legacy/fetch timeout.
+                if (startupTimeoutMs > 0L &&
+                    startupTimer.elapsedNow().inWholeMilliseconds >= startupTimeoutMs
+                ) {
+                    if (!tryNextAdvancedAutoPlayFallback()) {
+                        errorMessage = "Playback did not start within ${advancedSettings.playbackStartupTimeoutSeconds} seconds, and no fallback sources remain."
+                        controlsVisible = !playerControlsLocked
+                    }
                     return@LaunchedEffect
                 }
             } else {
-                val stableForMs = advancedSettings.stabilityWindowSeconds * 1_000L
-                if (!stabilityWindowApplied &&
-                    playbackStartedAt.elapsedNow().inWholeMilliseconds >= stableForMs
-                ) {
-                    // The stream is considered stable after this window; keep counting later rebuffer events.
+                val stableWindowMs = advancedSettings.stabilityWindowSeconds * 1_000L
+                if (!stabilityWindowApplied && stablePlaybackMs >= stableWindowMs) {
                     stabilityWindowApplied = true
+                    // The source has proven itself stable; give its later rebuffer
+                    // events a fresh retry budget without touching startup timeout.
+                    bufferEvents = 0
                 }
 
+                // Count real transitions into buffering. The initial startup is handled
+                // only by the startup watchdog; post-start stalls use this rule.
                 val currentlyLoading = playbackSnapshot.isLoading
                 if (currentlyLoading && !previousLoading) {
                     bufferEvents += 1
                     if (bufferEvents > advancedSettings.maxBufferEvents) {
-                        tryNextAdvancedAutoPlayFallback()
+                        if (!tryNextAdvancedAutoPlayFallback()) {
+                            errorMessage = "Playback repeatedly buffered, and no fallback sources remain."
+                            controlsVisible = !playerControlsLocked
+                        }
                         return@LaunchedEffect
                     }
                 }
                 previousLoading = currentlyLoading
             }
+            wasActuallyPlaying = isActuallyPlaying
             delay(150)
         }
     }

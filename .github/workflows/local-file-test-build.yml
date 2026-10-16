@@ -3,6 +3,8 @@ name: Local File Test Build
 # Manual-only test build for the branch selected in the Actions UI.
 on:
   workflow_dispatch:
+  push:
+    branches: [modified-autoplay]
 
 permissions:
   contents: read

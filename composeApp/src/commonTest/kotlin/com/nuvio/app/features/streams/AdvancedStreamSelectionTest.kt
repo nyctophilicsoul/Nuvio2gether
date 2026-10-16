@@ -46,6 +46,11 @@ class AdvancedStreamSelectionTest {
         assertTrue(started.failedStreamIds.isEmpty())
     }
 
+
+    @Test fun `2k metadata maps to the QHD quality bucket`() {
+        assertEquals(AdvancedStreamQuality.QHD_1440, AdvancedStreamQuality.fromMetadata("WEB-DL 2K"))
+    }
+
     @Test fun `buffer event threshold retries after more than configured limit`() {
         val settings = AdvancedAutoPlaySettings(maxBufferEvents = 2)
         var attempt = AdvancedPlaybackAttempt("link")

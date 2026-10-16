@@ -920,7 +920,7 @@ private fun PlaybackSettingsSection(
                     SettingsGroupDivider(isTablet = isTablet)
                     SettingsNavigationRow(
                         title = "Playback startup timeout",
-                        description = "${advanced.playbackStartupTimeoutSeconds} seconds to start playback",
+                        description = if (advanced.playbackStartupTimeoutSeconds == 0) "Disabled" else "${advanced.playbackStartupTimeoutSeconds} seconds to start playback",
                         isTablet = isTablet,
                         onClick = { showAdvancedStartupTimeoutDialog = true },
                     )

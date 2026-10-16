@@ -608,13 +608,30 @@ object StreamsRepository {
         _uiState.update { it.copy(selectedFilter = addonId) }
     }
 
+    /** Returns the currently fetched, eligible streams shown in Advanced quality counts. */
+    fun advancedAutoPlayEligibleStreams(): List<StreamItem> {
+        PlayerSettingsRepository.ensureLoaded()
+        val settings = PlayerSettingsRepository.uiState.value
+        val addonNames = AddonRepository.uiState.value.addons.enabledAddons()
+            .mapNotNull { it.manifest?.name }
+            .toSet()
+        val debrid = DebridSettingsRepository.snapshot()
+        return StreamAutoPlaySelector.eligibleAdvancedStreams(
+            streams = _uiState.value.groups.flatMap { it.streams },
+            source = settings.streamAutoPlaySource,
+            installedAddonNames = addonNames,
+            selectedAddons = settings.streamAutoPlaySelectedAddons,
+            selectedPlugins = settings.streamAutoPlaySelectedPlugins,
+            debridEnabled = debrid.canResolvePlayableLinks,
+            activeResolverProviderId = debrid.activeResolverProviderId,
+        )
+    }
+
     /** Starts the Advanced mode only after the user chooses a quality. */
     fun startAdvancedAutoPlay(selectedQuality: AdvancedStreamQuality): Boolean {
         PlayerSettingsRepository.ensureLoaded()
         val advancedSettings = PlayerSettingsRepository.uiState.value.advancedAutoPlaySettings
-        val current = _uiState.value
-        val streams = current.groups.flatMap { it.streams }
-            .filter { it.hasPlayableSource && !it.shouldOpenExternally }
+        val streams = advancedAutoPlayEligibleStreams()
         val candidates = advancedStreamCandidates(streams)
         val plan = runCatching {
             AdvancedStreamSelection.planForQuality(candidates, selectedQuality, advancedSettings)

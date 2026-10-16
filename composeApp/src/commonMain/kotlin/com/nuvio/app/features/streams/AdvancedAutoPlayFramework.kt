@@ -47,7 +47,7 @@ enum class AdvancedStreamQuality(val height: Int?) {
             val text = listOfNotNull(name, description, url).joinToString(" ").lowercase()
             return when {
                 Regex("""(^|[^0-9])(?:2160p|4k|uhd)([^0-9]|$)""").containsMatchIn(text) -> UHD_4K
-                Regex("""(^|[^0-9])1440p([^0-9]|$)""").containsMatchIn(text) -> QHD_1440
+                Regex("""(^|[^0-9])(?:1440p|2k|2560x1440)([^0-9]|$)""").containsMatchIn(text) -> QHD_1440
                 Regex("""(^|[^0-9])(?:1080p|1080i|fhd)([^0-9]|$)""").containsMatchIn(text) -> FHD_1080
                 Regex("""(^|[^0-9])(?:720p|hd)([^0-9]|$)""").containsMatchIn(text) -> HD_720
                 Regex("""(^|[^0-9])(?:480p|480i|sd)([^0-9]|$)""").containsMatchIn(text) -> SD_480

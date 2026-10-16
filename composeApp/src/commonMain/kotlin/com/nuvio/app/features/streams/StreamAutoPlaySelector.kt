@@ -37,6 +37,41 @@ object StreamAutoPlaySelector {
         return directDebridEntries + orderedAddons + pluginEntries
     }
 
+    /**
+     * Applies the same source scope/provider filters as the legacy auto-play selector,
+     * then keeps only streams the internal player can actually attempt. This is used
+     * exclusively by Advanced mode for matching quality counts and its fallback queue.
+     */
+    fun eligibleAdvancedStreams(
+        streams: List<StreamItem>,
+        source: StreamAutoPlaySource,
+        installedAddonNames: Set<String>,
+        selectedAddons: Set<String>,
+        selectedPlugins: Set<String>,
+        debridEnabled: Boolean,
+        activeResolverProviderId: String?,
+    ): List<StreamItem> {
+        val scoped = when (source) {
+            StreamAutoPlaySource.ALL_SOURCES -> streams
+            StreamAutoPlaySource.INSTALLED_ADDONS_ONLY ->
+                streams.filter { it.serverTarget != null || it.addonName in installedAddonNames }
+            StreamAutoPlaySource.ENABLED_PLUGINS_ONLY ->
+                streams.filter { it.addonName !in installedAddonNames }
+        }
+        return scoped.filter { stream ->
+            val isInstalledAddon = stream.addonName in installedAddonNames
+            when {
+                stream.serverTarget != null -> true
+                isInstalledAddon -> selectedAddons.isEmpty() || stream.addonName in selectedAddons
+                else -> selectedPlugins.isEmpty() || stream.addonName in selectedPlugins
+            }
+        }.filter { stream ->
+            stream.hasPlayableSource &&
+                !stream.shouldOpenExternally &&
+                stream.isAutoPlayable(debridEnabled, activeResolverProviderId)
+        }
+    }
+
     fun selectAutoPlayStream(
         streams: List<StreamItem>,
         mode: StreamAutoPlayMode,

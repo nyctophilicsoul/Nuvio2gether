@@ -58,7 +58,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.snapshotFlow
+import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -255,7 +255,7 @@ internal fun StreamDestination(
             contentLanguage = resolveLaunchContentLanguage(),
             sourceFilename = stream.behaviorHints.filename,
             stream = stream,
-            advancedAutoPlayFallbacks = streamsUiState.autoPlayCandidates.drop(1)
+            advancedAutoPlayFallbacks = StreamsRepository.uiState.value.autoPlayCandidates.drop(1)
                 .takeIf { playerSettings.streamAutoPlayMode == com.nuvio.app.features.streams.StreamAutoPlayMode.ADVANCED }
                 .orEmpty(),
             advancedAutoPlaySettings = playerSettings.advancedAutoPlaySettings.takeIf {
@@ -594,7 +594,7 @@ internal fun StreamDestination(
             contentLanguage = resolveLaunchContentLanguage(),
             sourceFilename = stream.behaviorHints.filename,
             stream = stream,
-            advancedAutoPlayFallbacks = streamsUiState.autoPlayCandidates.drop(1)
+            advancedAutoPlayFallbacks = StreamsRepository.uiState.value.autoPlayCandidates.drop(1)
                 .takeIf { playerSettings.streamAutoPlayMode == com.nuvio.app.features.streams.StreamAutoPlayMode.ADVANCED }
                 .orEmpty(),
             advancedAutoPlaySettings = playerSettings.advancedAutoPlaySettings.takeIf {
@@ -842,7 +842,7 @@ internal fun StreamDestination(
     }
 
     if (advancedQualityDialogVisible) {
-        val qualityStreams = streamsUiState.groups.flatMap { it.streams }
+        val qualityStreams = StreamsRepository.advancedAutoPlayEligibleStreams()
         val qualityCounts = AdvancedStreamSelection.qualityCounts(advancedStreamCandidates(qualityStreams))
         AlertDialog(
             onDismissRequest = { advancedQualityDialogVisible = false },
