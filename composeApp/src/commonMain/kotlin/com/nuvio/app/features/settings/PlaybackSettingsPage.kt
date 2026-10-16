@@ -2410,6 +2410,11 @@ private fun StreamAutoPlayModeDialog(
             Res.string.settings_playback_stream_selection_mode_regex,
             Res.string.settings_playback_stream_selection_mode_regex_description,
         ),
+        Triple(
+            StreamAutoPlayMode.ADVANCED,
+            Res.string.settings_playback_stream_selection_mode_advanced,
+            Res.string.settings_playback_stream_selection_mode_advanced_description,
+        ),
     )
 
     DialogSurface(
@@ -2904,6 +2909,7 @@ private val StreamAutoPlayMode.labelRes: StringResource
         StreamAutoPlayMode.MANUAL -> Res.string.settings_playback_stream_selection_mode_manual
         StreamAutoPlayMode.FIRST_STREAM -> Res.string.settings_playback_stream_selection_mode_first_stream
         StreamAutoPlayMode.REGEX_MATCH -> Res.string.settings_playback_stream_selection_mode_regex
+        StreamAutoPlayMode.ADVANCED -> Res.string.settings_playback_stream_selection_mode_advanced
     }
 
 private val com.nuvio.app.features.player.skip.NextEpisodeThresholdMode.labelRes: StringResource
