@@ -35,15 +35,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
     val fallbackTimeoutAttempted = remember(args.launchId) { mutableStateOf(false) }
     var bufferingFallbackAttempted by remember(args.launchId) { mutableStateOf(false) }
     var bufferingFallbackHandled by remember(args.launchId) { mutableStateOf(false) }
-    var bufferingFallbackAttempted by remember(args.launchId) { mutableStateOf(false) }
-    LaunchedEffect(
-        args.launchId,
-        playerSettingsUiState.streamAutoPlaySmartSelectionEnabled,
-        activePlaybackKey,
-        playbackSnapshot.isLoading,
-        initialLoadCompleted,
-        errorMessage,
-    ) {
+    LaunchedEffect(args.launchId, playerSettingsUiState.streamAutoPlaySmartSelectionEnabled, activePlaybackKey, activeSourceUrl, playbackSnapshot.isLoading, errorMessage) {
         if (
             !playerSettingsUiState.streamAutoPlaySmartSelectionEnabled ||
             args.onPlaybackFailure == null ||
@@ -53,8 +45,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
             bufferingFallbackAttempted
         ) return@LaunchedEffect
 
-        // Only continuous buffering trips this watchdog. A successful loading-to-playing
-        // transition cancels it, and a new launch gets a fresh attempt state.
+        // Start a fresh watchdog only while the player is continuously buffering.
         delay(10_000L)
         if (
             playerSettingsUiState.streamAutoPlaySmartSelectionEnabled &&
@@ -63,7 +54,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
             !bufferingFallbackAttempted
         ) {
             bufferingFallbackAttempted = true
-            args.onPlaybackFailure?.invoke(playbackSnapshot.positionMs)
+            bufferingFallbackHandled = args.onPlaybackFailure?.invoke(playbackSnapshot.positionMs) == true
         }
     }
     LaunchedEffect(args.launchId, playerSettingsUiState.streamAutoPlaySmartSelectionEnabled, playerSettingsUiState.streamAutoPlayFallbackTimeoutSeconds, activePlaybackKey, activeSourceUrl, errorMessage) {
