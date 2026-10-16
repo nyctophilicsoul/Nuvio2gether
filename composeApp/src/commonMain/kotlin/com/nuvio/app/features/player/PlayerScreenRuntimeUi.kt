@@ -33,6 +33,37 @@ import nuvio.composeapp.generated.resources.*
 internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
     val runtime = this
     val fallbackTimeoutAttempted = remember(args.launchId) { mutableStateOf(false) }
+    var bufferingFallbackAttempted by remember(args.launchId) { mutableStateOf(false) }
+    LaunchedEffect(
+        args.launchId,
+        playerSettingsUiState.streamAutoPlaySmartSelectionEnabled,
+        activePlaybackKey,
+        playbackSnapshot.isLoading,
+        initialLoadCompleted,
+        errorMessage,
+    ) {
+        if (
+            !playerSettingsUiState.streamAutoPlaySmartSelectionEnabled ||
+            args.onPlaybackFailure == null ||
+            activeSourceUrl == null ||
+            !playbackSnapshot.isLoading ||
+            errorMessage != null ||
+            bufferingFallbackAttempted
+        ) return@LaunchedEffect
+
+        // Only continuous buffering trips this watchdog. A successful loading-to-playing
+        // transition cancels it, and a new launch gets a fresh attempt state.
+        delay(10_000L)
+        if (
+            playerSettingsUiState.streamAutoPlaySmartSelectionEnabled &&
+            playbackSnapshot.isLoading &&
+            errorMessage == null &&
+            !bufferingFallbackAttempted
+        ) {
+            bufferingFallbackAttempted = true
+            args.onPlaybackFailure?.invoke(playbackSnapshot.positionMs)
+        }
+    }
     LaunchedEffect(args.launchId, playerSettingsUiState.streamAutoPlaySmartSelectionEnabled, playerSettingsUiState.streamAutoPlayFallbackTimeoutSeconds, activePlaybackKey, activeSourceUrl, errorMessage) {
         val timeoutSeconds = playerSettingsUiState.streamAutoPlayFallbackTimeoutSeconds
         if (!playerSettingsUiState.streamAutoPlaySmartSelectionEnabled || args.onPlaybackFailure == null || activeSourceUrl == null || initialLoadCompleted || errorMessage != null || timeoutSeconds !in 5..120) return@LaunchedEffect
