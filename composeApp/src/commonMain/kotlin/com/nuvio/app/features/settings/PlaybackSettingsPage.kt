@@ -3086,6 +3086,143 @@ private fun AdvancedAutoPlayIntegerDialog(
 }
 
 @Composable
+@Composable
+private fun AdvancedAutoPlaySettingsFullScreen(
+    currentMode: StreamAutoPlayMode,
+    advanced: AdvancedAutoPlaySettings,
+    pluginsEnabled: Boolean,
+    addonNames: List<String>,
+    pluginNames: List<String>,
+    onModeSelected: (StreamAutoPlayMode) -> Unit,
+    onAdvancedChanged: (AdvancedAutoPlaySettings) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var showFetchTimeout by remember { mutableStateOf(false) }
+    var showStartupTimeout by remember { mutableStateOf(false) }
+    var showBufferThreshold by remember { mutableStateOf(false) }
+    var showAddonPriority by remember { mutableStateOf(false) }
+    var showPluginPriority by remember { mutableStateOf(false) }
+
+    DialogSurface(onDismissRequest = onDismiss, title = "Auto-play advanced settings") {
+        Text(
+            text = "Semi-automatic mode shows quality choices with live link counts. Playback automatically falls back only after startup fails or buffering exceeds the configured threshold.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        SettingsSection(title = "Selection mode", isTablet = false) {
+            SettingsGroup(isTablet = false) {
+                listOf(
+                    StreamAutoPlayMode.MANUAL to "Manual",
+                    StreamAutoPlayMode.FIRST_STREAM to "First stream",
+                    StreamAutoPlayMode.REGEX_MATCH to "Regex matching",
+                    StreamAutoPlayMode.ADVANCED to "Semi-automatic quality chooser",
+                ).forEachIndexed { index, pair ->
+                    if (index > 0) SettingsGroupDivider(isTablet = false)
+                    DialogOption(
+                        text = pair.second,
+                        description = if (pair.first == StreamAutoPlayMode.ADVANCED) "Choose 4K, 1440p, 1080p, 720p or lower before playback." else null,
+                        selected = currentMode == pair.first,
+                        onClick = { onModeSelected(pair.first) },
+                    )
+                }
+            }
+        }
+        SettingsSection(title = "Fallback timing", isTablet = false) {
+            SettingsGroup(isTablet = false) {
+                SettingsNavigationRow(
+                    title = "Add-on / plugin fetch timeout",
+                    description = if (advanced.addonFetchTimeoutSeconds == 0) "No fetch deadline" else "${advanced.addonFetchTimeoutSeconds}s before quality selection",
+                    isTablet = false,
+                    onClick = { showFetchTimeout = true },
+                )
+                SettingsGroupDivider(isTablet = false)
+                SettingsNavigationRow(
+                    title = "Playback start-up timeout",
+                    description = if (advanced.playbackStartupTimeoutSeconds == 0) "Disabled" else "${advanced.playbackStartupTimeoutSeconds}s to begin playback before trying a fallback",
+                    isTablet = false,
+                    onClick = { showStartupTimeout = true },
+                )
+                SettingsGroupDivider(isTablet = false)
+                SettingsNavigationRow(
+                    title = "Buffer retry threshold",
+                    description = "Fallback after more than ${advanced.maxBufferEvents} buffer events",
+                    isTablet = false,
+                    onClick = { showBufferThreshold = true },
+                )
+            }
+        }
+        SettingsSection(title = "Provider priority", isTablet = false) {
+            SettingsGroup(isTablet = false) {
+                SettingsNavigationRow(
+                    title = "Add-on priority order",
+                    description = prioritySummary(advanced.addonPriority, addonNames),
+                    isTablet = false,
+                    onClick = { showAddonPriority = true },
+                )
+                if (pluginsEnabled) {
+                    SettingsGroupDivider(isTablet = false)
+                    SettingsNavigationRow(
+                        title = "Plugin priority order",
+                        description = prioritySummary(advanced.pluginPriority, pluginNames),
+                        isTablet = false,
+                        onClick = { showPluginPriority = true },
+                    )
+                }
+            }
+        }
+        DialogButtons {
+            DialogButton(text = "Done", onClick = onDismiss)
+        }
+    }
+
+    if (showFetchTimeout) AdvancedAutoPlayIntegerDialog(
+        title = "Add-on / plugin fetch timeout",
+        currentValue = advanced.addonFetchTimeoutSeconds,
+        options = listOf(0, 5, 10, 15, 20, 30, 45, 60, 90, 120),
+        suffix = "s",
+        onSelected = { onAdvancedChanged(advanced.copy(addonFetchTimeoutSeconds = it)); showFetchTimeout = false },
+        onDismiss = { showFetchTimeout = false },
+    )
+    if (showStartupTimeout) AdvancedAutoPlayIntegerDialog(
+        title = "Playback start-up timeout",
+        currentValue = advanced.playbackStartupTimeoutSeconds,
+        options = listOf(0, 3, 5, 10, 15, 20, 30, 45, 60),
+        suffix = "s",
+        onSelected = { onAdvancedChanged(advanced.copy(playbackStartupTimeoutSeconds = it)); showStartupTimeout = false },
+        onDismiss = { showStartupTimeout = false },
+    )
+    if (showBufferThreshold) AdvancedAutoPlayIntegerDialog(
+        title = "Buffer retry threshold",
+        currentValue = advanced.maxBufferEvents,
+        options = listOf(0, 3, 5, 10, 15, 20, 30),
+        suffix = " events",
+        onSelected = { onAdvancedChanged(advanced.copy(maxBufferEvents = it)); showBufferThreshold = false },
+        onDismiss = { showBufferThreshold = false },
+    )
+    if (showAddonPriority) AdvancedAutoPlayProviderPriorityDialog(
+        title = "Add-on priority order",
+        availableItems = addonNames,
+        initialValue = advanced.addonPriority,
+        onSave = { onAdvancedChanged(advanced.copy(addonPriority = it)); showAddonPriority = false },
+        onDismiss = { showAddonPriority = false },
+    )
+    if (pluginsEnabled && showPluginPriority) AdvancedAutoPlayProviderPriorityDialog(
+        title = "Plugin priority order",
+        availableItems = pluginNames,
+        initialValue = advanced.pluginPriority,
+        onSave = { onAdvancedChanged(advanced.copy(pluginPriority = it)); showPluginPriority = false },
+        onDismiss = { showPluginPriority = false },
+    )
+}
+
+@Composable
+private fun prioritySummary(priority: List<String>, available: List<String>): String {
+    val ordered = (priority.mapNotNull { value -> available.firstOrNull { it.equals(value, true) } } +
+        available.filterNot { candidate -> priority.any { it.equals(candidate, true) } }).distinct()
+    return ordered.take(3).joinToString(" → ").ifBlank { "No enabled providers installed" } +
+        if (ordered.size > 3) "  +${ordered.size - 3} more" else ""
+}
+
 private fun AdvancedAutoPlayProviderPriorityDialog(
     title: String,
     availableItems: List<String>,
