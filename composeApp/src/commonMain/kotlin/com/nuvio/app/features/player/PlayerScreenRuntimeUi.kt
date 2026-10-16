@@ -34,6 +34,8 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
     val runtime = this
     val fallbackTimeoutAttempted = remember(args.launchId) { mutableStateOf(false) }
     var bufferingFallbackAttempted by remember(args.launchId) { mutableStateOf(false) }
+    var bufferingFallbackHandled by remember(args.launchId) { mutableStateOf(false) }
+    var bufferingFallbackAttempted by remember(args.launchId) { mutableStateOf(false) }
     LaunchedEffect(
         args.launchId,
         playerSettingsUiState.streamAutoPlaySmartSelectionEnabled,
