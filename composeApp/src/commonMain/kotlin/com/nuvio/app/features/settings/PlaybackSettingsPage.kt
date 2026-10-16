@@ -2082,45 +2082,22 @@ private fun PlaybackSettingsSection(
             onDismiss = { showAdvancedBufferEventsDialog = false },
         )
     }
-    if (showAdvancedAddonPriorityDialog) {
-        val availableAddonNames = addonUiState.addons.enabledAddons()
-            .mapNotNull { it.manifest }
-            .filter { manifest -> manifest.resources.any { resource -> resource.name == "stream" } }
-            .map { it.name }
-            .distinct()
-            .sorted()
-        AdvancedAutoPlayProviderPriorityDialog(
-            title = "Add-on priority order",
-            availableItems = availableAddonNames,
-            initialValue = autoPlayPlayerSettings.advancedAutoPlaySettings.addonPriority,
-            onSave = { values ->
-                PlayerSettingsRepository.setAdvancedAutoPlaySettings(
-                    autoPlayPlayerSettings.advancedAutoPlaySettings.copy(addonPriority = values),
-                )
-                showAdvancedAddonPriorityDialog = false
-            },
-            onDismiss = { showAdvancedAddonPriorityDialog = false },
+    if (showAdvancedAutoPlaySettings) {
+        AdvancedAutoPlaySettingsFullScreen(
+            currentMode = autoPlayPlayerSettings.streamAutoPlayMode,
+            advanced = autoPlayPlayerSettings.advancedAutoPlaySettings,
+            pluginsEnabled = pluginsEnabled,
+            addonNames = addonUiState.addons.enabledAddons()
+                .mapNotNull { it.manifest }
+                .filter { manifest -> manifest.resources.any { resource -> resource.name == "stream" } }
+                .map { it.name }.distinct().sorted(),
+            pluginNames = pluginUiState.scrapers.filter { it.enabled }.map { it.name }.distinct().sorted(),
+            onModeSelected = PlayerSettingsRepository::setStreamAutoPlayMode,
+            onAdvancedChanged = PlayerSettingsRepository::setAdvancedAutoPlaySettings,
+            onDismiss = { showAdvancedAutoPlaySettings = false },
         )
     }
-    if (pluginsEnabled && showAdvancedPluginPriorityDialog) {
-        val availablePluginNames = pluginUiState.scrapers
-            .filter { it.enabled }
-            .map { it.name }
-            .distinct()
-            .sorted()
-        AdvancedAutoPlayProviderPriorityDialog(
-            title = "Plugin priority order",
-            availableItems = availablePluginNames,
-            initialValue = autoPlayPlayerSettings.advancedAutoPlaySettings.pluginPriority,
-            onSave = { values ->
-                PlayerSettingsRepository.setAdvancedAutoPlaySettings(
-                    autoPlayPlayerSettings.advancedAutoPlaySettings.copy(pluginPriority = values),
-                )
-                showAdvancedPluginPriorityDialog = false
-            },
-            onDismiss = { showAdvancedPluginPriorityDialog = false },
-        )
-    }
+
 }
 
 @Composable
