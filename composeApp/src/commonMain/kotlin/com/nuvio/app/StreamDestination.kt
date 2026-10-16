@@ -58,7 +58,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.first
-import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -432,32 +431,29 @@ internal fun StreamDestination(
     )
     SideEffect { onLandscapeLoadingChanged(useLandscapeLoading) }
 
-    // Advanced mode waits for all providers or the independent fetch deadline.
+    // Advanced mode waits for provider results or the independent fetch deadline.
+    // Use the repository StateFlow directly; Compose snapshotFlow does not observe StateFlow.value.
     LaunchedEffect(expectedStreamsRequestToken, playerSettings.streamAutoPlayMode, launch.manualSelection, reuseHandled, reuseNavigated) {
         if (!reuseHandled || reuseNavigated || launch.manualSelection || playerSettings.streamAutoPlayMode != com.nuvio.app.features.streams.StreamAutoPlayMode.ADVANCED) {
             advancedQualityDialogVisible = false
             return@LaunchedEffect
         }
         val fetchTimeoutMs = playerSettings.advancedAutoPlaySettings.addonFetchTimeoutSeconds * 1_000L
-        val settledState = {
-            val state = StreamsRepository.uiState.value
-            state.requestToken == expectedStreamsRequestToken &&
-                !state.isAnyLoading &&
-                (state.groups.isNotEmpty() || state.emptyStateReason != null)
-        }
         if (fetchTimeoutMs > 0L) {
             withTimeoutOrNull(fetchTimeoutMs) {
-                snapshotFlow { StreamsRepository.uiState.value }
-                    .first { settledState() }
+                StreamsRepository.uiState.first { state ->
+                    state.requestToken == expectedStreamsRequestToken &&
+                        !state.isAnyLoading &&
+                        (state.groups.isNotEmpty() || state.emptyStateReason != null)
+                }
             }
         } else {
-            // With no waiting deadline, show the chooser when any source returns,
-            // or when fetching ends with an empty result.
-            snapshotFlow { StreamsRepository.uiState.value }
-                .first {
-                    it.requestToken == expectedStreamsRequestToken &&
-                        (it.hasAnyStreams || (!it.isAnyLoading && (it.groups.isNotEmpty() || it.emptyStateReason != null)))
-                }
+            // A zero fetch wait means choose as soon as a result arrives (or fetching ends).
+            StreamsRepository.uiState.first { state ->
+                state.requestToken == expectedStreamsRequestToken &&
+                    (state.hasAnyStreams ||
+                        (!state.isAnyLoading && (state.groups.isNotEmpty() || state.emptyStateReason != null)))
+            }
         }
         val current = StreamsRepository.uiState.value
         if (current.requestToken == expectedStreamsRequestToken && current.hasAnyStreams) {

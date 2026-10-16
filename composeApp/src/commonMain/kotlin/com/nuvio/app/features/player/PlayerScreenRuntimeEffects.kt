@@ -984,7 +984,7 @@ private const val CREDENTIAL_REFRESH_POLL_INTERVAL_MS = 500L
 
 
 /** Switches to the next pre-ranked Advanced Auto Play candidate exactly once. */
-private fun PlayerScreenRuntime.tryNextAdvancedAutoPlayFallback(): Boolean {
+internal fun PlayerScreenRuntime.tryNextAdvancedAutoPlayFallback(): Boolean {
     val launchId = args.launchId ?: return false
     val launch = PlayerLaunchStore.get(launchId) ?: return false
     val next = launch.advancedAutoPlayFallbacks.firstOrNull() ?: return false

@@ -31,6 +31,7 @@ internal fun PlayerScreenRuntime.resolveDebridForPlayer(
     episode: Int?,
     onResolved: (StreamItem) -> Unit,
     onStale: () -> Unit,
+    onFailed: () -> Unit = {},
 ): Boolean {
     if (!DirectDebridPlaybackResolver.shouldResolveToPlayableStream(stream)) return false
     scope.launch {
@@ -46,6 +47,7 @@ internal fun PlayerScreenRuntime.resolveDebridForPlayer(
                 if (resolved == DirectDebridPlayableResult.Stale) {
                     onStale()
                 }
+                onFailed()
             }
         }
     }
@@ -54,6 +56,7 @@ internal fun PlayerScreenRuntime.resolveDebridForPlayer(
 
 internal fun PlayerScreenRuntime.prepareServerForPlayer(
     stream: StreamItem,
+    onFailed: () -> Unit = {},
     onPrepared: suspend (StreamItem) -> Unit,
 ): Boolean {
     if (!stream.needsServerPreparation) return false
@@ -61,13 +64,17 @@ internal fun PlayerScreenRuntime.prepareServerForPlayer(
         runCatching { ServerPlayback.prepare(stream) }
             .onFailure { if (it is CancellationException) throw it }
             .onSuccess { onPrepared(it) }
-            .onFailure { NuvioToastController.show(it.serverPlaybackMessage()) }
+            .onFailure {
+                NuvioToastController.show(it.serverPlaybackMessage())
+                onFailed()
+            }
     }
     return true
 }
 
 internal fun PlayerScreenRuntime.resolveYouTubeForPlayer(
     stream: StreamItem,
+    onFailed: () -> Unit = {},
     onResolved: (StreamItem) -> Unit,
 ): Boolean {
     if (stream.youTubeIdToResolve == null) return false
@@ -75,6 +82,7 @@ internal fun PlayerScreenRuntime.resolveYouTubeForPlayer(
         val resolved = YouTubeStreamResolver.Default.resolve(stream)
         if (resolved == null) {
             NuvioToastController.show(getString(Res.string.youtube_resolution_failed))
+            onFailed()
             return@launch
         }
         onResolved(resolved)
@@ -276,9 +284,10 @@ internal fun PlayerScreenRuntime.switchToSource(
     stream: StreamItem,
     saveForReuse: Boolean = true,
 ) {
-    if (prepareServerForPlayer(stream) { switchToSource(it) }) return
+    val onAdvancedResolutionFailed = { advanceAfterAdvancedResolutionFailure() }
+    if (prepareServerForPlayer(stream, onFailed = onAdvancedResolutionFailed) { switchToSource(it) }) return
     // The resolved URL expires after a few hours, so it isn't kept for reuse.
-    if (resolveYouTubeForPlayer(stream) { switchToSource(it, saveForReuse = false) }) return
+    if (resolveYouTubeForPlayer(stream, onFailed = onAdvancedResolutionFailed) { switchToSource(it, saveForReuse = false) }) return
     if (
         resolveDebridForPlayer(
             stream = stream,
@@ -297,6 +306,7 @@ internal fun PlayerScreenRuntime.switchToSource(
                     )
                 }
             },
+            onFailed = onAdvancedResolutionFailed,
         )
     ) return
     if (isP2pStream(stream)) {
@@ -336,6 +346,17 @@ internal fun PlayerScreenRuntime.switchToSource(
     showSourcesPanel = false
     controlsVisible = true
     PlayerStreamsRepository.pauseSearchForPlayback()
+}
+
+
+/** Resolution/preparation can fail before a playable URL reaches the engine. */
+private fun PlayerScreenRuntime.advanceAfterAdvancedResolutionFailure() {
+    val launchId = args.launchId ?: return
+    if (PlayerLaunchStore.get(launchId)?.advancedAutoPlaySettings == null) return
+    if (!tryNextAdvancedAutoPlayFallback()) {
+        errorMessage = "Unable to prepare this source, and no fallback sources remain."
+        controlsVisible = !playerControlsLocked
+    }
 }
 
 internal fun PlayerScreenRuntime.switchToEpisodeStream(
