@@ -100,7 +100,7 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
                 // Count real transitions into buffering. The initial startup is handled
                 // only by the startup watchdog; post-start stalls use this rule.
                 val currentlyLoading = playbackSnapshot.isLoading
-                if (currentlyLoading && !previousLoading) {
+                if (stabilityWindowApplied && currentlyLoading && !previousLoading) {
                     bufferEvents += 1
                     if (bufferEvents > advancedSettings.maxBufferEvents) {
                         if (!tryNextAdvancedAutoPlayFallback()) {
