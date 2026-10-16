@@ -37,6 +37,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -351,6 +352,7 @@ private fun PlaybackSettingsSection(
     var showIosTargetTransferDialog by remember { mutableStateOf(false) }
     var showLibassRenderTypeDialog by remember { mutableStateOf(false) }
     var showAutoPlayModeDialog by remember { mutableStateOf(false) }
+    var showAdvancedAutoPlaySettings by rememberSaveable { mutableStateOf(false) }
     var showAutoPlaySourceDialog by remember { mutableStateOf(false) }
     var showAutoPlayAddonSelectionDialog by remember { mutableStateOf(false) }
     var showAutoPlayPluginSelectionDialog by remember { mutableStateOf(false) }
@@ -832,6 +834,13 @@ private fun PlaybackSettingsSection(
         ) {
             SettingsGroup(isTablet = isTablet) {
                 SettingsNavigationRow(
+                    title = "Auto-play advanced settings",
+                    description = "Quality selection, provider priorities, startup timeout and fallback rules",
+                    isTablet = isTablet,
+                    onClick = { showAdvancedAutoPlaySettings = true },
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsNavigationRow(
                     title = stringResource(Res.string.settings_playback_stream_selection_mode),
                     description = stringResource(autoPlayPlayerSettings.streamAutoPlayMode.labelRes),
                     isTablet = isTablet,
@@ -950,6 +959,7 @@ private fun PlaybackSettingsSection(
                         )
                     }
                 }
+                if (autoPlayPlayerSettings.streamAutoPlayMode != StreamAutoPlayMode.ADVANCED) {
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_playback_source_scope),
@@ -990,6 +1000,7 @@ private fun PlaybackSettingsSection(
                         isTablet = isTablet,
                         onClick = { showAutoPlayPluginSelectionDialog = true },
                     )
+                }
                 }
             }
         }
@@ -2056,8 +2067,15 @@ private fun PlaybackSettingsSection(
         )
     }
     if (showAdvancedAddonPriorityDialog) {
-        AdvancedAutoPlayProviderOrderDialog(
+        val availableAddonNames = addonUiState.addons.enabledAddons()
+            .mapNotNull { it.manifest }
+            .filter { manifest -> manifest.resources.any { resource -> resource.name == "stream" } }
+            .map { it.name }
+            .distinct()
+            .sorted()
+        AdvancedAutoPlayProviderPriorityDialog(
             title = "Add-on priority order",
+            availableItems = availableAddonNames,
             initialValue = autoPlayPlayerSettings.advancedAutoPlaySettings.addonPriority,
             onSave = { values ->
                 PlayerSettingsRepository.setAdvancedAutoPlaySettings(
@@ -2068,9 +2086,15 @@ private fun PlaybackSettingsSection(
             onDismiss = { showAdvancedAddonPriorityDialog = false },
         )
     }
-    if (showAdvancedPluginPriorityDialog) {
-        AdvancedAutoPlayProviderOrderDialog(
+    if (pluginsEnabled && showAdvancedPluginPriorityDialog) {
+        val availablePluginNames = pluginUiState.scrapers
+            .filter { it.enabled }
+            .map { it.name }
+            .distinct()
+            .sorted()
+        AdvancedAutoPlayProviderPriorityDialog(
             title = "Plugin priority order",
+            availableItems = availablePluginNames,
             initialValue = autoPlayPlayerSettings.advancedAutoPlaySettings.pluginPriority,
             onSave = { values ->
                 PlayerSettingsRepository.setAdvancedAutoPlaySettings(
@@ -3084,37 +3108,85 @@ private fun AdvancedAutoPlayIntegerDialog(
 }
 
 @Composable
-private fun AdvancedAutoPlayProviderOrderDialog(
+private fun AdvancedAutoPlayProviderPriorityDialog(
     title: String,
+    availableItems: List<String>,
     initialValue: List<String>,
     onSave: (List<String>) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var draft by remember(initialValue) { mutableStateOf(initialValue.joinToString("\n")) }
+    var selectedOrder by remember(availableItems, initialValue) {
+        mutableStateOf(
+            (initialValue.filter { chosen -> availableItems.any { it.equals(chosen, ignoreCase = true) } }
+                .mapNotNull { chosen -> availableItems.firstOrNull { it.equals(chosen, ignoreCase = true) } } +
+                availableItems.filterNot { candidate -> initialValue.any { it.equals(candidate, ignoreCase = true) } })
+                .distinct()
+        )
+    }
     DialogSurface(onDismissRequest = onDismiss, title = title) {
         Text(
-            text = "One provider name per line. The first line has the highest priority. Leave blank to use the default order.",
+            text = "Installed providers only. Use the arrows to move providers; the first item has highest priority.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        BasicTextField(
-            value = draft,
-            onValueChange = { draft = it },
-            modifier = Modifier.fillMaxWidth().heightIn(min = 140.dp).padding(vertical = 8.dp),
-            textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
-            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-        )
+        if (selectedOrder.isEmpty()) {
+            Text(
+                text = "No enabled stream providers are currently installed.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                items(selectedOrder.size) { index ->
+                    val name = selectedOrder[index]
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "${index + 1}. $name",
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        DialogButton(
+                            text = "↑",
+                            enabled = index > 0,
+                            onClick = {
+                                selectedOrder = selectedOrder.toMutableList().apply {
+                                    add(index - 1, removeAt(index))
+                                }
+                            },
+                        )
+                        DialogButton(
+                            text = "↓",
+                            enabled = index < selectedOrder.lastIndex,
+                            onClick = {
+                                selectedOrder = selectedOrder.toMutableList().apply {
+                                    add(index + 1, removeAt(index))
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+        }
         DialogButtons {
             DialogButton(text = "Cancel", onClick = onDismiss)
             DialogButton(
                 text = "Save",
+                onClick = { onSave(selectedOrder) },
+                enabled = selectedOrder.isNotEmpty(),
+            )
+            DialogButton(
+                text = "Reset",
                 onClick = {
-                    val values = draft.lineSequence().map { it.trim() }
-                        .filter { it.isNotBlank() }
-                        .distinctBy { it.lowercase() }
-                        .toList()
-                    onSave(values)
+                    selectedOrder = availableItems
+                    onSave(emptyList())
                 },
+                enabled = availableItems.isNotEmpty(),
             )
         }
     }
