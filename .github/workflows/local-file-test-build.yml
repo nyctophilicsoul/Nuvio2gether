@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: local-file-test-build-${{ github.ref }}
+  group: local-file-test-build-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:
