@@ -917,45 +917,46 @@ private fun PlaybackSettingsSection(
                     )
                 }
                 }
-                if (autoPlayPlayerSettings.streamAutoPlayMode == StreamAutoPlayMode.ADVANCED) {
-                    val advanced = autoPlayPlayerSettings.advancedAutoPlaySettings
+                if (autoPlayPlayerSettings.streamAutoPlayMode != StreamAutoPlayMode.ADVANCED) {
                     SettingsGroupDivider(isTablet = isTablet)
                     SettingsNavigationRow(
-                        title = "Add-on / plugin fetch timeout",
-                        description = "${advanced.addonFetchTimeoutSeconds} seconds before quality selection",
+                        title = stringResource(Res.string.settings_playback_source_scope),
+                        description = stringResource(autoPlayPlayerSettings.streamAutoPlaySource.labelRes(pluginsEnabled)),
                         isTablet = isTablet,
-                        onClick = { showAdvancedFetchTimeoutDialog = true },
+                        onClick = { showAutoPlaySourceDialog = true },
                     )
-                    SettingsGroupDivider(isTablet = isTablet)
-                    SettingsNavigationRow(
-                        title = "Playback startup timeout",
-                        description = if (advanced.playbackStartupTimeoutSeconds == 0) "Disabled" else "${advanced.playbackStartupTimeoutSeconds} seconds to start playback",
-                        isTablet = isTablet,
-                        onClick = { showAdvancedStartupTimeoutDialog = true },
-                    )
-                    SettingsGroupDivider(isTablet = isTablet)
-                    SettingsNavigationRow(
-                        title = "Buffer retry threshold",
-                        description = "Try another stream after more than ${advanced.maxBufferEvents} buffer events",
-                        isTablet = isTablet,
-                        onClick = { showAdvancedBufferEventsDialog = true },
-                    )
-                    SettingsGroupDivider(isTablet = isTablet)
-                    SettingsNavigationRow(
-                        title = "Add-on priority order",
-                        description = advanced.addonPriority.takeIf { it.isNotEmpty() }?.joinToString(" → ")
-                            ?: "Use default add-on order",
-                        isTablet = isTablet,
-                        onClick = { showAdvancedAddonPriorityDialog = true },
-                    )
-                    if (pluginsEnabled) {
+                    if (autoPlayPlayerSettings.streamAutoPlaySource != StreamAutoPlaySource.ENABLED_PLUGINS_ONLY) {
                         SettingsGroupDivider(isTablet = isTablet)
+                        val addonSubtitle = if (autoPlayPlayerSettings.streamAutoPlaySelectedAddons.isEmpty()) {
+                            stringResource(Res.string.settings_playback_all_addons)
+                        } else {
+                            stringResource(
+                                Res.string.settings_playback_selected_count,
+                                autoPlayPlayerSettings.streamAutoPlaySelectedAddons.size,
+                            )
+                        }
                         SettingsNavigationRow(
-                            title = "Plugin priority order",
-                            description = advanced.pluginPriority.takeIf { it.isNotEmpty() }?.joinToString(" → ")
-                                ?: "Use default plugin order",
+                            title = stringResource(Res.string.settings_playback_allowed_addons),
+                            description = addonSubtitle,
                             isTablet = isTablet,
-                            onClick = { showAdvancedPluginPriorityDialog = true },
+                            onClick = { showAutoPlayAddonSelectionDialog = true },
+                        )
+                    }
+                    if (pluginsEnabled && autoPlayPlayerSettings.streamAutoPlaySource != StreamAutoPlaySource.INSTALLED_ADDONS_ONLY) {
+                        SettingsGroupDivider(isTablet = isTablet)
+                        val pluginSubtitle = if (autoPlayPlayerSettings.streamAutoPlaySelectedPlugins.isEmpty()) {
+                            stringResource(Res.string.settings_playback_all_plugins)
+                        } else {
+                            stringResource(
+                                Res.string.settings_playback_selected_count,
+                                autoPlayPlayerSettings.streamAutoPlaySelectedPlugins.size,
+                            )
+                        }
+                        SettingsNavigationRow(
+                            title = stringResource(Res.string.settings_playback_allowed_plugins),
+                            description = pluginSubtitle,
+                            isTablet = isTablet,
+                            onClick = { showAutoPlayPluginSelectionDialog = true },
                         )
                     }
                 }
