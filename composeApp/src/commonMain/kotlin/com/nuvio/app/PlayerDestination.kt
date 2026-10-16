@@ -15,11 +15,17 @@ import com.nuvio.app.features.player.ExternalPlayerPlatform
 import com.nuvio.app.features.player.PlayerLaunch
 import com.nuvio.app.features.player.PlayerLaunchStore
 import com.nuvio.app.features.player.PlayerScreen
+import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.player.sanitizePlaybackHeaders
 import com.nuvio.app.features.player.sanitizePlaybackResponseHeaders
 import com.nuvio.app.features.watchprogress.ResumePromptRepository
 import com.nuvio.app.navigation.NuvioNavigator
 import com.nuvio.app.navigation.PlayerRoute
+
+private data class PlaybackFallbackState(
+    val currentUrl: String,
+    val remaining: List<StreamItem>,
+)
 
 @Composable
 internal fun PlayerDestination(
@@ -44,27 +50,28 @@ internal fun PlayerDestination(
     LaunchedEffect(launch.videoId) {
         launch.videoId?.let { ResumePromptRepository.markPlayerEntered(it) }
     }
+    val fallbackState = remember(route.launchId) {
+        mutableStateOf(PlaybackFallbackState(launch.sourceUrl, launch.autoPlayFallbacks))
+    }
     val onPlaybackFailure: (Long) -> Boolean = { positionMs ->
-        val attemptedUrls = launch.autoPlayFallbacks
-            .mapNotNull { it.playableDirectUrl }
-            .takeWhile { it != launch.sourceUrl }
-            .toSet() + launch.sourceUrl
-        val nextStream = launch.autoPlayFallbacks.firstOrNull { candidate ->
+        val state = fallbackState.value
+        val nextStream = state.remaining.firstOrNull { candidate ->
             val url = candidate.playableDirectUrl
-            url != null && url !in attemptedUrls
+            url != null && url != state.currentUrl
         }
         val nextUrl = nextStream?.playableDirectUrl
         if (nextStream == null || nextUrl == null) {
             false
         } else {
-            val remainingFallbacks = launch.autoPlayFallbacks
+            val remainingFallbacks = state.remaining
                 .dropWhile { it != nextStream }
                 .drop(1)
                 .filter { candidate ->
                     val url = candidate.playableDirectUrl
-                    url != null && url != nextUrl && url != launch.sourceUrl
+                    url != null && url != nextUrl && url != state.currentUrl
                 }
                 .distinctBy { it.playableDirectUrl }
+            fallbackState.value = PlaybackFallbackState(nextUrl, remainingFallbacks)
             val nextLaunch = launch.copy(
                 sourceUrl = nextUrl,
                 sourceAudioUrl = null,
