@@ -47,7 +47,7 @@ import org.jetbrains.compose.resources.getString
 internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
     // Advanced Auto Play has a separate playback-start watchdog. Its clock starts
     // here, inside the player route, never while add-ons/plugins are still fetching.
-    LaunchedEffect(args.launchId, activeSourceUrl, activeSourceIdentityKey, activeStream) {
+    LaunchedEffect(args.launchId, activeSourceUrl, activeSourceIdentityKey, activeStream, advancedAutoPlayAttemptGeneration) {
         val launchId = args.launchId ?: return@LaunchedEffect
         val launchAtStart = PlayerLaunchStore.get(launchId) ?: return@LaunchedEffect
         val advancedSettings = launchAtStart.advancedAutoPlaySettings ?: return@LaunchedEffect
@@ -991,6 +991,10 @@ internal fun PlayerScreenRuntime.tryNextAdvancedAutoPlayFallback(): Boolean {
     PlayerLaunchStore.update(launchId) { current ->
         current.copy(advancedAutoPlayFallbacks = current.advancedAutoPlayFallbacks.drop(1))
     }
+    // Restart the watchdog even when resolving the candidate has not yet changed
+    // the player URL. This prevents a stalled server/debrid/YouTube resolution
+    // from leaving the previous buffering screen alive indefinitely.
+    advancedAutoPlayAttemptGeneration += 1
     errorMessage = null
     activeInitialPositionMs = playbackSnapshot.positionMs.coerceAtLeast(0L)
     activeInitialProgressFraction = null
