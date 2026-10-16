@@ -32,7 +32,6 @@ import nuvio.composeapp.generated.resources.*
 @Composable
 internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
     val runtime = this
-    val fallbackTimeoutAttempted = remember(args.launchId) { mutableStateOf(false) }
     var bufferingFallbackAttempted by remember(args.launchId) { mutableStateOf(false) }
     var bufferingFallbackHandled by remember(args.launchId) { mutableStateOf(false) }
     LaunchedEffect(args.launchId, playerSettingsUiState.streamAutoPlaySmartSelectionEnabled, activePlaybackKey, activeSourceUrl, playbackSnapshot.isLoading, errorMessage) {
@@ -45,7 +44,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
             bufferingFallbackAttempted
         ) return@LaunchedEffect
 
-        // The watchdog is restarted by Compose whenever loading ends or a new source starts.
+        // Retry only if this source remains continuously buffered for 10 seconds.
         delay(10_000L)
         if (
             playerSettingsUiState.streamAutoPlaySmartSelectionEnabled &&
