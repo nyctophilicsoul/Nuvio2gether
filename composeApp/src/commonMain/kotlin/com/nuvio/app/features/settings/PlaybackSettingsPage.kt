@@ -2067,86 +2067,7 @@ private fun PlaybackSettingsSection(
             onDismiss = { showAdvancedBufferEventsDialog = false },
         )
     }
-    if (showAdvancedAutoPlaySettings) {
-        AdvancedAutoPlaySettingsFullScreen(
-            currentMode = autoPlayPlayerSettings.streamAutoPlayMode,
-            advanced = autoPlayPlayerSettings.advancedAutoPlaySettings,
-            pluginsEnabled = pluginsEnabled,
-            addonNames = addonUiState.addons.enabledAddons()
-                .mapNotNull { it.manifest }
-                .filter { manifest -> manifest.resources.any { resource -> resource.name == "stream" } }
-                .map { it.name }.distinct().sorted(),
-            pluginNames = pluginUiState.scrapers.filter { it.enabled }.map { it.name }.distinct().sorted(),
-            onModeSelected = PlayerSettingsRepository::setStreamAutoPlayMode,
-            onAdvancedChanged = PlayerSettingsRepository::setAdvancedAutoPlaySettings,
-            onDismiss = { showAdvancedAutoPlaySettings = false },
-        )
-    }
-}
 
-
-@Composable
-private fun formatReuseCacheDuration(hours: Int): String = when {
-    hours < 24 && hours == 1 -> stringResource(Res.string.settings_playback_duration_hour_one, hours)
-    hours < 24 -> stringResource(Res.string.settings_playback_duration_hours, hours)
-    hours % 24 == 0 -> {
-        val days = hours / 24
-        if (days == 1) stringResource(Res.string.settings_playback_duration_day_one, days)
-        else stringResource(Res.string.settings_playback_duration_days, days)
-    }
-    else -> stringResource(Res.string.settings_playback_duration_hours, hours)
-}
-
-private data class LanguageSelectionOption(
-    val value: String?,
-    val label: String,
-    val description: String? = null,
-)
-
-@Composable
-@OptIn(ExperimentalMaterial3Api::class)
-private fun PlayerPreferenceDialog(
-    isExternal: Boolean,
-    onPreferenceSelected: (Boolean) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    DialogSurface(
-        onDismissRequest = onDismiss,
-        title = stringResource(Res.string.settings_playback_player_preference),
-    ) {
-        Text(
-            text = stringResource(Res.string.settings_playback_player_preference_description),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            // Internal option
-            val internalSelected = !isExternal
-            DialogOption(
-                text = stringResource(Res.string.settings_playback_player_preference_internal),
-                selected = internalSelected,
-                onClick = { onPreferenceSelected(false) },
-            )
-
-            // External option
-            DialogOption(
-                text = stringResource(Res.string.settings_playback_player_preference_external),
-                selected = isExternal,
-                onClick = { onPreferenceSelected(true) },
-            )
-        }
-
-        DialogButtons {
-            DialogButton(
-                text = stringResource(Res.string.action_done),
-                onClick = onDismiss,
-            )
-        }
-    }
 }
 
 @Composable
@@ -3085,7 +3006,6 @@ private fun AdvancedAutoPlayIntegerDialog(
     }
 }
 
-@Composable
 @Composable
 private fun AdvancedAutoPlaySettingsFullScreen(
     currentMode: StreamAutoPlayMode,
