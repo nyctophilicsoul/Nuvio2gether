@@ -34,7 +34,6 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
     val runtime = this
     val fallbackTimeoutAttempted = remember(args.launchId) { mutableStateOf(false) }
     var bufferingFallbackAttempted by remember(args.launchId) { mutableStateOf(false) }
-    var bufferingFallbackHandled by remember(args.launchId) { mutableStateOf(false) }
     LaunchedEffect(args.launchId, playerSettingsUiState.streamAutoPlaySmartSelectionEnabled, activePlaybackKey, activeSourceUrl, playbackSnapshot.isLoading, errorMessage) {
         if (
             !playerSettingsUiState.streamAutoPlaySmartSelectionEnabled ||
@@ -45,7 +44,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
             bufferingFallbackAttempted
         ) return@LaunchedEffect
 
-        // Start a fresh watchdog only while the player is continuously buffering.
+        // The watchdog is restarted by Compose whenever loading ends or a new source starts.
         delay(10_000L)
         if (
             playerSettingsUiState.streamAutoPlaySmartSelectionEnabled &&
@@ -54,15 +53,6 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
             !bufferingFallbackAttempted
         ) {
             bufferingFallbackAttempted = true
-            bufferingFallbackHandled = args.onPlaybackFailure?.invoke(playbackSnapshot.positionMs) == true
-        }
-    }
-    LaunchedEffect(args.launchId, playerSettingsUiState.streamAutoPlaySmartSelectionEnabled, playerSettingsUiState.streamAutoPlayFallbackTimeoutSeconds, activePlaybackKey, activeSourceUrl, errorMessage) {
-        val timeoutSeconds = playerSettingsUiState.streamAutoPlayFallbackTimeoutSeconds
-        if (!playerSettingsUiState.streamAutoPlaySmartSelectionEnabled || args.onPlaybackFailure == null || activeSourceUrl == null || initialLoadCompleted || errorMessage != null || timeoutSeconds !in 5..120) return@LaunchedEffect
-        delay(timeoutSeconds * 1_000L)
-        if (!initialLoadCompleted && errorMessage == null && !fallbackTimeoutAttempted.value) {
-            fallbackTimeoutAttempted.value = true
             args.onPlaybackFailure?.invoke(playbackSnapshot.positionMs)
         }
     }
