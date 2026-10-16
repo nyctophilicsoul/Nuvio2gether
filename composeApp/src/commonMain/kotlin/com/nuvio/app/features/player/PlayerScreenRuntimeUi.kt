@@ -34,6 +34,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
     val runtime = this
     val fallbackTimeoutAttempted = remember(args.launchId) { mutableStateOf(false) }
     var bufferingFallbackAttempted by remember(args.launchId) { mutableStateOf(false) }
+    var bufferingFallbackHandled by remember(args.launchId) { mutableStateOf(false) }
     LaunchedEffect(args.launchId, playerSettingsUiState.streamAutoPlaySmartSelectionEnabled, activePlaybackKey, activeSourceUrl, playbackSnapshot.isLoading, errorMessage) {
         if (
             !playerSettingsUiState.streamAutoPlaySmartSelectionEnabled ||
@@ -53,7 +54,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
             !bufferingFallbackAttempted
         ) {
             bufferingFallbackAttempted = true
-            args.onPlaybackFailure?.invoke(playbackSnapshot.positionMs)
+            bufferingFallbackHandled = args.onPlaybackFailure?.invoke(playbackSnapshot.positionMs) == true
         }
     }
     val isInPip = rememberIsInPictureInPicture()
