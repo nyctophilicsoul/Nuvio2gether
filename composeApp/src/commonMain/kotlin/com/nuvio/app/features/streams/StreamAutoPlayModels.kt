@@ -4,6 +4,8 @@ enum class StreamAutoPlayMode {
     MANUAL,
     FIRST_STREAM,
     REGEX_MATCH,
+    /** Opens the quality chooser; must never silently select a source. */
+    ADVANCED,
 }
 
 enum class StreamAutoPlaySource {

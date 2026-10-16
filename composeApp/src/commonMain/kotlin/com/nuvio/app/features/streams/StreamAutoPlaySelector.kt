@@ -81,6 +81,8 @@ object StreamAutoPlaySelector {
         activeResolverProviderId: String? = null,
     ): StreamAutoPlayEvaluation {
         if (streams.isEmpty()) return StreamAutoPlayEvaluation()
+        // Advanced mode must route to its quality chooser, never reuse first/regex selection.
+        if (mode == StreamAutoPlayMode.ADVANCED && !bingeGroupOnly) return StreamAutoPlayEvaluation()
 
         val sourceScopedStreams = when (source) {
             StreamAutoPlaySource.ALL_SOURCES -> streams
@@ -136,6 +138,7 @@ object StreamAutoPlaySelector {
         val matchingStreams = when (mode) {
             StreamAutoPlayMode.MANUAL -> emptyList()
             StreamAutoPlayMode.FIRST_STREAM -> candidateStreams
+            StreamAutoPlayMode.ADVANCED -> emptyList()
             StreamAutoPlayMode.REGEX_MATCH -> {
                 val pattern = regexPattern.trim()
 

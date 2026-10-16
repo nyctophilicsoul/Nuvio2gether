@@ -20,6 +20,7 @@ internal fun StreamsUiState.shouldUseLandscapeAutoPlayLoading(
 ): Boolean =
     !manualSelection &&
         settings.streamAutoPlayMode != StreamAutoPlayMode.MANUAL &&
+        settings.streamAutoPlayMode != StreamAutoPlayMode.ADVANCED &&
         requestToken == expectedRequestToken &&
         autoPlayDecided &&
         isDirectAutoPlayFlow &&

@@ -7,6 +7,9 @@ object StreamAutoPlayPolicy {
         if (settings.streamReuseLastLinkEnabled) return true
         if (settings.streamAutoPlayReuseBingeGroup && settings.streamAutoPlayPreferBingeGroup) return true
 
+        // Advanced playback is a user-confirmed quality-selection flow, not auto-play.
+        if (settings.streamAutoPlayMode == StreamAutoPlayMode.ADVANCED) return false
+
         return when (settings.streamAutoPlayMode) {
             StreamAutoPlayMode.MANUAL -> false
             StreamAutoPlayMode.FIRST_STREAM -> true
