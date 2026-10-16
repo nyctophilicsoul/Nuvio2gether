@@ -5,6 +5,10 @@ import com.nuvio.app.features.player.skip.AutoSkipSegmentType
 import com.nuvio.app.features.player.skip.NextEpisodeThresholdMode
 import com.nuvio.app.features.streams.StreamAutoPlayMode
 import com.nuvio.app.features.streams.StreamAutoPlaySource
+import com.nuvio.app.features.streams.AdvancedAutoPlaySettings
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -77,6 +81,7 @@ data class PlayerSettingsUiState(
     val streamAutoPlaySelectedPlugins: Set<String> = emptySet(),
     val streamAutoPlayRegex: String = "",
     val streamAutoPlayTimeoutSeconds: Int = 3,
+    val advancedAutoPlaySettings: AdvancedAutoPlaySettings = AdvancedAutoPlaySettings(),
     val skipIntroEnabled: Boolean = true,
     val autoSkipSegmentTypes: Set<AutoSkipSegmentType> = emptySet(),
     val animeSkipEnabled: Boolean = false,
@@ -159,6 +164,7 @@ object PlayerSettingsRepository {
     private var streamAutoPlaySelectedPlugins: Set<String> = emptySet()
     private var streamAutoPlayRegex = ""
     private var streamAutoPlayTimeoutSeconds = 3
+    private var advancedAutoPlaySettings = AdvancedAutoPlaySettings()
     private var skipIntroEnabled = true
     private var autoSkipSegmentTypes: Set<AutoSkipSegmentType> = emptySet()
     private var animeSkipEnabled = false
@@ -247,6 +253,7 @@ object PlayerSettingsRepository {
         streamAutoPlaySelectedPlugins = emptySet()
         streamAutoPlayRegex = ""
         streamAutoPlayTimeoutSeconds = 3
+        advancedAutoPlaySettings = AdvancedAutoPlaySettings()
         skipIntroEnabled = true
         autoSkipSegmentTypes = emptySet()
         animeSkipEnabled = false
@@ -388,6 +395,9 @@ object PlayerSettingsRepository {
         }
         streamAutoPlayRegex = PlayerSettingsStorage.loadStreamAutoPlayRegex() ?: ""
         streamAutoPlayTimeoutSeconds = PlayerSettingsStorage.loadStreamAutoPlayTimeoutSeconds() ?: 3
+        advancedAutoPlaySettings = PlayerSettingsStorage.loadAdvancedAutoPlaySettings()
+            ?.let { raw -> runCatching { Json { ignoreUnknownKeys = true }.decodeFromString<AdvancedAutoPlaySettings>(raw) }.getOrNull() }
+            ?: AdvancedAutoPlaySettings()
         // Legacy migration: 11 was the old sentinel for "unlimited"
         if (streamAutoPlayTimeoutSeconds == 11) {
             streamAutoPlayTimeoutSeconds = Int.MAX_VALUE
@@ -859,6 +869,22 @@ object PlayerSettingsRepository {
         PlayerSettingsStorage.saveStreamAutoPlayTimeoutSeconds(seconds)
     }
 
+    fun setAdvancedAutoPlaySettings(settings: AdvancedAutoPlaySettings) {
+        ensureLoaded()
+        val normalized = settings.copy(
+            addonFetchTimeoutSeconds = settings.addonFetchTimeoutSeconds.coerceIn(0, 120),
+            playbackStartupTimeoutSeconds = settings.playbackStartupTimeoutSeconds.coerceIn(0, 120),
+            maxBufferEvents = settings.maxBufferEvents.coerceIn(0, 100),
+            stabilityWindowSeconds = settings.stabilityWindowSeconds.coerceIn(0, 300),
+            addonPriority = settings.addonPriority.distinctBy { it.lowercase() },
+            pluginPriority = settings.pluginPriority.distinctBy { it.lowercase() },
+        )
+        if (advancedAutoPlaySettings == normalized) return
+        advancedAutoPlaySettings = normalized
+        publish()
+        PlayerSettingsStorage.saveAdvancedAutoPlaySettings(Json.encodeToString(normalized))
+    }
+
     fun setSkipIntroEnabled(enabled: Boolean) {
         ensureLoaded()
         if (skipIntroEnabled == enabled) return
@@ -1199,6 +1225,7 @@ object PlayerSettingsRepository {
             streamAutoPlaySelectedPlugins = streamAutoPlaySelectedPlugins,
             streamAutoPlayRegex = streamAutoPlayRegex,
             streamAutoPlayTimeoutSeconds = streamAutoPlayTimeoutSeconds,
+            advancedAutoPlaySettings = advancedAutoPlaySettings,
             skipIntroEnabled = skipIntroEnabled,
             autoSkipSegmentTypes = autoSkipSegmentTypes,
             animeSkipEnabled = animeSkipEnabled,

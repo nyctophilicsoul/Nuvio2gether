@@ -1,5 +1,7 @@
 package com.nuvio.app.features.streams
 
+import kotlinx.serialization.Serializable
+
 /**
  * Pure decision framework for the Auto play Advanced flow.
  *
@@ -7,10 +9,12 @@ package com.nuvio.app.features.streams
  * separate lifecycle entry points. The host UI/player owns timers and calls these
  * decisions when the corresponding deadline expires.
  */
+@Serializable
 data class AdvancedAutoPlaySettings(
     val addonFetchTimeoutSeconds: Int = DEFAULT_ADDON_FETCH_TIMEOUT_SECONDS,
     val playbackStartupTimeoutSeconds: Int = DEFAULT_PLAYBACK_STARTUP_TIMEOUT_SECONDS,
     val maxBufferEvents: Int = DEFAULT_MAX_BUFFER_EVENTS,
+    val stabilityWindowSeconds: Int = DEFAULT_STABILITY_WINDOW_SECONDS,
     val addonPriority: List<String> = emptyList(),
     val pluginPriority: List<String> = emptyList(),
 ) {
@@ -18,12 +22,14 @@ data class AdvancedAutoPlaySettings(
         require(addonFetchTimeoutSeconds >= 0) { "Add-on fetch timeout cannot be negative" }
         require(playbackStartupTimeoutSeconds >= 0) { "Playback startup timeout cannot be negative" }
         require(maxBufferEvents >= 0) { "Maximum buffer events cannot be negative" }
+        require(stabilityWindowSeconds >= 0) { "Stability window cannot be negative" }
     }
 
     companion object {
         const val DEFAULT_ADDON_FETCH_TIMEOUT_SECONDS = 15
         const val DEFAULT_PLAYBACK_STARTUP_TIMEOUT_SECONDS = 10
         const val DEFAULT_MAX_BUFFER_EVENTS = 10
+        const val DEFAULT_STABILITY_WINDOW_SECONDS = 20
     }
 }
 

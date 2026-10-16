@@ -115,6 +115,8 @@ internal expect object PlayerSettingsStorage {
     fun saveStreamAutoPlayRegex(regex: String)
     fun loadStreamAutoPlayTimeoutSeconds(): Int?
     fun saveStreamAutoPlayTimeoutSeconds(seconds: Int)
+    fun loadAdvancedAutoPlaySettings(): String?
+    fun saveAdvancedAutoPlaySettings(settings: String)
     fun loadSkipIntroEnabled(): Boolean?
     fun loadAutoSkipMovieCredits(): Boolean?
     fun loadAutoSkipSegmentTypes(): Set<String>?
