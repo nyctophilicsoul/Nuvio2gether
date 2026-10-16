@@ -856,6 +856,7 @@ private fun PlaybackSettingsSection(
                         onClick = { showAutoPlayRegexDialog = true },
                     )
                 }
+
                 if (autoPlayPlayerSettings.streamAutoPlayMode != StreamAutoPlayMode.ADVANCED) {
                     SettingsGroupDivider(isTablet = isTablet)
                     val timeoutSec = autoPlayPlayerSettings.streamAutoPlayTimeoutSeconds
@@ -960,6 +961,7 @@ private fun PlaybackSettingsSection(
                         )
                     }
                 }
+
 
             }
 
