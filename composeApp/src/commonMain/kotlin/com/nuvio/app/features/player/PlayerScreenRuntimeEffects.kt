@@ -1,6 +1,7 @@
 package com.nuvio.app.features.player
 
 import com.nuvio.app.core.i18n.localizedSeasonEpisodeCode
+import co.touchlab.kermit.Logger
 import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.features.party.PartyRepository
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -14,6 +15,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.p2p.P2pSettingsRepository
@@ -44,6 +46,42 @@ import org.jetbrains.compose.resources.getString
 
 @Composable
 internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
+    val deadLinkScope = rememberCoroutineScope()
+    val deadLinkMonitor = remember(deadLinkScope) {
+        DeadLinkStartupMonitor(
+            scope = deadLinkScope,
+            timeoutSeconds = { PlayerSettingsRepository.uiState.value.deadLinkTimeoutSeconds },
+            candidateStreams = { PlayerStreamsRepository.currentSourceCandidates() },
+            onFallback = { next ->
+                val sourceName = "${next.addonName} · ${next.streamLabel}"
+                deadLinkStatusMessage = "Fallback → $sourceName"
+                Logger.withTag("DeadLinkFallback").i { "Fallback triggered to source: $sourceName (addonId=${next.addonId})" }
+                switchToSource(next)
+            },
+            onExhausted = {
+                errorMessage = errorMessage ?: "This source did not start and no alternate sources remain."
+                controlsVisible = !playerControlsLocked
+            },
+        )
+    }
+    DisposableEffect(deadLinkMonitor) { onDispose { deadLinkMonitor.close() } }
+
+    LaunchedEffect(activeVideoId, activeSeasonNumber, activeEpisodeNumber) {
+        deadLinkMonitor.resetForContent()
+        deadLinkStatusMessage = null
+        activeStream?.let { deadLinkMonitor.sourceSelected(it) }
+    }
+
+    LaunchedEffect(activeStream, activeSourceUrl, activePlaybackKey) {
+        val stream = activeStream ?: return@LaunchedEffect
+        deadLinkMonitor.sourceSelected(stream)
+    }
+
+    LaunchedEffect(activeStream, activeSourceUrl, playbackSnapshot.isPlaying, playbackSnapshotKey, activePlaybackKey) {
+        if (playbackSnapshotKey != activePlaybackKey) return@LaunchedEffect
+        deadLinkMonitor.playbackStateChanged(activeStream, playbackSnapshot.isPlaying)
+    }
+
     val currentFeedback = liveGestureFeedback ?: gestureFeedback
     LaunchedEffect(currentFeedback) {
         if (currentFeedback != null) {
