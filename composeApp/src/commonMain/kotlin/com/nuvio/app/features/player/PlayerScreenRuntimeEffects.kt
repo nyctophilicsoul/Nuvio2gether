@@ -998,7 +998,6 @@ internal fun PlayerScreenRuntime.tryNextAdvancedAutoPlayFallback(): Boolean {
     errorMessage = null
     activeInitialPositionMs = playbackSnapshot.positionMs.coerceAtLeast(0L)
     activeInitialProgressFraction = null
-    NuvioToastController.show("Auto play Advanced: trying ${next.addonName} — ${next.streamLabel}")
     switchToSource(next, saveForReuse = false)
     return true
 }
