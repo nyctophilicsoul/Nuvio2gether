@@ -75,6 +75,7 @@ actual object PlayerSettingsStorage {
     private const val streamAutoPlaySelectedPluginsKey = "stream_auto_play_selected_plugins"
     private const val streamAutoPlayRegexKey = "stream_auto_play_regex"
     private const val streamAutoPlayTimeoutSecondsKey = "stream_auto_play_timeout_seconds"
+    private const val deadLinkTimeoutSecondsKey = "dead_link_timeout_seconds"
     private const val skipIntroEnabledKey = "skip_intro_enabled"
     private const val autoSkipMovieCreditsKey = "auto_skip_movie_credits"
     private const val autoSkipSegmentTypesKey = "auto_skip_segment_types"
@@ -151,6 +152,7 @@ actual object PlayerSettingsStorage {
         streamAutoPlaySelectedPluginsKey,
         streamAutoPlayRegexKey,
         streamAutoPlayTimeoutSecondsKey,
+        deadLinkTimeoutSecondsKey,
         skipIntroEnabledKey,
         autoSkipMovieCreditsKey,
         autoSkipSegmentTypesKey,
@@ -739,6 +741,18 @@ actual object PlayerSettingsStorage {
         preferences
             ?.edit()
             ?.putInt(ProfileScopedKey.of(decoderPriorityKey), priority)
+            ?.apply()
+    }
+
+    actual fun loadDeadLinkTimeoutSeconds(): Int? =
+        preferences?.let { prefs ->
+            val key = ProfileScopedKey.of(deadLinkTimeoutSecondsKey)
+            if (prefs.contains(key)) prefs.getInt(key, 10) else null
+        }
+
+    actual fun saveDeadLinkTimeoutSeconds(seconds: Int) {
+        preferences?.edit()
+            ?.putInt(ProfileScopedKey.of(deadLinkTimeoutSecondsKey), DeadLinkTimeoutPolicy.normalizeSeconds(seconds))
             ?.apply()
     }
 
@@ -1365,6 +1379,7 @@ actual object PlayerSettingsStorage {
         loadStreamAutoPlaySelectedPlugins()?.let { put(streamAutoPlaySelectedPluginsKey, encodeSyncStringSet(it)) }
         loadStreamAutoPlayRegex()?.let { put(streamAutoPlayRegexKey, encodeSyncString(it)) }
         loadStreamAutoPlayTimeoutSeconds()?.let { put(streamAutoPlayTimeoutSecondsKey, encodeSyncInt(it)) }
+        loadDeadLinkTimeoutSeconds()?.let { put(deadLinkTimeoutSecondsKey, encodeSyncInt(it)) }
         loadSkipIntroEnabled()?.let { put(skipIntroEnabledKey, encodeSyncBoolean(it)) }
         loadAutoSkipMovieCredits()?.let { put(autoSkipMovieCreditsKey, encodeSyncBoolean(it)) }
         loadAutoSkipSegmentTypes()?.let { put(autoSkipSegmentTypesKey, encodeSyncStringSet(it)) }
@@ -1446,6 +1461,7 @@ actual object PlayerSettingsStorage {
         payload.decodeSyncStringSet(streamAutoPlaySelectedPluginsKey)?.let(::saveStreamAutoPlaySelectedPlugins)
         payload.decodeSyncString(streamAutoPlayRegexKey)?.let(::saveStreamAutoPlayRegex)
         payload.decodeSyncInt(streamAutoPlayTimeoutSecondsKey)?.let(::saveStreamAutoPlayTimeoutSeconds)
+        payload.decodeSyncInt(deadLinkTimeoutSecondsKey)?.let(::saveDeadLinkTimeoutSeconds)
         payload.decodeSyncBoolean(skipIntroEnabledKey)?.let(::saveSkipIntroEnabled)
         payload.decodeSyncBoolean(autoSkipMovieCreditsKey)?.let(::saveAutoSkipMovieCredits)
         payload.decodeSyncStringSet(autoSkipSegmentTypesKey)?.let(::saveAutoSkipSegmentTypes)
