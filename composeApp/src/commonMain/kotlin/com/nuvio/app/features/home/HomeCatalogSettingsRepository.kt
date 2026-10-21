@@ -731,6 +731,20 @@ object HomeCatalogSettingsRepository {
             updatedPreferences[itemKey] = current.copy(order = index)
         }
         preferences = updatedPreferences
+
+        val addonKeysById = definitions
+            .filterNot { ServerCatalog.isServerKey(it.key) }
+            .groupBy { it.addonGroupId() }
+            .mapValues { (_, addonDefinitions) -> addonDefinitions.mapTo(mutableSetOf(), HomeCatalogDefinition::key) }
+        addonLayouts = addonLayouts.mapValues { (addonId, layout) ->
+            if (HomeAddonLayoutMode.fromStorage(layout.mode) != HomeAddonLayoutMode.LOCKED) {
+                layout
+            } else {
+                val groupKeys = addonKeysById[addonId].orEmpty()
+                val refreshedAnchor = reorderedKeys.indexOfFirst { it in groupKeys }
+                if (refreshedAnchor >= 0) layout.copy(anchorOrder = refreshedAnchor) else layout
+            }
+        }
     }
 
     private fun defaultPreferenceForMissingKey(key: String): StoredHomeCatalogPreference? {
