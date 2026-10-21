@@ -44,6 +44,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -242,7 +243,7 @@ actual fun LocalFilesScreen(
                 text = when {
                     matchedFile != null -> "WatchParty match found: ${matchedFile.displayName}"
                     isLoading -> "Looking for the shared file in your device library and granted folders…"
-                    else -> "To join this WatchParty, scan your device library or grant access to the folder containing the same video. The video itself is not shared."
+                    else -> "To join this WatchParty, scan your device library or grant access to the folder containing the same video. The video itself is not shared; only a filename-and-size match can be played in this party."
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (matchedFile != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -261,7 +262,10 @@ actual fun LocalFilesScreen(
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
                 items(files, key = { it.uri }) { file ->
                     val isMatch = preferredMatchKey != null && file.matchKey == preferredMatchKey
-                    Card(modifier = Modifier.fillMaxWidth().clickable { onPlay(file) }) {
+                    val canPlay = preferredMatchKey == null || isMatch
+                    val cardModifier = Modifier.fillMaxWidth()
+                        .then(if (canPlay) Modifier.clickable { onPlay(file) } else Modifier.alpha(0.55f))
+                    Card(modifier = cardModifier) {
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
