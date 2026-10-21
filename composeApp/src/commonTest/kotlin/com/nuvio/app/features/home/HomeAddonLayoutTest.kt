@@ -143,6 +143,5 @@ class HomeAddonLayoutTest {
         )
 
     private fun label(definition: HomeCatalogDefinition): String =
-        definition.key.removeSuffix(":movie:") // replaced below using the actual final key
-            .let { definition.key.substringBefore(":movie:") + ":" + definition.catalogId }
+        definition.key.substringBefore(":movie:") + ":" + definition.catalogId
 }
