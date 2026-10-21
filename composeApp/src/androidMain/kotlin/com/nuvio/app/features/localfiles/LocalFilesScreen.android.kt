@@ -42,7 +42,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,7 +51,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
@@ -69,7 +67,6 @@ actual fun LocalFilesScreen(
     onPlay: (LocalVideoFile) -> Unit,
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     var folders by remember(context) { mutableStateOf(loadTreeUris(context)) }
     var deviceFiles by remember { mutableStateOf(emptyList<LocalVideoFile>()) }
     var folderFiles by remember { mutableStateOf(emptyList<LocalVideoFile>()) }
@@ -82,8 +79,11 @@ actual fun LocalFilesScreen(
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-    ) { granted ->
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+    ) { grants ->
+        val granted = grants[Manifest.permission.READ_MEDIA_VIDEO] == true ||
+            grants[Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED] == true ||
+            grants[Manifest.permission.READ_EXTERNAL_STORAGE] == true
         if (granted) {
             deviceScanRequest += 1
         } else {
@@ -96,9 +96,10 @@ actual fun LocalFilesScreen(
     ) { uri ->
         if (uri != null) {
             val stored = runCatching {
+                // Local playback only needs read access; do not request or persist write access.
                 context.contentResolver.takePersistableUriPermission(
                     uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
                 )
                 uri.toString()
             }.getOrElse {
@@ -136,18 +137,22 @@ actual fun LocalFilesScreen(
         isLoading = true
         errorMessage = null
         try {
-            val scan = withContext(Dispatchers.IO) {
-                folders.flatMap { uriString ->
-                    runCatching { scanFolderVideos(context, Uri.parse(uriString)) }
-                        .getOrElse { error ->
-                            if (error is SecurityException) {
-                                errorMessage = "Folder access has expired. Remove that folder and select it again."
-                            }
-                            emptyList()
-                        }
+            val result = withContext(Dispatchers.IO) {
+                val files = mutableListOf<LocalVideoFile>()
+                val failedFolders = mutableSetOf<String>()
+                folders.forEach { uriString ->
+                    try {
+                        files += scanFolderVideos(context, Uri.parse(uriString))
+                    } catch (_: Exception) {
+                        failedFolders += uriString
+                    }
                 }
+                files to failedFolders
             }
-            folderFiles = scan
+            folderFiles = result.first
+            if (result.second.isNotEmpty()) {
+                errorMessage = "Some selected folders could not be read. Access may have expired; remove and select the folder again."
+            }
         } catch (error: Exception) {
             errorMessage = "Could not scan selected folders: ${error.message ?: error::class.simpleName ?: "unknown error"}"
         } finally {
@@ -175,10 +180,10 @@ actual fun LocalFilesScreen(
                 Text("Play videos through Nuvio’s built-in player", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             IconButton(onClick = {
-                if (ContextCompat.checkSelfPermission(context, videoPermission) == PackageManager.PERMISSION_GRANTED) {
+                if (hasVideoLibraryPermission(context)) {
                     deviceScanRequest += 1
                 } else {
-                    permissionLauncher.launch(videoPermission)
+                    permissionLauncher.launch(videoLibraryPermissions())
                 }
             }) {
                 Icon(Icons.Rounded.Refresh, contentDescription = "Refresh device library")
@@ -215,7 +220,12 @@ actual fun LocalFilesScreen(
                     Icon(Icons.Rounded.FolderOpen, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Text(label, modifier = Modifier.weight(1f).padding(start = 8.dp), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
                     IconButton(onClick = {
-                        runCatching { context.contentResolver.releasePersistableUriPermission(Uri.parse(uriString), Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
+                        runCatching {
+                    context.contentResolver.releasePersistableUriPermission(
+                        Uri.parse(uriString),
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                    )
+                }
                         val updated = folders - uriString
                         saveTreeUris(context, updated)
                         folders = updated
@@ -286,6 +296,34 @@ private data class MediaTreeRow(
     val modifiedAtMs: Long?,
     val folderName: String,
 )
+
+private fun hasVideoLibraryPermission(context: Context): Boolean {
+    val mediaVideoGranted = Build.VERSION.SDK_INT >= 33 &&
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.READ_MEDIA_VIDEO,
+        ) == PackageManager.PERMISSION_GRANTED
+    val selectedVisualMediaGranted = Build.VERSION.SDK_INT >= 34 &&
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED,
+        ) == PackageManager.PERMISSION_GRANTED
+    val legacyGranted = Build.VERSION.SDK_INT <= 32 &&
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+        ) == PackageManager.PERMISSION_GRANTED
+    return mediaVideoGranted || selectedVisualMediaGranted || legacyGranted
+}
+
+private fun videoLibraryPermissions(): Array<String> = when {
+    Build.VERSION.SDK_INT >= 34 -> arrayOf(
+        Manifest.permission.READ_MEDIA_VIDEO,
+        Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED,
+    )
+    Build.VERSION.SDK_INT >= 33 -> arrayOf(Manifest.permission.READ_MEDIA_VIDEO)
+    else -> arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+}
 
 private fun queryDeviceVideos(context: Context): List<LocalVideoFile> {
     val columns = mutableListOf(
