@@ -21,6 +21,7 @@ import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -201,6 +202,28 @@ internal fun LazyListScope.homescreenSettingsContent(
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
+                            }
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                IconButton(
+                                    onClick = { HomeCatalogSettingsRepository.moveAddonGroup(index, index - 1) },
+                                    enabled = index > 0,
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.KeyboardArrowUp,
+                                        contentDescription = "Move ${group.addonName} up",
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { HomeCatalogSettingsRepository.moveAddonGroup(index, index + 1) },
+                                    enabled = index < addonGroups.lastIndex,
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.KeyboardArrowDown,
+                                        contentDescription = "Move ${group.addonName} down",
+                                    )
+                                }
                             }
                             androidx.compose.foundation.layout.Box {
                                 TextButton(onClick = { expandedAddonId = group.addonId.takeIf { expandedAddonId != it } }) {
