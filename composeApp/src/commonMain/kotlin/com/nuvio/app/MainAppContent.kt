@@ -120,6 +120,8 @@ import com.nuvio.app.features.library.librarySectionItemKey
 import com.nuvio.app.features.library.showTrackingMembershipRewriteFeedback
 import com.nuvio.app.features.library.toLibraryItem
 import com.nuvio.app.features.library.toMetaPreview
+import com.nuvio.app.features.localfiles.LocalVideoFile
+import com.nuvio.app.features.localfiles.LOCAL_FILE_META_TYPE
 import com.nuvio.app.features.membership.MemberAccessRepository
 import com.nuvio.app.features.notifications.EpisodeReleaseNotificationsRepository
 import com.nuvio.app.features.p2p.P2pSettingsRepository
@@ -870,6 +872,28 @@ internal fun MainAppContent(
             navController.navigate(PlayerRoute(launchId = launchId, title = playerLaunch.title))
         }
 
+        fun openLocalVideo(file: LocalVideoFile) {
+            val playerLaunch = PlayerLaunch(
+                profileId = activePlaybackProfileId,
+                title = file.displayName.substringBeforeLast('.').ifBlank { file.displayName },
+                sourceUrl = file.uri,
+                sourceHeaders = emptyMap(),
+                sourceResponseHeaders = emptyMap(),
+                streamType = null,
+                streamTitle = file.displayName,
+                streamSubtitle = file.folderName,
+                providerName = "Local storage",
+                contentType = LOCAL_FILE_META_TYPE,
+                videoId = null,
+                parentMetaId = file.matchKey,
+                parentMetaType = LOCAL_FILE_META_TYPE,
+                sourceFilename = file.displayName,
+            )
+            // Local URIs stay on this device; WatchParty receives only the media-match key and filename.
+            val launchId = PlayerLaunchStore.put(playerLaunch)
+            navController.navigate(PlayerRoute(launchId = launchId, title = playerLaunch.title))
+        }
+
         fun openExternalStreamUrl(url: String): Boolean {
             val opened = runCatching {
                 uriHandler.openUri(url)
@@ -1027,6 +1051,16 @@ internal fun MainAppContent(
         }
 
         fun openPartyMedia(media: PartyMedia) {
+            if (media.metaType == LOCAL_FILE_META_TYPE) {
+                if (navController.currentRoute is PlayerRoute) navController.popBackStack()
+                navController.navigate(
+                    LocalFilesRoute(
+                        preferredMatchKey = media.metaId,
+                        title = "Local files",
+                    ),
+                )
+                return
+            }
             if (navController.currentRoute is PlayerRoute) navController.popBackStack()
             val resumePositionMs = PartyRepository.playback.value
                 ?.takeIf { it.mediaKey == null || it.mediaKey == media.key }
@@ -1613,6 +1647,13 @@ internal fun MainAppContent(
                         route = route,
                         navController = navController,
                         onOpenDownload = ::openDownloadedItem,
+                    )
+                }
+                entry<LocalFilesRoute> { route ->
+                    LocalFilesDestination(
+                        route = route,
+                        navController = navController,
+                        onPlay = ::openLocalVideo,
                     )
                 }
                 entry<AddonsSettingsRoute> { route ->
