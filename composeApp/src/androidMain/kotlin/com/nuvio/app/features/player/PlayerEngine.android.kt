@@ -133,8 +133,15 @@ actual fun PlatformPlayerSurface(
         initialPositionRequestKey.orEmpty(),
     )
     val requestedEngine = playbackEngine ?: playerSettings.androidPlaybackEngine
+    // Android content:// URIs are readable through ContentResolver/ExoPlayer, but libmpv expects
+    // filesystem/network input rather than an app-scoped SAF URI. Keep local-library playback on
+    // ExoPlayer even when the user's global engine preference is libmpv or Auto.
+    val isContentUri = sourceUrl.startsWith("content://", ignoreCase = true)
     var activeEngine by remember(playerSourceKey, requestedEngine) {
-        mutableStateOf(requestedEngine.initialAndroidEngine())
+        mutableStateOf(
+            if (isContentUri) ResolvedAndroidPlaybackEngine.ExoPlayer
+            else requestedEngine.initialAndroidEngine(),
+        )
     }
 
     when (activeEngine) {
@@ -156,7 +163,7 @@ actual fun PlatformPlayerSurface(
             onControllerReady = onControllerReady,
             onSnapshot = onSnapshot,
             onError = { message ->
-                if (message != null && requestedEngine == AndroidPlaybackEngine.Auto) {
+                if (message != null && requestedEngine == AndroidPlaybackEngine.Auto && !isContentUri) {
                     Log.w(TAG, "ExoPlayer failed; falling back to libmpv: $message")
                     initialPositionRequestKey?.let { key ->
                         onInitialPositionHandled(key, false)
