@@ -29,6 +29,8 @@ data class HomeCatalogSettingsItem(
     val isCollection: Boolean = false,
     val collectionId: String? = null,
     val isPinnedToTop: Boolean = false,
+    val addonId: String? = null,
+    val addonLayoutMode: HomeAddonLayoutMode = HomeAddonLayoutMode.NORMAL,
 ) {
     val displayTitle: String
         get() = customTitle.ifBlank { defaultTitle }
@@ -309,20 +311,29 @@ object HomeCatalogSettingsRepository {
             if (addonId !in addonLayouts) return
             addonLayouts = addonLayouts - addonId
         } else {
-            val firstOrder = addonDefinitions.minOfOrNull { definition ->
+            val addonKeys = addonDefinitions.mapTo(mutableSetOf(), HomeCatalogDefinition::key)
+            val storedFirstOrder = addonDefinitions.minOfOrNull { definition ->
                 preferences[definition.key]?.order ?: Int.MAX_VALUE
-            }?.takeIf { it != Int.MAX_VALUE } ?: _uiState.value.items
-                .filterNot { it.isCollection }
-                .filter { it.key in addonDefinitions.map(HomeCatalogDefinition::key) }
-                .minOfOrNull(HomeCatalogSettingsItem::order)
-                ?: 0
+            }?.takeIf { it != Int.MAX_VALUE }
+            val visibleFirstOrder = _uiState.value.items
+                .indexOfFirst { it.key in addonKeys }
+                .takeIf { it >= 0 }
+            val firstOrder = visibleFirstOrder ?: storedFirstOrder ?: 0
             val existing = addonLayouts[addonId]
+            val anchorOrder = if (
+                mode == HomeAddonLayoutMode.LOCKED &&
+                existing?.mode != HomeAddonLayoutMode.LOCKED.storageValue
+            ) {
+                firstOrder
+            } else {
+                existing?.anchorOrder ?: firstOrder
+            }
             addonLayouts = addonLayouts + (
                 addonId to StoredHomeAddonLayoutPreference(
                     addonId = addonId,
                     mode = mode.storageValue,
                     order = existing?.order ?: firstOrder,
-                    anchorOrder = existing?.anchorOrder ?: firstOrder,
+                    anchorOrder = anchorOrder,
                 )
             )
         }
@@ -466,6 +477,12 @@ object HomeCatalogSettingsRepository {
                     enabled = preference?.enabled ?: true,
                     heroSourceEnabled = preference?.heroSourceEnabled ?: true,
                     order = preference?.order ?: 0,
+                    addonId = if (ServerCatalog.isServerKey(definition.key)) null else definition.addonGroupId(),
+                    addonLayoutMode = if (ServerCatalog.isServerKey(definition.key)) {
+                        HomeAddonLayoutMode.NORMAL
+                    } else {
+                        HomeAddonLayoutMode.fromStorage(addonLayouts[definition.addonGroupId()]?.mode)
+                    },
                 )
             }
 
