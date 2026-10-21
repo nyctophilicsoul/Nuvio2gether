@@ -439,15 +439,16 @@ object HomeCatalogSettingsRepository {
         }.groupBy({ it.first }, { it.second })
             .mapValues { (_, indexes) -> indexes.minOrNull() ?: Int.MAX_VALUE }
         val updatedLayouts = addonLayouts.toMutableMap()
-        firstIndexByAddon.entries.sortedBy { it.value }.forEachIndexed { index, entry ->
+        firstIndexByAddon.entries.sortedBy { it.value }.forEach { entry ->
             val existing = updatedLayouts[entry.key]
+            val groupOrder = entry.value
             updatedLayouts[entry.key] = StoredHomeAddonLayoutPreference(
                 addonId = entry.key,
                 mode = existing?.mode ?: HomeAddonLayoutMode.NORMAL.storageValue,
-                order = index,
+                order = groupOrder,
                 anchorOrder = if (
                     HomeAddonLayoutMode.fromStorage(existing?.mode) == HomeAddonLayoutMode.LOCKED
-                ) index else existing?.anchorOrder ?: index,
+                ) groupOrder else existing?.anchorOrder ?: groupOrder,
             )
         }
         addonLayouts = updatedLayouts
