@@ -31,9 +31,21 @@ data class HomeCatalogSettingsItem(
     val isPinnedToTop: Boolean = false,
     val addonId: String? = null,
     val addonLayoutMode: HomeAddonLayoutMode = HomeAddonLayoutMode.NORMAL,
+    val rowPlacement: HomeCatalogRowPlacement = HomeCatalogRowPlacement.NORMAL,
 ) {
     val displayTitle: String
         get() = customTitle.ifBlank { defaultTitle }
+}
+
+enum class HomeCatalogRowPlacement(val storageValue: String) {
+    NORMAL("normal"),
+    PINNED_TOP("pinned_top"),
+    PINNED_BOTTOM("pinned_bottom");
+
+    companion object {
+        fun fromStorage(value: String?): HomeCatalogRowPlacement =
+            values().firstOrNull { it.storageValue == value } ?: NORMAL
+    }
 }
 
 enum class HomeAddonLayoutMode(val storageValue: String) {
@@ -95,6 +107,7 @@ internal data class HomeCatalogPreference(
     val enabled: Boolean,
     val heroSourceEnabled: Boolean,
     val order: Int,
+    val rowPlacement: HomeCatalogRowPlacement = HomeCatalogRowPlacement.NORMAL,
 )
 
 internal data class HomeCatalogSettingsSnapshot(
@@ -112,6 +125,7 @@ private data class StoredHomeCatalogPreference(
     val enabled: Boolean = true,
     val heroSourceEnabled: Boolean = true,
     val order: Int = 0,
+    val rowPlacement: String = HomeCatalogRowPlacement.NORMAL.storageValue,
 )
 
 @Serializable
@@ -235,6 +249,7 @@ object HomeCatalogSettingsRepository {
                     enabled = value.enabled,
                     heroSourceEnabled = value.heroSourceEnabled,
                     order = value.order,
+                    rowPlacement = HomeCatalogRowPlacement.fromStorage(value.rowPlacement),
                 )
             },
             addonLayouts = addonLayouts.mapValues { (_, value) ->
@@ -284,6 +299,12 @@ object HomeCatalogSettingsRepository {
             } else {
                 preference.copy(heroSourceEnabled = true)
             }
+        }
+    }
+
+    fun setRowPlacement(key: String, placement: HomeCatalogRowPlacement) {
+        updatePreference(key) { preference ->
+            preference.copy(rowPlacement = placement.storageValue)
         }
     }
 
@@ -495,6 +516,7 @@ object HomeCatalogSettingsRepository {
                     heroSourceEnabled = preference?.heroSourceEnabled ?: true,
                     order = preference?.order ?: 0,
                     addonId = if (ServerCatalog.isServerKey(definition.key)) null else definition.addonGroupId(),
+                    rowPlacement = HomeCatalogRowPlacement.fromStorage(preference?.rowPlacement),
                     addonLayoutMode = if (ServerCatalog.isServerKey(definition.key)) {
                         HomeAddonLayoutMode.NORMAL
                     } else {
@@ -516,6 +538,7 @@ object HomeCatalogSettingsRepository {
                 isCollection = true,
                 collectionId = colDef.collectionId,
                 isPinnedToTop = colDef.isPinnedToTop,
+                rowPlacement = HomeCatalogRowPlacement.fromStorage(preference?.rowPlacement),
             )
         }
 
