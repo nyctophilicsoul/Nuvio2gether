@@ -92,6 +92,18 @@ data class DownloadsRoute(override val title: String = "") : AppRoute {
 }
 
 @Serializable
+data class LocalFilesRoute(
+    val preferredMatchKey: String? = null,
+    override val title: String = "Local files",
+) : AppRoute {
+    override val preferredTabName: String
+        get() = "Library"
+
+    override val navigationIdentity: String
+        get() = "LocalFilesRoute:${preferredMatchKey.orEmpty()}"
+}
+
+@Serializable
 data class DownloadShowRoute(
     val showId: String,
     override val title: String,
