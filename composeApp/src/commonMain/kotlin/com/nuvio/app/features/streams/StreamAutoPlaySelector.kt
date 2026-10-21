@@ -124,45 +124,45 @@ object StreamAutoPlaySelector {
             null
         }
         val matchingStreams = if (mode == StreamAutoPlayMode.REGEX_MATCH) {
-                val pattern = regexPattern.trim()
+            val pattern = regexPattern.trim()
 
-                val userRegex = runCatching { Regex(pattern, RegexOption.IGNORE_CASE) }.getOrNull()
-                    ?: return StreamAutoPlayEvaluation()
+            val userRegex = runCatching { Regex(pattern, RegexOption.IGNORE_CASE) }.getOrNull()
+                ?: return StreamAutoPlayEvaluation()
 
-                val exclusionMatches = Regex("\\(\\?![^)]*?\\(([^)]+)\\)").findAll(pattern)
+            val exclusionMatches = Regex("\\(\\?![^)]*?\\(([^)]+)\\)").findAll(pattern)
 
-                val exclusionWords = exclusionMatches
-                    .flatMap { match -> match.groupValues[1].split("|") }
-                    .map { it.trim() }
-                    .filter { it.isNotBlank() }
-                    .toList()
+            val exclusionWords = exclusionMatches
+                .flatMap { match -> match.groupValues[1].split("|") }
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .toList()
 
-                val excludeRegex = if (exclusionWords.isNotEmpty()) {
-                    Regex(
-                        "\\b(${exclusionWords.joinToString("|") { Regex.escape(it) }})\\b",
-                        RegexOption.IGNORE_CASE,
-                    )
-                } else null
+            val excludeRegex = if (exclusionWords.isNotEmpty()) {
+                Regex(
+                    "\\b(${exclusionWords.joinToString("|") { Regex.escape(it) }})\\b",
+                    RegexOption.IGNORE_CASE,
+                )
+            } else null
 
-                candidateStreams.filter { stream ->
-                    val url = stream.playableDirectUrl.orEmpty()
+            candidateStreams.filter { stream ->
+                val url = stream.playableDirectUrl.orEmpty()
 
-                    val searchableText = buildString {
-                        append(stream.addonName).append(' ')
-                        append(stream.name.orEmpty()).append(' ')
-                        append(stream.streamLabel).append(' ')
-                        append(stream.description.orEmpty()).append(' ')
-                        append(url)
-                    }
-
-                    if (!userRegex.containsMatchIn(searchableText)) return@filter false
-
-                    if (excludeRegex != null && excludeRegex.containsMatchIn(searchableText)) {
-                        return@filter false
-                    }
-
-                    true
+                val searchableText = buildString {
+                    append(stream.addonName).append(' ')
+                    append(stream.name.orEmpty()).append(' ')
+                    append(stream.streamLabel).append(' ')
+                    append(stream.description.orEmpty()).append(' ')
+                    append(url)
                 }
+
+                if (!userRegex.containsMatchIn(searchableText)) return@filter false
+
+                if (excludeRegex != null && excludeRegex.containsMatchIn(searchableText)) {
+                    return@filter false
+                }
+
+                true
+            }
         } else {
             // Remaining modes are FIRST_STREAM and SEMI_AUTOMATIC.
             candidateStreams
