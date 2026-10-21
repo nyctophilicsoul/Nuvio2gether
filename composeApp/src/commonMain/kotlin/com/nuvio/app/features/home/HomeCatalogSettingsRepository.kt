@@ -662,18 +662,20 @@ object HomeCatalogSettingsRepository {
         ensureLoaded()
         showCatalogType = payload.showCatalogType
         hideUnreleasedContent = payload.hideUnreleasedContent
-        payload.addonLayouts?.let { remoteLayouts ->
-            addonLayouts = remoteLayouts
-                .filter { it.addonId.isNotBlank() }
-                .associate { layout ->
-                    layout.addonId to StoredHomeAddonLayoutPreference(
-                        addonId = layout.addonId,
-                        mode = HomeAddonLayoutMode.fromStorage(layout.mode).storageValue,
-                        order = layout.order,
-                        anchorOrder = layout.anchorOrder,
-                    )
-                }
-        }
+        payload.addonLayouts
+            ?.takeIf { layouts -> layouts.isNotEmpty() || payload.items.isNotEmpty() }
+            ?.let { remoteLayouts ->
+                addonLayouts = remoteLayouts
+                    .filter { it.addonId.isNotBlank() }
+                    .associate { layout ->
+                        layout.addonId to StoredHomeAddonLayoutPreference(
+                            addonId = layout.addonId,
+                            mode = HomeAddonLayoutMode.fromStorage(layout.mode).storageValue,
+                            order = layout.order,
+                            anchorOrder = layout.anchorOrder,
+                        )
+                    }
+            }
         if (payload.items.isNotEmpty()) {
             val existingHeroState = preferences.mapValues { it.value.heroSourceEnabled }
             val remotePreferences = payload.items.associate { item ->
