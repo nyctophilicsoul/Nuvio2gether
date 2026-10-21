@@ -7,7 +7,18 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.WarningAmber
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.toDp
 import androidx.compose.ui.Alignment
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -157,12 +168,33 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
             ),
     ) {
         deadLinkStatusMessage?.let { status ->
-            Text(
-                text = status,
+            val isUnavailable = status.startsWith("Skipping unavailable source") ||
+                status.startsWith("Dead link pruned:")
+            val statusIconSize = with(LocalDensity.current) {
+                MaterialTheme.typography.bodyLarge.fontSize.toDp()
+            }
+            Row(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 20.dp),
-            )
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = if (isUnavailable) {
+                        Icons.Outlined.WarningAmber
+                    } else {
+                        Icons.Outlined.Refresh
+                    },
+                    contentDescription = null,
+                    modifier = Modifier.size(statusIconSize),
+                    tint = if (isUnavailable) Color(0xFFFFC66D) else Color(0xFF8BCBFF),
+                )
+                Text(
+                    text = status,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+            }
         }
         val playerSurfaceSourceUrl = if (isP2pPlaybackActive) p2pResolvedSourceUrl else activeSourceUrl
         val playbackKey = activePlaybackKey
