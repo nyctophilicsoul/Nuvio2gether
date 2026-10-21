@@ -2468,4 +2468,11 @@
     <string name="stream_info_subtitle_source_embedded">Embedded</string>
     <string name="stream_info_player_engine">Player Engine</string>
     <string name="stream_info_server">Server</string>
+    <string name="settings_homescreen_addon_groups">ADD-ON GROUPS</string>
+    <string name="settings_homescreen_addon_groups_description">Control every home row from a catalog add-on together. New or changing catalogs follow the selected rule.</string>
+    <string name="settings_homescreen_group_rows_count">%1$d catalog rows</string>
+    <string name="settings_homescreen_group_mode_normal">Use row order</string>
+    <string name="settings_homescreen_group_mode_locked">Lock group here</string>
+    <string name="settings_homescreen_group_mode_top">Pin all rows to top</string>
+    <string name="settings_homescreen_group_mode_bottom">Pin all rows to bottom</string>
 </resources>
