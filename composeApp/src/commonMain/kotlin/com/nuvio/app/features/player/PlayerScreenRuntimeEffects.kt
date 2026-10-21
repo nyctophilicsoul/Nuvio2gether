@@ -113,8 +113,8 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
                 val selectedHeight = selectedQuality?.targetHeight
                 val qualityStatus = when {
                     selectedHeight == null || nextHeight == null -> null
-                    nextHeight == selectedHeight -> "Retrying selected ${selectedHeight}p"
-                    nextHeight < selectedHeight -> "${selectedHeight}p → ${nextHeight}p fallback"
+                    nextHeight == selectedHeight -> "${selectedHeight}p retry"
+                    nextHeight < selectedHeight -> "${nextHeight}p fallback"
                     else -> "${nextHeight}p source"
                 }
                 deadLinkStatusMessage = if (qualityStatus == null) {
