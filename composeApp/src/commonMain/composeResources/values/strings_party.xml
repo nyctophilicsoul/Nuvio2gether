@@ -73,4 +73,6 @@
     <string name="party_share_description">Friends can play your link instead of picking their own. It can include your debrid key.</string>
     <string name="party_share_unavailable">This stream can't be shared.</string>
     <string name="party_shared_by">Shared by %1$s</string>
+    <string name="party_companion_chatting_as">Chatting as %1$s</string>
+    <string name="party_companion_seat_left">Your other device left the watch party.</string>
 </resources>
