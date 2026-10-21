@@ -442,7 +442,10 @@ private fun HomescreenCatalogList(
     ) { from, to ->
         val fromItem = items.getOrNull(from.index)
         val toItem = items.getOrNull(to.index)
-        if (fromItem?.isPinnedToTop == true || toItem?.isPinnedToTop == true) {
+        if (fromItem?.isPinnedToTop == true || toItem?.isPinnedToTop == true ||
+            fromItem?.rowPlacement != HomeCatalogRowPlacement.NORMAL ||
+            toItem?.rowPlacement != HomeCatalogRowPlacement.NORMAL
+        ) {
             onPinnedDragAttempt()
             return@rememberReorderableLazyListState
         }
@@ -481,7 +484,7 @@ private fun HomescreenCatalogList(
                 ReorderableItem(
                     reorderableLazyListState,
                     key = item.key,
-                    enabled = !item.isPinnedToTop,
+                    enabled = !item.isPinnedToTop && item.rowPlacement == HomeCatalogRowPlacement.NORMAL,
                 ) { isDragging ->
                     val elevation by animateDpAsState(if (isDragging) 4.dp else 0.dp)
 
