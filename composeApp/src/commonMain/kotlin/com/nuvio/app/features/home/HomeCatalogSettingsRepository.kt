@@ -851,9 +851,19 @@ internal fun orderHomeCatalogSettingsItems(
         .sortedWith(compareBy<IndexedValue<HomeCatalogSettingsItem>> { it.value.order }.thenBy { it.index })
     if (original.isEmpty()) return emptyList()
     val rankByKey = original.mapIndexed { rank, indexed -> indexed.value.key to rank }.toMap()
+    val pinnedTopRows = original.map { it.value }.filter { item ->
+        item.rowPlacement == HomeCatalogRowPlacement.PINNED_TOP ||
+            (item.isCollection && item.isPinnedToTop)
+    }
+    val pinnedBottomRows = original.map { it.value }.filter { item ->
+        item.rowPlacement == HomeCatalogRowPlacement.PINNED_BOTTOM &&
+            !(item.isCollection && item.isPinnedToTop)
+    }
+    val pinnedKeys = (pinnedTopRows + pinnedBottomRows).mapTo(mutableSetOf(), HomeCatalogSettingsItem::key)
     val addonRows = original.mapNotNull { indexed ->
-        if (indexed.value.isCollection) null
-        else addonIdByCatalogKey[indexed.value.key]?.let { it to indexed.value }
+        val item = indexed.value
+        if (item.isCollection || item.key in pinnedKeys) null
+        else addonIdByCatalogKey[item.key]?.let { it to item }
     }.groupBy({ it.first }, { it.second })
 
     fun rowOrder(rows: List<HomeCatalogSettingsItem>): Int =
@@ -863,7 +873,7 @@ internal fun orderHomeCatalogSettingsItems(
         compareBy<HomeCatalogSettingsItem> { it.order }.thenBy { rankByKey[it.key] ?: Int.MAX_VALUE },
     )
 
-    val pinnedCollections = original.map { it.value }.filter { it.isCollection && it.isPinnedToTop }
+    val pinnedCollections = pinnedTopRows
     val pinnedCollectionKeys = pinnedCollections.mapTo(mutableSetOf(), HomeCatalogSettingsItem::key)
     val topGroups = addonRows.filter { (id, _) ->
         HomeAddonLayoutMode.fromStorage(addonLayouts[id]?.mode) == HomeAddonLayoutMode.PINNED_TOP
@@ -891,7 +901,7 @@ internal fun orderHomeCatalogSettingsItems(
 
     original.forEach { indexed ->
         val item = indexed.value
-        if (item.key in pinnedCollectionKeys) return@forEach
+        if (item.key in pinnedKeys) return@forEach
         if (item.isCollection || item.key !in addonIdByCatalogKey) {
             units += OrderedUnit(item.order, rankByKey[item.key] ?: indexed.index, listOf(item))
         }
@@ -903,6 +913,7 @@ internal fun orderHomeCatalogSettingsItems(
     return pinnedCollections +
         topGroups.flatMap { sortedRows(it.value) } +
         orderedMiddle +
+        pinnedBottomRows +
         bottomGroups.flatMap { sortedRows(it.value) }
 }
 
