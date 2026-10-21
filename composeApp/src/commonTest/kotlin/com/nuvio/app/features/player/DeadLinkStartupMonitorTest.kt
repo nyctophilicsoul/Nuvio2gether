@@ -760,6 +760,29 @@ class DeadLinkStartupMonitorTest {
         monitor.close()
     }
 
+    @Test
+    fun installedAddonWinsWhenPluginAndAddonShareAPlaybackUrl() = runTest {
+        val dead = stream("Dead source", "addon:dead", "https://media.example/dead.mp4")
+        val plugin = stream("Plugin", "plugin:one", "https://media.example/shared.mp4")
+        val addon = stream("Installed addon", "addon:one", "https://media.example/shared.mp4")
+        val fallbacks = mutableListOf<StreamItem>()
+        val monitor = newMonitor(
+            scope = backgroundScope,
+            timeoutSeconds = { 5 },
+            // Deliberately return the plugin first to catch dedupe-before-priority bugs.
+            candidates = { listOf(plugin, addon) },
+            onFallback = fallbacks::add,
+        )
+
+        monitor.sourceSelected(dead)
+        runCurrent()
+        advanceTimeBy(5_000)
+        runCurrent()
+
+        assertEquals(listOf(addon), fallbacks)
+        monitor.close()
+    }
+
     private fun stream(name: String, addonId: String, url: String) =
         StreamItem(name = name, url = url, addonName = name, addonId = addonId)
 
