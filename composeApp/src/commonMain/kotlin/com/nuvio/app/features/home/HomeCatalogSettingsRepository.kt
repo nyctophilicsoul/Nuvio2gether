@@ -357,7 +357,7 @@ object HomeCatalogSettingsRepository {
 
     fun moveByIndex(fromIndex: Int, toIndex: Int) {
         ensureLoaded()
-        val allKeys = allOrderedKeys()
+        val allKeys = _uiState.value.items.map { it.key }
         if (allKeys.isEmpty()) return
         if (fromIndex !in allKeys.indices || toIndex !in allKeys.indices) return
         if (fromIndex == toIndex) return
@@ -572,7 +572,7 @@ object HomeCatalogSettingsRepository {
         direction: Int,
     ) {
         ensureLoaded()
-        val orderedKeys = allOrderedKeys().toMutableList()
+        val orderedKeys = _uiState.value.items.map { it.key }.toMutableList()
         if (orderedKeys.isEmpty()) return
 
         val currentIndex = orderedKeys.indexOf(key)
