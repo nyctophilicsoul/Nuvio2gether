@@ -485,8 +485,19 @@ object HomeCatalogSettingsRepository {
             )
         }
 
-        val items = (catalogItems + collectionItems)
-            .sortedBy { it.order }
+        val items = orderHomeCatalogSettingsItems(
+            items = catalogItems + collectionItems,
+            addonIdByCatalogKey = definitions
+                .filterNot { ServerCatalog.isServerKey(it.key) }
+                .associate { definition -> definition.key to definition.addonGroupId() },
+            addonLayouts = addonLayouts.mapValues { (_, stored) ->
+                HomeAddonLayoutPreference(
+                    mode = HomeAddonLayoutMode.fromStorage(stored.mode),
+                    order = stored.order,
+                    anchorOrder = stored.anchorOrder,
+                )
+            },
+        )
         val addonGroups = definitions
             .filterNot { ServerCatalog.isServerKey(it.key) }
             .groupBy { it.addonGroupId() }
@@ -750,6 +761,99 @@ object HomeCatalogSettingsRepository {
 
     private fun String.requiresExplicitSyncKey(): Boolean =
         !startsWith("collection_") && count { it == ':' } > 2
+}
+
+internal fun orderHomeCatalogSettingsItems(
+    items: List<HomeCatalogSettingsItem>,
+    addonIdByCatalogKey: Map<String, String>,
+    addonLayouts: Map<String, HomeAddonLayoutPreference>,
+): List<HomeCatalogSettingsItem> {
+    data class UnitEntry(
+        val key: String,
+        val order: Int,
+        val tiePriority: Int,
+        val originalIndex: Int,
+        val rows: List<HomeCatalogSettingsItem>,
+    )
+
+    val original = items.withIndex()
+        .sortedWith(compareBy<IndexedValue<HomeCatalogSettingsItem>> { it.value.order }.thenBy { it.index })
+    if (original.isEmpty()) return emptyList()
+
+    val catalogRowsByAddon = original
+        .mapNotNull { indexed ->
+            addonIdByCatalogKey[indexed.value.key]?.let { it to indexed.value }
+        }
+        .groupBy(keySelector = { it.first }, valueTransform = { it.second })
+
+    val topGroups = catalogRowsByAddon.entries
+        .filter { addonLayouts[it.key]?.mode == HomeAddonLayoutMode.PINNED_TOP }
+        .sortedWith(compareBy<Map.Entry<String, List<HomeCatalogSettingsItem>>> {
+            addonLayouts[it.key]?.order ?: it.value.minOf(HomeCatalogSettingsItem::order)
+        }.thenBy { it.key })
+    val bottomGroups = catalogRowsByAddon.entries
+        .filter { addonLayouts[it.key]?.mode == HomeAddonLayoutMode.PINNED_BOTTOM }
+        .sortedWith(compareBy<Map.Entry<String, List<HomeCatalogSettingsItem>>> {
+            addonLayouts[it.key]?.order ?: it.value.minOf(HomeCatalogSettingsItem::order)
+        }.thenBy { it.key })
+    val lockedGroups = catalogRowsByAddon.entries
+        .filter { addonLayouts[it.key]?.mode == HomeAddonLayoutMode.LOCKED }
+        .sortedWith(
+            compareBy<Map.Entry<String, List<HomeCatalogSettingsItem>>> {
+                addonLayouts[it.key]?.anchorOrder ?: it.value.minOf(HomeCatalogSettingsItem::order)
+            }.thenBy { addonLayouts[it.key]?.order ?: Int.MAX_VALUE }.thenBy { it.key },
+        )
+
+    val groupedAddonIds = (topGroups + bottomGroups + lockedGroups).mapTo(mutableSetOf()) { it.key }
+    val originalIndexByKey = original.associate { it.value.key to it.index }
+
+    fun sortedGroupRows(rows: List<HomeCatalogSettingsItem>): List<HomeCatalogSettingsItem> =
+        rows.sortedWith(
+            compareBy<HomeCatalogSettingsItem> { it.order }
+                .thenBy { originalIndexByKey[it.key] ?: Int.MAX_VALUE },
+        )
+
+    val pinnedCollections = original.map { it.value }.filter { it.isCollection && it.isPinnedToTop }
+    val pinnedCollectionKeys = pinnedCollections.mapTo(mutableSetOf(), HomeCatalogSettingsItem::key)
+    val units = mutableListOf<UnitEntry>()
+
+    original.forEach { indexed ->
+        val item = indexed.value
+        if (item.key in pinnedCollectionKeys) return@forEach
+        val addonId = addonIdByCatalogKey[item.key]
+        if (addonId == null || addonId !in groupedAddonIds) {
+            units += UnitEntry(
+                key = item.key,
+                order = item.order,
+                tiePriority = 1,
+                originalIndex = indexed.index,
+                rows = listOf(item),
+            )
+        }
+    }
+
+    lockedGroups.forEach { entry ->
+        val layout = addonLayouts.getValue(entry.key)
+        val rows = sortedGroupRows(entry.value)
+        units += UnitEntry(
+            key = entry.key,
+            order = layout.anchorOrder,
+            tiePriority = 0,
+            originalIndex = rows.minOfOrNull { originalIndexByKey[it.key] ?: Int.MAX_VALUE } ?: Int.MAX_VALUE,
+            rows = rows,
+        )
+    }
+
+    val middle = units.sortedWith(
+        compareBy<UnitEntry> { it.order }
+            .thenBy { it.tiePriority }
+            .thenBy { it.originalIndex }
+            .thenBy { it.key },
+    ).flatMap(UnitEntry::rows)
+
+    val top = topGroups.flatMap { sortedGroupRows(it.value) }
+    val bottom = bottomGroups.flatMap { sortedGroupRows(it.value) }
+    return pinnedCollections + top + middle + bottom
 }
 
 internal fun orderHomeCatalogDefinitions(
