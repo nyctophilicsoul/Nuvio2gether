@@ -109,6 +109,100 @@ class HomeAddonLayoutTest {
         )
     }
 
+    @Test
+    fun `actual home settings order groups pinned add-on rows`() {
+        val items = listOf(
+            settingItem("A", "one", 0),
+            settingItem("C", "one", 1),
+            settingItem("B", "one", 2),
+            settingItem("C", "two", 3),
+            settingItem("D", "one", 4),
+        )
+        val addonIds = items.filterNot { it.isCollection }
+            .associate { it.key to it.key.substringBefore(":movie:") }
+        val layouts = mapOf(
+            "C" to HomeAddonLayoutPreference(
+                mode = HomeAddonLayoutMode.PINNED_TOP,
+                order = 1,
+                anchorOrder = 1,
+            ),
+        )
+
+        assertEquals(
+            listOf("C:one", "C:two", "A:one", "B:one", "D:one"),
+            orderHomeCatalogSettingsItems(items, addonIds, layouts).map(::settingLabel),
+        )
+    }
+
+    @Test
+    fun `actual home settings order keeps locked add-on anchor after catalog IDs change`() {
+        val items = listOf(
+            settingItem("A", "one", 0),
+            settingItem("B", "one", 1),
+            settingItem("D", "one", 3),
+            settingItem("C", "new", 5),
+            settingItem("C", "latest", 6),
+        )
+        val addonIds = items.filterNot { it.isCollection }
+            .associate { it.key to it.key.substringBefore(":movie:") }
+        val layouts = mapOf(
+            "C" to HomeAddonLayoutPreference(
+                mode = HomeAddonLayoutMode.LOCKED,
+                order = 2,
+                anchorOrder = 2,
+            ),
+        )
+
+        assertEquals(
+            listOf("A:one", "B:one", "C:new", "C:latest", "D:one"),
+            orderHomeCatalogSettingsItems(items, addonIds, layouts).map(::settingLabel),
+        )
+    }
+
+    @Test
+    fun `pinned collections retain priority when add-ons are pinned as a group`() {
+        val items = listOf(
+            HomeCatalogSettingsItem(
+                key = "collection_favorites",
+                defaultTitle = "Favorites",
+                addonName = "Favorites",
+                order = 0,
+                isCollection = true,
+                isPinnedToTop = true,
+            ),
+            settingItem("A", "one", 1),
+            settingItem("C", "one", 2),
+            settingItem("B", "one", 3),
+        )
+        val addonIds = items.filterNot { it.isCollection }
+            .associate { it.key to it.key.substringBefore(":movie:") }
+        val layouts = mapOf(
+            "C" to HomeAddonLayoutPreference(
+                mode = HomeAddonLayoutMode.PINNED_TOP,
+                order = 2,
+                anchorOrder = 2,
+            ),
+        )
+
+        assertEquals(
+            listOf("collection_favorites", "C:one", "A:one", "B:one"),
+            orderHomeCatalogSettingsItems(items, addonIds, layouts).map(::settingLabel),
+        )
+    }
+
+    private fun settingItem(addonId: String, catalogId: String, order: Int) =
+        HomeCatalogSettingsItem(
+            key = "$addonId:movie:$catalogId",
+            defaultTitle = "$addonId $catalogId",
+            addonName = "Addon $addonId",
+            order = order,
+            addonId = addonId,
+        )
+
+    private fun settingLabel(item: HomeCatalogSettingsItem): String =
+        if (item.isCollection) item.key else
+            item.key.substringBefore(":movie:") + ":" + item.key.substringAfterLast(":")
+
     private fun snapshot(
         definitions: List<HomeCatalogDefinition>,
         layouts: Map<String, HomeAddonLayoutPreference> = emptyMap(),
