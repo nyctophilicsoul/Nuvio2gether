@@ -2237,9 +2237,33 @@ private fun ExoPlayer.logCurrentTracks(context: String) {
             C.TRACK_TYPE_VIDEO -> "VIDEO"
             else -> "OTHER(${group.type})"
         }
-        if (group.type != C.TRACK_TYPE_TEXT && group.type != C.TRACK_TYPE_AUDIO) continue
-        val format = group.mediaTrackGroup.getFormat(0)
-        Log.d(TAG, "  group type=$typeName id=${format.id} lang=${format.language} label=${format.label} selected=${group.isSelected} supported=${group.isSupported}")
+        // Video was previously filtered out here, which hid the codec/profile and
+        // HDR colour metadata needed to diagnose DV/HDR playback problems.
+        if (
+            group.type != C.TRACK_TYPE_TEXT &&
+            group.type != C.TRACK_TYPE_AUDIO &&
+            group.type != C.TRACK_TYPE_VIDEO
+        ) continue
+
+        val trackCount = if (group.type == C.TRACK_TYPE_VIDEO) {
+            group.mediaTrackGroup.length
+        } else {
+            1
+        }
+        for (trackIndex in 0 until trackCount) {
+            val format = group.mediaTrackGroup.getFormat(trackIndex)
+            val colorInfo = format.colorInfo
+            Log.d(
+                TAG,
+                "  group type=$typeName track=$trackIndex id=${format.id} " +
+                    "mime=${format.sampleMimeType} codecs=${format.codecs} " +
+                    "size=${format.width}x${format.height} fps=${format.frameRate} " +
+                    "bitrate=${format.bitrate} colorSpace=${colorInfo?.colorSpace} " +
+                    "colorRange=${colorInfo?.colorRange} colorTransfer=${colorInfo?.colorTransfer} " +
+                    "lang=${format.language} label=${format.label} " +
+                    "selected=${group.isSelected} supported=${group.isSupported}"
+            )
+        }
     }
     Log.d(TAG, "--- end logCurrentTracks ---")
 }
