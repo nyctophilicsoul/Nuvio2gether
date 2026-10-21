@@ -957,29 +957,29 @@ private fun PlaybackSettingsSection(
                         isTablet = isTablet,
                         onClick = { showAutoPlayAddonSelectionDialog = true },
                     )
-                    if (autoPlayPlayerSettings.streamAutoPlayMode == StreamAutoPlayMode.SEMI_AUTOMATIC) {
-                        SettingsGroupDivider(isTablet = isTablet)
-                        val priorityAddonNames = addonUiState.addons
-                            .enabledAddons()
-                            .mapNotNull { addon ->
-                                addon.manifest
-                                    ?.takeIf { manifest -> manifest.resources.any { resource -> resource.name == "stream" } }
-                                    ?.name
-                            }
-                            .distinct()
-                        val configuredPriority = autoPlayPlayerSettings.streamAutoPlayAddonPriority
-                            .filter { it in priorityAddonNames }
-                        SettingsNavigationRow(
-                            title = "Semi-auto add-on priority",
-                            description = if (configuredPriority.isEmpty()) {
-                                "Use enabled add-on order; tap to customise"
-                            } else {
-                                configuredPriority.take(3).joinToString(" → ")
-                            },
-                            isTablet = isTablet,
-                            onClick = { showAutoPlayAddonPriorityDialog = true },
-                        )
-                    }
+                }
+                if (autoPlayPlayerSettings.streamAutoPlayMode == StreamAutoPlayMode.SEMI_AUTOMATIC) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    val priorityAddonNames = addonUiState.addons
+                        .enabledAddons()
+                        .mapNotNull { addon ->
+                            addon.manifest
+                                ?.takeIf { manifest -> manifest.resources.any { resource -> resource.name == "stream" } }
+                                ?.name
+                        }
+                        .distinct()
+                    val configuredPriority = autoPlayPlayerSettings.streamAutoPlayAddonPriority
+                        .filter { it in priorityAddonNames }
+                    SettingsNavigationRow(
+                        title = "Semi-auto add-on priority",
+                        description = if (configuredPriority.isEmpty()) {
+                            "Use enabled add-on order; tap to customise"
+                        } else {
+                            configuredPriority.take(3).joinToString(" → ")
+                        },
+                        isTablet = isTablet,
+                        onClick = { showAutoPlayAddonPriorityDialog = true },
+                    )
                 }
                 if (pluginsEnabled && autoPlayPlayerSettings.streamAutoPlaySource != StreamAutoPlaySource.INSTALLED_ADDONS_ONLY) {
                     SettingsGroupDivider(isTablet = isTablet)
