@@ -38,10 +38,19 @@ data class SyncCatalogItem(
 )
 
 @Serializable
+data class SyncAddonLayoutPreference(
+    @SerialName("addon_id") val addonId: String,
+    val mode: String = HomeAddonLayoutMode.NORMAL.storageValue,
+    val order: Int = 0,
+    @SerialName("anchor_order") val anchorOrder: Int = 0,
+)
+
+@Serializable
 data class SyncHomeCatalogPayload(
     @SerialName("show_catalog_type") val showCatalogType: Boolean = true,
     @SerialName("hide_unreleased_content") val hideUnreleasedContent: Boolean = false,
     val items: List<SyncCatalogItem> = emptyList(),
+    @SerialName("addon_layouts") val addonLayouts: List<SyncAddonLayoutPreference>? = null,
 )
 
 @Serializable
