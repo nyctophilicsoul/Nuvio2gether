@@ -14,6 +14,36 @@ object StreamAutoPlayPolicy {
         }
     }
 
+    /**
+     * Applies the configured source mode and per-provider allow-lists without reordering streams.
+     * Keep this shared so normal autoplay, quality-first selection and dead-link fallback agree.
+     */
+    fun filterEligibleSources(
+        streams: List<StreamItem>,
+        source: StreamAutoPlaySource,
+        installedAddonNames: Set<String>,
+        selectedAddons: Set<String>,
+        selectedPlugins: Set<String>,
+    ): List<StreamItem> {
+        val sourceScopedStreams = when (source) {
+            StreamAutoPlaySource.ALL_SOURCES -> streams
+            StreamAutoPlaySource.INSTALLED_ADDONS_ONLY ->
+                streams.filter { it.serverTarget != null || it.addonName in installedAddonNames }
+            StreamAutoPlaySource.ENABLED_PLUGINS_ONLY ->
+                streams.filter { it.addonName !in installedAddonNames }
+        }
+
+        return sourceScopedStreams.filter { stream ->
+            when {
+                stream.serverTarget != null -> true
+                stream.addonName in installedAddonNames ->
+                    selectedAddons.isEmpty() || stream.addonName in selectedAddons
+                else ->
+                    selectedPlugins.isEmpty() || stream.addonName in selectedPlugins
+            }
+        }
+    }
+
     fun isRegexSelectionConfigured(regexPattern: String): Boolean {
         val pattern = regexPattern.trim()
         if (pattern.isEmpty() || !pattern.any { it.isLetterOrDigit() }) return false
