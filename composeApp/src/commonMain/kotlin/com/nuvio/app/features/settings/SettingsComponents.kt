@@ -591,7 +591,7 @@ internal fun HomescreenCatalogRow(
                     ) { Text("Pin top") }
                     TextButton(
                         onClick = { onRowPlacementChange(HomeCatalogRowPlacement.PINNED_BOTTOM) },
-                        enabled = item.rowPlacement != HomeCatalogRowPlacement.PINNED_BOTTOM,
+                        enabled = item.rowPlacement != HomeCatalogRowPlacement.PINNED_BOTTOM && !item.isPinnedToTop,
                     ) { Text("Pin bottom") }
                 }
             }
