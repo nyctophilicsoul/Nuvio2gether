@@ -18,7 +18,7 @@ object StreamAutoPlayPolicy {
      * Applies the configured source mode and per-provider allow-lists without reordering streams.
      * Keep this shared so normal autoplay, quality-first selection and dead-link fallback agree.
      */
-    fun filterEligibleSources(
+    internal fun filterEligibleSources(
         streams: List<StreamItem>,
         source: StreamAutoPlaySource,
         installedAddonNames: Set<String>,
