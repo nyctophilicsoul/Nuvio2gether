@@ -34,11 +34,39 @@ data class HomeCatalogSettingsItem(
         get() = customTitle.ifBlank { defaultTitle }
 }
 
+enum class HomeAddonLayoutMode(val storageValue: String) {
+    NORMAL("normal"),
+    LOCKED("locked"),
+    PINNED_TOP("pinned_top"),
+    PINNED_BOTTOM("pinned_bottom");
+
+    companion object {
+        fun fromStorage(value: String?): HomeAddonLayoutMode =
+            values().firstOrNull { it.storageValue == value } ?: NORMAL
+    }
+}
+
+data class HomeAddonLayoutItem(
+    val addonId: String,
+    val addonName: String,
+    val catalogCount: Int,
+    val mode: HomeAddonLayoutMode,
+    val order: Int,
+    val anchorOrder: Int,
+)
+
+internal data class HomeAddonLayoutPreference(
+    val mode: HomeAddonLayoutMode,
+    val order: Int,
+    val anchorOrder: Int,
+)
+
 data class HomeCatalogSettingsUiState(
     val heroEnabled: Boolean = true,
     val showCatalogType: Boolean = true,
     val hideUnreleasedContent: Boolean = false,
     val items: List<HomeCatalogSettingsItem> = emptyList(),
+    val addonGroups: List<HomeAddonLayoutItem> = emptyList(),
 ) {
     val signature: String
         get() = buildString {
@@ -53,6 +81,10 @@ data class HomeCatalogSettingsUiState(
                     "${item.key}:${item.order}:${item.enabled}:${item.heroSourceEnabled}:${item.customTitle}"
                 }
             )
+            append('|')
+            append(addonGroups.joinToString(separator = "|") { group ->
+                "${group.addonId}:${group.mode}:${group.order}:${group.anchorOrder}"
+            })
         }
 }
 
@@ -68,6 +100,7 @@ internal data class HomeCatalogSettingsSnapshot(
     val showCatalogType: Boolean,
     val hideUnreleasedContent: Boolean,
     val preferences: Map<String, HomeCatalogPreference>,
+    val addonLayouts: Map<String, HomeAddonLayoutPreference> = emptyMap(),
 )
 
 @Serializable
@@ -80,11 +113,20 @@ private data class StoredHomeCatalogPreference(
 )
 
 @Serializable
+private data class StoredHomeAddonLayoutPreference(
+    val addonId: String,
+    val mode: String = HomeAddonLayoutMode.NORMAL.storageValue,
+    val order: Int = 0,
+    val anchorOrder: Int = 0,
+)
+
+@Serializable
 private data class StoredHomeCatalogSettingsPayload(
     val heroEnabled: Boolean = true,
     val showCatalogType: Boolean = true,
     val hideUnreleasedContent: Boolean = false,
     val items: List<StoredHomeCatalogPreference> = emptyList(),
+    val addonLayouts: List<StoredHomeAddonLayoutPreference> = emptyList(),
 )
 
 object HomeCatalogSettingsRepository {
@@ -112,6 +154,7 @@ object HomeCatalogSettingsRepository {
     private var heroEnabled = true
     private var showCatalogType = true
     private var hideUnreleasedContent = false
+    private var addonLayouts: Map<String, StoredHomeAddonLayoutPreference> = emptyMap()
 
     fun onProfileChanged() {
         hasLoaded = false
@@ -119,6 +162,7 @@ object HomeCatalogSettingsRepository {
         heroEnabled = true
         showCatalogType = true
         hideUnreleasedContent = false
+        addonLayouts = emptyMap()
         definitions = emptyList()
         collectionDefinitions = emptyList()
         lastCatalogSync = null
@@ -136,6 +180,7 @@ object HomeCatalogSettingsRepository {
         heroEnabled = true
         showCatalogType = true
         hideUnreleasedContent = false
+        addonLayouts = emptyMap()
         _uiState.value = HomeCatalogSettingsUiState()
     }
 
@@ -188,6 +233,13 @@ object HomeCatalogSettingsRepository {
                     enabled = value.enabled,
                     heroSourceEnabled = value.heroSourceEnabled,
                     order = value.order,
+                )
+            },
+            addonLayouts = addonLayouts.mapValues { (_, value) ->
+                HomeAddonLayoutPreference(
+                    mode = HomeAddonLayoutMode.fromStorage(value.mode),
+                    order = value.order,
+                    anchorOrder = value.anchorOrder,
                 )
             },
         )
@@ -245,12 +297,49 @@ object HomeCatalogSettingsRepository {
         }
     }
 
+    fun setAddonLayoutMode(addonId: String, mode: HomeAddonLayoutMode) {
+        ensureLoaded()
+        if (addonId.isBlank()) return
+        val addonDefinitions = definitions.filter { definition ->
+            !ServerCatalog.isServerKey(definition.key) && definition.addonGroupId() == addonId
+        }
+        if (addonDefinitions.isEmpty()) return
+
+        if (mode == HomeAddonLayoutMode.NORMAL) {
+            if (addonId !in addonLayouts) return
+            addonLayouts = addonLayouts - addonId
+        } else {
+            val firstOrder = addonDefinitions.minOfOrNull { definition ->
+                preferences[definition.key]?.order ?: Int.MAX_VALUE
+            }?.takeIf { it != Int.MAX_VALUE } ?: _uiState.value.items
+                .filterNot { it.isCollection }
+                .filter { it.key in addonDefinitions.map(HomeCatalogDefinition::key) }
+                .minOfOrNull(HomeCatalogSettingsItem::order)
+                ?: 0
+            val existing = addonLayouts[addonId]
+            addonLayouts = addonLayouts + (
+                addonId to StoredHomeAddonLayoutPreference(
+                    addonId = addonId,
+                    mode = mode.storageValue,
+                    order = existing?.order ?: firstOrder,
+                    anchorOrder = existing?.anchorOrder ?: firstOrder,
+                )
+            )
+        }
+
+        publish()
+        persist()
+        HomeRepository.applyCurrentSettings()
+        HomeCatalogSettingsSyncService.triggerPush()
+    }
+
     fun resetToDefaults() {
         ensureLoaded()
         heroEnabled = true
         showCatalogType = true
         hideUnreleasedContent = false
         preferences = emptyMap()
+        addonLayouts = emptyMap()
         normalizePreferences()
         publish()
         persist()
@@ -302,6 +391,7 @@ object HomeCatalogSettingsRepository {
             showCatalogType = parsedPayload.showCatalogType
             hideUnreleasedContent = parsedPayload.hideUnreleasedContent
             preferences = parsedPayload.items.associateBy { it.key }
+            addonLayouts = parsedPayload.addonLayouts.associateBy { it.addonId }
             publish()
             return
         }
@@ -311,6 +401,7 @@ object HomeCatalogSettingsRepository {
         }.getOrDefault(emptyList())
 
         preferences = legacyItems.associateBy { it.key }
+        addonLayouts = emptyMap()
         publish()
     }
 
@@ -396,12 +487,31 @@ object HomeCatalogSettingsRepository {
 
         val items = (catalogItems + collectionItems)
             .sortedBy { it.order }
+        val addonGroups = definitions
+            .filterNot { ServerCatalog.isServerKey(it.key) }
+            .groupBy(HomeCatalogDefinition::addonGroupId)
+            .map { (addonId, addonDefinitions) ->
+                val firstOrder = addonDefinitions.minOfOrNull { definition ->
+                    preferences[definition.key]?.order ?: Int.MAX_VALUE
+                }?.takeIf { it != Int.MAX_VALUE } ?: 0
+                val storedLayout = addonLayouts[addonId]
+                HomeAddonLayoutItem(
+                    addonId = addonId,
+                    addonName = addonDefinitions.first().addonName,
+                    catalogCount = addonDefinitions.size,
+                    mode = HomeAddonLayoutMode.fromStorage(storedLayout?.mode),
+                    order = storedLayout?.order ?: firstOrder,
+                    anchorOrder = storedLayout?.anchorOrder ?: firstOrder,
+                )
+            }
+            .sortedWith(compareBy<HomeAddonLayoutItem> { it.order }.thenBy { it.addonName.lowercase() })
 
         _uiState.value = HomeCatalogSettingsUiState(
             heroEnabled = heroEnabled,
             showCatalogType = showCatalogType,
             hideUnreleasedContent = hideUnreleasedContent,
             items = items,
+            addonGroups = addonGroups,
         )
     }
 
@@ -413,6 +523,9 @@ object HomeCatalogSettingsRepository {
                     showCatalogType = showCatalogType,
                     hideUnreleasedContent = hideUnreleasedContent,
                     items = preferences.values.sortedBy { it.order },
+                    addonLayouts = addonLayouts.values.sortedWith(
+                        compareBy<StoredHomeAddonLayoutPreference> { it.order }.thenBy { it.addonId },
+                    ),
                 ),
             ),
         )
@@ -511,6 +624,16 @@ object HomeCatalogSettingsRepository {
             showCatalogType = showCatalogType,
             hideUnreleasedContent = hideUnreleasedContent,
             items = items,
+            addonLayouts = addonLayouts.values
+                .sortedWith(compareBy<StoredHomeAddonLayoutPreference> { it.order }.thenBy { it.addonId })
+                .map { stored ->
+                    SyncAddonLayoutPreference(
+                        addonId = stored.addonId,
+                        mode = stored.mode,
+                        order = stored.order,
+                        anchorOrder = stored.anchorOrder,
+                    )
+                },
         )
     }
 
@@ -518,6 +641,18 @@ object HomeCatalogSettingsRepository {
         ensureLoaded()
         showCatalogType = payload.showCatalogType
         hideUnreleasedContent = payload.hideUnreleasedContent
+        payload.addonLayouts?.let { remoteLayouts ->
+            addonLayouts = remoteLayouts
+                .filter { it.addonId.isNotBlank() }
+                .associate { layout ->
+                    layout.addonId to StoredHomeAddonLayoutPreference(
+                        addonId = layout.addonId,
+                        mode = HomeAddonLayoutMode.fromStorage(layout.mode).storageValue,
+                        order = layout.order,
+                        anchorOrder = layout.anchorOrder,
+                    )
+                }
+        }
         if (payload.items.isNotEmpty()) {
             val existingHeroState = preferences.mapValues { it.value.heroSourceEnabled }
             val remotePreferences = payload.items.associate { item ->
@@ -601,6 +736,8 @@ object HomeCatalogSettingsRepository {
         val suffix = ":$type:$catalogId"
         return key.removeSuffix(suffix)
     }
+
+    private fun HomeCatalogDefinition.addonGroupId(): String = addonIdForSync()
 
     private fun SyncCatalogItem.preferenceKey(): String =
         key.ifBlank {
