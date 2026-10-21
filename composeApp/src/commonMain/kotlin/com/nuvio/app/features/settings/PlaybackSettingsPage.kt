@@ -972,10 +972,12 @@ private fun PlaybackSettingsSection(
                         .filter { it in priorityAddonNames }
                     SettingsNavigationRow(
                         title = "Semi-auto add-on priority",
-                        description = if (configuredPriority.isEmpty()) {
-                            "Use enabled add-on order; tap to customise"
-                        } else {
-                            configuredPriority.take(3).joinToString(" → ")
+                        description = when {
+                            autoPlayPlayerSettings.streamAutoPlaySource == StreamAutoPlaySource.ENABLED_PLUGINS_ONLY ->
+                                "Saved for when add-ons are included in source scope"
+                            configuredPriority.isEmpty() ->
+                                "Use enabled add-on order; tap to customise"
+                            else -> configuredPriority.take(3).joinToString(" → ")
                         },
                         isTablet = isTablet,
                         onClick = { showAutoPlayAddonPriorityDialog = true },
