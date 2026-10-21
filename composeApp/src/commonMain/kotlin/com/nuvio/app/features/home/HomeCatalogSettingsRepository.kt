@@ -306,6 +306,7 @@ object HomeCatalogSettingsRepository {
             !ServerCatalog.isServerKey(definition.key) && definition.addonGroupId() == addonId
         }
         if (addonDefinitions.isEmpty()) return
+        if (mode != HomeAddonLayoutMode.NORMAL && addonLayouts[addonId]?.mode == mode.storageValue) return
 
         if (mode == HomeAddonLayoutMode.NORMAL) {
             if (addonId !in addonLayouts) return
