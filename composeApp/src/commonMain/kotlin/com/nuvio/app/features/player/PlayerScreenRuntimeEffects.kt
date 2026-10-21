@@ -128,14 +128,36 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
                 switchToSource(next)
             },
             onExhausted = {
-                errorMessage = errorMessage ?: "This source did not start and no alternate sources remain."
+                val selectedHeight = args.semiAutoSelectedQuality?.targetHeight
+                errorMessage = errorMessage ?: if (selectedHeight != null) {
+                    "No source started at ${selectedHeight}p or any lower eligible quality."
+                } else {
+                    "This source did not start and no alternate sources remain."
+                }
+                deadLinkStatusMessage = if (selectedHeight != null) {
+                    "Fallback exhausted · ${selectedHeight}p and lower qualities"
+                } else {
+                    "Fallback exhausted · no alternate sources"
+                }
                 controlsVisible = !playerControlsLocked
             },
             sourceDiscoveryLoading = { PlayerStreamsRepository.isSourceDiscoveryLoading() },
             preserveCandidateOrder = { args.semiAutoSelectedQuality != null },
             onDeadLink = { failed, stableIdentityKey ->
                 PlayerStreamsRepository.pruneDeadSource(failed, stableIdentityKey)
-                deadLinkStatusMessage = "Skipping unavailable source · ${failed.addonName} · ${failed.streamLabel}"
+                val selectedHeight = args.semiAutoSelectedQuality?.targetHeight
+                val actualHeight = QualityFirstAutoPlayPolicy.detectQualityHeight(failed)
+                val qualityLabel = when {
+                    selectedHeight == null || actualHeight == null -> null
+                    actualHeight == selectedHeight -> "${actualHeight}p"
+                    actualHeight < selectedHeight -> "${actualHeight}p fallback"
+                    else -> "${actualHeight}p"
+                }
+                deadLinkStatusMessage = buildString {
+                    append("Skipping unavailable source")
+                    if (qualityLabel != null) append(" · ").append(qualityLabel)
+                    append(" · ").append(failed.addonName).append(" · ").append(failed.streamLabel)
+                }
             },
         )
     }
