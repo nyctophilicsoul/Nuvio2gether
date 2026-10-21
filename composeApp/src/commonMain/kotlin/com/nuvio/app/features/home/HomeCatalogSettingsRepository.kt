@@ -306,39 +306,53 @@ object HomeCatalogSettingsRepository {
             !ServerCatalog.isServerKey(definition.key) && definition.addonGroupId() == addonId
         }
         if (addonDefinitions.isEmpty()) return
-        if (mode != HomeAddonLayoutMode.NORMAL && addonLayouts[addonId]?.mode == mode.storageValue) return
+        val existing = addonLayouts[addonId]
+        if (HomeAddonLayoutMode.fromStorage(existing?.mode) == mode && existing != null) return
 
-        if (mode == HomeAddonLayoutMode.NORMAL) {
-            if (addonId !in addonLayouts) return
-            addonLayouts = addonLayouts - addonId
-        } else {
-            val addonKeys = addonDefinitions.mapTo(mutableSetOf(), HomeCatalogDefinition::key)
-            val storedFirstOrder = addonDefinitions.minOfOrNull { definition ->
-                preferences[definition.key]?.order ?: Int.MAX_VALUE
-            }?.takeIf { it != Int.MAX_VALUE }
-            val visibleFirstOrder = _uiState.value.items
-                .filter { it.key in addonKeys }
-                .minOfOrNull(HomeCatalogSettingsItem::order)
-            val firstOrder = storedFirstOrder ?: visibleFirstOrder ?: 0
-            val existing = addonLayouts[addonId]
-            val anchorOrder = if (
-                mode == HomeAddonLayoutMode.LOCKED &&
-                existing?.mode != HomeAddonLayoutMode.LOCKED.storageValue
-            ) {
-                firstOrder
-            } else {
-                existing?.anchorOrder ?: firstOrder
-            }
-            addonLayouts = addonLayouts + (
-                addonId to StoredHomeAddonLayoutPreference(
-                    addonId = addonId,
-                    mode = mode.storageValue,
-                    order = existing?.order ?: firstOrder,
-                    anchorOrder = anchorOrder,
-                )
+        val firstOrder = existing?.order ?: _uiState.value.addonGroups
+            .firstOrNull { it.addonId == addonId }?.order ?: 0
+        val firstRowOrder = addonDefinitions.minOfOrNull { definition ->
+            preferences[definition.key]?.order ?: Int.MAX_VALUE
+        }?.takeIf { it != Int.MAX_VALUE } ?: firstOrder
+        val anchorOrder = if (
+            mode == HomeAddonLayoutMode.LOCKED &&
+            HomeAddonLayoutMode.fromStorage(existing?.mode) != HomeAddonLayoutMode.LOCKED
+        ) firstRowOrder else existing?.anchorOrder ?: firstRowOrder
+
+        // Keep the add-on's group order even when its pin/lock mode is NORMAL.
+        addonLayouts = addonLayouts + (
+            addonId to StoredHomeAddonLayoutPreference(
+                addonId = addonId,
+                mode = mode.storageValue,
+                order = firstOrder,
+                anchorOrder = anchorOrder,
+            )
+        )
+        publish()
+        persist()
+        HomeRepository.applyCurrentSettings()
+        HomeCatalogSettingsSyncService.triggerPush()
+    }
+
+    fun moveAddonGroup(fromIndex: Int, toIndex: Int) {
+        ensureLoaded()
+        val groups = _uiState.value.addonGroups
+        if (fromIndex !in groups.indices || toIndex !in groups.indices || fromIndex == toIndex) return
+
+        val reordered = groups.toMutableList().apply {
+            add(toIndex, removeAt(fromIndex))
+        }
+        val currentLayouts = addonLayouts.toMutableMap()
+        reordered.forEachIndexed { index, group ->
+            val existing = currentLayouts[group.addonId]
+            currentLayouts[group.addonId] = StoredHomeAddonLayoutPreference(
+                addonId = group.addonId,
+                mode = existing?.mode ?: HomeAddonLayoutMode.NORMAL.storageValue,
+                order = index,
+                anchorOrder = existing?.anchorOrder ?: index,
             )
         }
-
+        addonLayouts = currentLayouts
         publish()
         persist()
         HomeRepository.applyCurrentSettings()
