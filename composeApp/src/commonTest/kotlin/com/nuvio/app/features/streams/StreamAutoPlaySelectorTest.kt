@@ -9,6 +9,49 @@ import kotlin.test.assertTrue
 class StreamAutoPlaySelectorTest {
 
     @Test
+    fun `shared source filtering honors provider allow-lists and preserves order`() {
+        val addonA = stream(addonName = "AddonA", url = "https://example.com/addon-a.m3u8")
+        val addonB = stream(addonName = "AddonB", url = "https://example.com/addon-b.m3u8")
+        val pluginA = stream(addonName = "PluginA", url = "https://example.com/plugin-a.m3u8")
+        val pluginB = stream(addonName = "PluginB", url = "https://example.com/plugin-b.m3u8")
+        val streams = listOf(pluginA, addonB, pluginB, addonA)
+        val installedAddons = setOf("AddonA", "AddonB")
+        val selectedAddons = setOf("AddonB")
+        val selectedPlugins = setOf("PluginB")
+
+        assertEquals(
+            listOf(addonB),
+            StreamAutoPlayPolicy.filterEligibleSources(
+                streams = streams,
+                source = StreamAutoPlaySource.INSTALLED_ADDONS_ONLY,
+                installedAddonNames = installedAddons,
+                selectedAddons = selectedAddons,
+                selectedPlugins = selectedPlugins,
+            ),
+        )
+        assertEquals(
+            listOf(pluginB),
+            StreamAutoPlayPolicy.filterEligibleSources(
+                streams = streams,
+                source = StreamAutoPlaySource.ENABLED_PLUGINS_ONLY,
+                installedAddonNames = installedAddons,
+                selectedAddons = selectedAddons,
+                selectedPlugins = selectedPlugins,
+            ),
+        )
+        assertEquals(
+            listOf(addonB, pluginB),
+            StreamAutoPlayPolicy.filterEligibleSources(
+                streams = streams,
+                source = StreamAutoPlaySource.ALL_SOURCES,
+                installedAddonNames = installedAddons,
+                selectedAddons = selectedAddons,
+                selectedPlugins = selectedPlugins,
+            ),
+        )
+    }
+
+    @Test
     fun `bingeGroup-first selects matching stream before first stream mode`() {
         val first = stream(
             addonName = "AddonA",
