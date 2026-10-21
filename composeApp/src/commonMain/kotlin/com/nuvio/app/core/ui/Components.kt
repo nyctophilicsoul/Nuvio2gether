@@ -50,6 +50,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -174,6 +175,7 @@ fun NuvioScreenHeader(
             verticalAlignment = Alignment.Bottom,
         ) {
             Row(
+                modifier = Modifier.weight(1f),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(tokens.spacing.controlGap),
             ) {
@@ -187,6 +189,7 @@ fun NuvioScreenHeader(
                     }
                 }
                 AnimatedContent(
+                    modifier = Modifier.weight(1f),
                     targetState = title,
                     transitionSpec = { fadeIn() togetherWith fadeOut() },
                     label = "screen_header_title",
@@ -195,6 +198,8 @@ fun NuvioScreenHeader(
                         text = currentTitle,
                         style = MaterialTheme.typography.displayLarge,
                         color = tokens.colors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
