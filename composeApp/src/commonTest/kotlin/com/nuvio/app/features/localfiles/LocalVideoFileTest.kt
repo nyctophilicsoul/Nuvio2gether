@@ -30,7 +30,7 @@ class LocalVideoFileTest {
             localVideoMatchKey("A Movie.mkv", 1024L),
         )
         assertEquals(
-            localVideoMatchKey("A Movie.mkv", 1024L),
+            localVideoMatchKey("nested/path/A Movie.mkv", 1024L),
             localVideoMatchKey("A Movie.mkv", 1024L),
         )
     }
