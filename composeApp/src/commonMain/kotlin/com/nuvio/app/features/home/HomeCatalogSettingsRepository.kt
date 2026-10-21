@@ -425,7 +425,17 @@ object HomeCatalogSettingsRepository {
             .filterNot { ServerCatalog.isServerKey(it.key) }
             .associate { it.key to it.addonGroupId() }
         val firstIndexByAddon = orderedKeys.withIndex().mapNotNull { (index, key) ->
-            addonIdByKey[key]?.let { it to index }
+            val addonId = addonIdByKey[key] ?: return@mapNotNull null
+            val row = preferences[key] ?: return@mapNotNull null
+            val groupMode = HomeAddonLayoutMode.fromStorage(addonLayouts[addonId]?.mode)
+            if (
+                row.rowPlacement != HomeCatalogRowPlacement.NORMAL.storageValue ||
+                groupMode == HomeAddonLayoutMode.PINNED_TOP ||
+                groupMode == HomeAddonLayoutMode.PINNED_BOTTOM
+            ) {
+                return@mapNotNull null
+            }
+            addonId to index
         }.groupBy({ it.first }, { it.second })
             .mapValues { (_, indexes) -> indexes.minOrNull() ?: Int.MAX_VALUE }
         val updatedLayouts = addonLayouts.toMutableMap()
