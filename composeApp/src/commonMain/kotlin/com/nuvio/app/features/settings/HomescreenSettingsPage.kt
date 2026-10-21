@@ -426,9 +426,19 @@ private fun HomescreenCatalogList(
             fromItem.addonLayoutMode != HomeAddonLayoutMode.NORMAL
         val toGrouped = toItem?.addonId != null &&
             toItem.addonLayoutMode != HomeAddonLayoutMode.NORMAL
-        if ((fromGrouped || toGrouped) &&
-            !(fromGrouped && toGrouped && fromItem?.addonId == toItem?.addonId)
-        ) {
+        val rangeStart = minOf(from.index, to.index).coerceAtLeast(0)
+        val rangeEnd = maxOf(from.index, to.index).coerceAtMost(items.lastIndex)
+        val crossedGroupedBoundary = rangeStart <= rangeEnd && items
+            .subList(rangeStart, rangeEnd + 1)
+            .any { it.addonId != null && it.addonLayoutMode != HomeAddonLayoutMode.NORMAL }
+        val moveStaysWithinSameGroup = fromGrouped && toGrouped &&
+            fromItem?.addonId == toItem?.addonId &&
+            rangeStart <= rangeEnd &&
+            items.subList(rangeStart, rangeEnd + 1).all {
+                it.addonId == fromItem?.addonId &&
+                    it.addonLayoutMode != HomeAddonLayoutMode.NORMAL
+            }
+        if (crossedGroupedBoundary && !moveStaysWithinSameGroup) {
             onPinnedDragAttempt()
             return@rememberReorderableLazyListState
         }
