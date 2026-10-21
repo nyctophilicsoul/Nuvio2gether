@@ -465,7 +465,9 @@ private fun HomescreenCatalogList(
                 it.addonId == fromItem?.addonId &&
                     it.addonLayoutMode != HomeAddonLayoutMode.NORMAL
             }
-        if (crossedGroupedBoundary && !moveStaysWithinSameGroup) {
+        // Collections are independent layout entries and may move across add-on groups.
+        // Catalog rows remain grouped unless the drag stays within the same locked/pinned group.
+        if (crossedGroupedBoundary && !moveStaysWithinSameGroup && fromItem?.isCollection != true) {
             onPinnedDragAttempt()
             return@rememberReorderableLazyListState
         }
