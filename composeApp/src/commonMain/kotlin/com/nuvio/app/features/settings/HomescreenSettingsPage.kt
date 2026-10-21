@@ -419,6 +419,17 @@ private fun HomescreenCatalogList(
         val fromItem = items.getOrNull(from.index)
         val toItem = items.getOrNull(to.index)
         if (fromItem?.isPinnedToTop == true || toItem?.isPinnedToTop == true) {
+            onPinnedDragAttempt()
+            return@rememberReorderableLazyListState
+        }
+        val fromGrouped = fromItem?.addonId != null &&
+            fromItem.addonLayoutMode != HomeAddonLayoutMode.NORMAL
+        val toGrouped = toItem?.addonId != null &&
+            toItem.addonLayoutMode != HomeAddonLayoutMode.NORMAL
+        if ((fromGrouped || toGrouped) &&
+            !(fromGrouped && toGrouped && fromItem?.addonId == toItem?.addonId)
+        ) {
+            onPinnedDragAttempt()
             return@rememberReorderableLazyListState
         }
         HomeCatalogSettingsRepository.moveByIndex(from.index, to.index)
