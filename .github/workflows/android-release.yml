@@ -1,3 +1,4 @@
+# Refresh workflow discovery in the fork; no runtime behavior changed.
 name: Build Mobile Release
 
 on:
