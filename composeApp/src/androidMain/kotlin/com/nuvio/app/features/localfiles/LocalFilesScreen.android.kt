@@ -70,13 +70,11 @@ actual fun LocalFilesScreen(
     var folders by remember(context) { mutableStateOf(loadTreeUris(context)) }
     var deviceFiles by remember { mutableStateOf(emptyList<LocalVideoFile>()) }
     var folderFiles by remember { mutableStateOf(emptyList<LocalVideoFile>()) }
-    var isLoading by remember { mutableStateOf(false) }
+    var isDeviceLoading by remember { mutableStateOf(false) }
+    var isFolderLoading by remember { mutableStateOf(false) }
+    val isLoading = isDeviceLoading || isFolderLoading
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var deviceScanRequest by remember { mutableIntStateOf(0) }
-    val videoPermission = remember {
-        if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_VIDEO
-        else Manifest.permission.READ_EXTERNAL_STORAGE
-    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
@@ -116,7 +114,7 @@ actual fun LocalFilesScreen(
 
     LaunchedEffect(deviceScanRequest) {
         if (deviceScanRequest == 0) return@LaunchedEffect
-        isLoading = true
+        isDeviceLoading = true
         errorMessage = null
         try {
             deviceFiles = withContext(Dispatchers.IO) { queryDeviceVideos(context) }
@@ -125,7 +123,7 @@ actual fun LocalFilesScreen(
         } catch (error: Exception) {
             errorMessage = "Could not scan device videos: ${error.message ?: error::class.simpleName ?: "unknown error"}"
         } finally {
-            isLoading = false
+            isDeviceLoading = false
         }
     }
 
@@ -134,7 +132,7 @@ actual fun LocalFilesScreen(
             folderFiles = emptyList()
             return@LaunchedEffect
         }
-        isLoading = true
+        isFolderLoading = true
         errorMessage = null
         try {
             val result = withContext(Dispatchers.IO) {
@@ -156,7 +154,7 @@ actual fun LocalFilesScreen(
         } catch (error: Exception) {
             errorMessage = "Could not scan selected folders: ${error.message ?: error::class.simpleName ?: "unknown error"}"
         } finally {
-            isLoading = false
+            isFolderLoading = false
         }
     }
 
