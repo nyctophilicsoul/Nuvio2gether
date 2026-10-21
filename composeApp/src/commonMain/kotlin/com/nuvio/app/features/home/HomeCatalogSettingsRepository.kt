@@ -797,6 +797,7 @@ internal fun orderHomeCatalogSettingsItems(
         .sortedWith(compareBy<IndexedValue<HomeCatalogSettingsItem>> { it.value.order }.thenBy { it.index })
     if (original.isEmpty()) return emptyList()
 
+    val originalRankByKey = original.mapIndexed { rank, indexed -> indexed.value.key to rank }.toMap()
     val catalogRowsByAddon = original
         .mapNotNull { indexed ->
             addonIdByCatalogKey[indexed.value.key]?.let { it to indexed.value }
@@ -841,9 +842,9 @@ internal fun orderHomeCatalogSettingsItems(
         if (addonId == null || addonId !in groupedAddonIds) {
             units += UnitEntry(
                 key = item.key,
-                order = item.order,
+                order = originalRankByKey[item.key] ?: Int.MAX_VALUE,
                 tiePriority = 1,
-                originalIndex = indexed.index,
+                originalIndex = originalRankByKey[item.key] ?: indexed.index,
                 rows = listOf(item),
             )
         }
@@ -856,7 +857,7 @@ internal fun orderHomeCatalogSettingsItems(
             key = entry.key,
             order = layout.anchorOrder,
             tiePriority = 0,
-            originalIndex = rows.minOfOrNull { originalIndexByKey[it.key] ?: Int.MAX_VALUE } ?: Int.MAX_VALUE,
+            originalIndex = rows.minOfOrNull { originalRankByKey[it.key] ?: Int.MAX_VALUE } ?: Int.MAX_VALUE,
             rows = rows,
         )
     }
@@ -900,6 +901,7 @@ internal fun orderHomeCatalogDefinitions(
         }
 
     val orderedDefinitions = original.map { it.value }
+    val originalRankByKey = original.mapIndexed { rank, indexed -> indexed.value.key to rank }.toMap()
     val grouped = orderedDefinitions
         .mapNotNull { definition -> groupId(definition)?.let { it to definition } }
         .groupBy(keySelector = { it.first }, valueTransform = { it.second })
@@ -907,7 +909,7 @@ internal fun orderHomeCatalogDefinitions(
     fun layout(addonId: String): HomeAddonLayoutPreference? = snapshot.addonLayouts[addonId]
     fun layoutOrder(addonId: String, rows: List<HomeCatalogDefinition>): Int =
         layout(addonId)?.order ?: (rows.minOfOrNull {
-            snapshot.preferences[it.key]?.order ?: Int.MAX_VALUE
+            originalRankByKey[it.key] ?: Int.MAX_VALUE
         } ?: Int.MAX_VALUE)
 
     val topGroups = grouped.entries
@@ -934,9 +936,9 @@ internal fun orderHomeCatalogDefinitions(
         val addonId = groupId(definition)
         if (addonId == null || addonId !in reservedAddonIds) {
             middleUnits += OrderedUnit(
-                order = snapshot.preferences[definition.key]?.order ?: Int.MAX_VALUE,
+                order = originalRankByKey[definition.key] ?: Int.MAX_VALUE,
                 tiePriority = 1,
-                stableIndex = originalIndexByKey[definition.key] ?: Int.MAX_VALUE,
+                stableIndex = originalRankByKey[definition.key] ?: Int.MAX_VALUE,
                 definitions = listOf(definition),
             )
         }
@@ -951,7 +953,7 @@ internal fun orderHomeCatalogDefinitions(
         middleUnits += OrderedUnit(
             order = stored?.anchorOrder ?: layoutOrder(entry.key, rows),
             tiePriority = 0,
-            stableIndex = rows.minOfOrNull { originalIndexByKey[it.key] ?: Int.MAX_VALUE } ?: Int.MAX_VALUE,
+            stableIndex = rows.minOfOrNull { originalRankByKey[it.key] ?: Int.MAX_VALUE } ?: Int.MAX_VALUE,
             definitions = rows,
         )
     }
