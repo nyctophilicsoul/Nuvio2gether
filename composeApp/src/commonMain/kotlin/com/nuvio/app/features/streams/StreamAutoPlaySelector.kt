@@ -82,21 +82,13 @@ object StreamAutoPlaySelector {
     ): StreamAutoPlayEvaluation {
         if (streams.isEmpty()) return StreamAutoPlayEvaluation()
 
-        val sourceScopedStreams = when (source) {
-            StreamAutoPlaySource.ALL_SOURCES -> streams
-            StreamAutoPlaySource.INSTALLED_ADDONS_ONLY -> streams.filter { it.serverTarget != null || it.addonName in installedAddonNames }
-            StreamAutoPlaySource.ENABLED_PLUGINS_ONLY -> streams.filter { it.addonName !in installedAddonNames }
-        }
-        val candidateStreams = sourceScopedStreams.filter { stream ->
-            val isAddonStream = stream.addonName in installedAddonNames
-            if (stream.serverTarget != null) {
-                true
-            } else if (isAddonStream) {
-                selectedAddons.isEmpty() || stream.addonName in selectedAddons
-            } else {
-                selectedPlugins.isEmpty() || stream.addonName in selectedPlugins
-            }
-        }
+        val candidateStreams = StreamAutoPlayPolicy.filterEligibleSources(
+            streams = streams,
+            source = source,
+            installedAddonNames = installedAddonNames,
+            selectedAddons = selectedAddons,
+            selectedPlugins = selectedPlugins,
+        )
         if (candidateStreams.isEmpty()) return StreamAutoPlayEvaluation()
         if (mode == StreamAutoPlayMode.MANUAL && !bingeGroupOnly) {
             return StreamAutoPlayEvaluation()
@@ -122,9 +114,7 @@ object StreamAutoPlaySelector {
                     },
             )
         }
-        if (mode == StreamAutoPlayMode.MANUAL) {
-            return StreamAutoPlayEvaluation()
-        }
+        // Manual mode already returned above or through the binge-group-only path.
         val preferredStream = if (preferBingeGroupInSelection && targetBingeGroup.isNotEmpty()) {
             candidateStreams.firstOrNull { stream ->
                 stream.behaviorHints.bingeGroup == targetBingeGroup &&
@@ -133,10 +123,7 @@ object StreamAutoPlaySelector {
         } else {
             null
         }
-        val matchingStreams = when (mode) {
-            StreamAutoPlayMode.MANUAL -> emptyList()
-            StreamAutoPlayMode.FIRST_STREAM, StreamAutoPlayMode.SEMI_AUTOMATIC -> candidateStreams
-            StreamAutoPlayMode.REGEX_MATCH -> {
+        val matchingStreams = if (mode == StreamAutoPlayMode.REGEX_MATCH) {
                 val pattern = regexPattern.trim()
 
                 val userRegex = runCatching { Regex(pattern, RegexOption.IGNORE_CASE) }.getOrNull()
@@ -176,7 +163,9 @@ object StreamAutoPlaySelector {
 
                     true
                 }
-            }
+        } else {
+            // Remaining modes are FIRST_STREAM and SEMI_AUTOMATIC.
+            candidateStreams
         }
         if (matchingStreams.isEmpty() && preferredStream == null) return StreamAutoPlayEvaluation()
 
