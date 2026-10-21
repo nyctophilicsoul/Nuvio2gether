@@ -113,6 +113,15 @@ actual fun LocalFilesScreen(
         }
     }
 
+    // Reuse already-granted Android media permission so opening Local Files immediately
+    // loads real MediaStore results. If permission has not been granted, the explicit Scan
+    // device action remains responsible for showing the system permission prompt.
+    LaunchedEffect(Unit) {
+        if (hasVideoLibraryPermission(context)) {
+            deviceScanRequest += 1
+        }
+    }
+
     LaunchedEffect(deviceScanRequest) {
         if (deviceScanRequest == 0) return@LaunchedEffect
         isDeviceLoading = true
