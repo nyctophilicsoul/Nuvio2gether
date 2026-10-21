@@ -217,24 +217,28 @@ internal class DeadLinkStartupMonitor(
             if (!isCurrent(key, expectedGeneration)) return
 
             val debridEnabled = DebridSettingsRepository.snapshot().enabled
-            val eligibleCandidates = discovered.asSequence()
-                // Do not auto-open an external app: it has no in-player startup
-                // signal, so the watchdog cannot know whether it succeeded.
+            // Do not auto-open an external app: it has no in-player startup
+            // signal, so the watchdog cannot know whether it succeeded.
+            val selectableCandidates = discovered.asSequence()
                 .filter { !it.shouldOpenExternally && it.isSelectableForPlayback(debridEnabled) }
+            // Prefer installed add-ons before plugins before deduplicating playback
+            // targets. Otherwise a plugin listed first can hide an equivalent add-on
+            // URL, making the provider-priority rule ineffective for that target.
+            // Semi-auto sequences are already ranked by the user's selected quality;
+            // preserve that order and only deduplicate equivalent playback targets.
+            val orderedCandidates = if (preserveCandidateOrder()) {
+                selectableCandidates
+            } else {
+                selectableCandidates.sortedBy(::deadLinkSourcePriority)
+            }
+            val eligibleCandidates = orderedCandidates
                 .distinctBy { it.playerPlaybackDeduplicationKey() }
                 .filter { candidate ->
                     val candidateKey = candidate.playerSourceIdentityKey()
                     candidateKey != null && candidateKey !in attemptedKeys
                 }
                 .toList()
-            // Semi-auto candidate providers return an explicitly ranked sequence:
-            // selected quality first, then lower tiers. Re-sorting it here used to
-            // discard that ordering and could jump straight to 4K after 1080p failed.
-            val next = if (preserveCandidateOrder()) {
-                eligibleCandidates.firstOrNull()
-            } else {
-                eligibleCandidates.sortedBy(::deadLinkSourcePriority).firstOrNull()
-            }
+            val next = eligibleCandidates.firstOrNull()
 
             if (next != null) {
                 val nextKey = next.playerSourceIdentityKey()
