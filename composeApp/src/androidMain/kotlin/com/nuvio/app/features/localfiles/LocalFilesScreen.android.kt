@@ -192,10 +192,10 @@ actual fun LocalFilesScreen(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             Button(
                 onClick = {
-                    if (ContextCompat.checkSelfPermission(context, videoPermission) == PackageManager.PERMISSION_GRANTED) {
+                    if (hasVideoLibraryPermission(context)) {
                         deviceScanRequest += 1
                     } else {
-                        permissionLauncher.launch(videoPermission)
+                        permissionLauncher.launch(videoLibraryPermissions())
                     }
                 },
                 modifier = Modifier.weight(1f),
@@ -219,12 +219,12 @@ actual fun LocalFilesScreen(
                     Icon(Icons.Rounded.FolderOpen, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Text(label, modifier = Modifier.weight(1f).padding(start = 8.dp), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
                     IconButton(onClick = {
-                        runCatching {
-                    context.contentResolver.releasePersistableUriPermission(
-                        Uri.parse(uriString),
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                    )
-                }
+                                runCatching {
+                            context.contentResolver.releasePersistableUriPermission(
+                                Uri.parse(uriString),
+                                Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                            )
+                        }
                         val updated = folders - uriString
                         saveTreeUris(context, updated)
                         folders = updated
