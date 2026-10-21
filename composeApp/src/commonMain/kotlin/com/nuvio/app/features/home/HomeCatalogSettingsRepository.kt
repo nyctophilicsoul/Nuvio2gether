@@ -349,7 +349,9 @@ object HomeCatalogSettingsRepository {
                 addonId = group.addonId,
                 mode = existing?.mode ?: HomeAddonLayoutMode.NORMAL.storageValue,
                 order = index,
-                anchorOrder = existing?.anchorOrder ?: index,
+                anchorOrder = if (
+                    HomeAddonLayoutMode.fromStorage(existing?.mode) == HomeAddonLayoutMode.LOCKED
+                ) index else existing?.anchorOrder ?: index,
             )
         }
         addonLayouts = currentLayouts
