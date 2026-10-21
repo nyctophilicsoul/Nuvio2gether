@@ -5,6 +5,7 @@ import com.nuvio.app.features.downloads.DownloadItem
 import com.nuvio.app.features.downloads.DownloadsScreen
 import com.nuvio.app.navigation.DownloadShowRoute
 import com.nuvio.app.navigation.DownloadsRoute
+import com.nuvio.app.navigation.LocalFilesRoute
 import com.nuvio.app.navigation.NuvioNavigator
 
 @Composable
@@ -18,6 +19,7 @@ internal fun DownloadsDestination(
     DownloadsScreen(
         onBack = onBack,
         onOpenDownload = onOpenDownload,
+        onNavigateToLocalFiles = { navController.navigate(LocalFilesRoute()) },
         onNavigateToShow = if (useNativeNavigation) {
             { showId, title -> navController.navigate(DownloadShowRoute(showId, title)) }
         } else {
