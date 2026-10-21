@@ -92,7 +92,7 @@ data class HomeCatalogSettingsUiState(
             append('|')
             append(
                 items.joinToString(separator = "|") { item ->
-                    "${item.key}:${item.order}:${item.enabled}:${item.heroSourceEnabled}:${item.customTitle}"
+                    "${item.key}:${item.order}:${item.enabled}:${item.heroSourceEnabled}:${item.customTitle}:${item.rowPlacement}"
                 }
             )
             append('|')
@@ -418,6 +418,29 @@ object HomeCatalogSettingsRepository {
             updatedPreferences[itemKey] = current.copy(order = index)
         }
         preferences = updatedPreferences
+
+        // Keep group positions aligned with the unified list, so moving a collection
+        // relative to an add-on group is reflected on the actual Home screen.
+        val addonIdByKey = definitions
+            .filterNot { ServerCatalog.isServerKey(it.key) }
+            .associate { it.key to it.addonGroupId() }
+        val firstIndexByAddon = orderedKeys.withIndex().mapNotNull { (index, key) ->
+            addonIdByKey[key]?.let { it to index }
+        }.groupBy({ it.first }, { it.second })
+            .mapValues { (_, indexes) -> indexes.minOrNull() ?: Int.MAX_VALUE }
+        val updatedLayouts = addonLayouts.toMutableMap()
+        firstIndexByAddon.entries.sortedBy { it.value }.forEachIndexed { index, entry ->
+            val existing = updatedLayouts[entry.key]
+            updatedLayouts[entry.key] = StoredHomeAddonLayoutPreference(
+                addonId = entry.key,
+                mode = existing?.mode ?: HomeAddonLayoutMode.NORMAL.storageValue,
+                order = index,
+                anchorOrder = if (
+                    HomeAddonLayoutMode.fromStorage(existing?.mode) == HomeAddonLayoutMode.LOCKED
+                ) index else existing?.anchorOrder ?: index,
+            )
+        }
+        addonLayouts = updatedLayouts
         publish()
         persist()
         HomeRepository.applyCurrentSettings()
