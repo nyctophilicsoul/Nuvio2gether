@@ -166,6 +166,11 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
     }
 
     LaunchedEffect(parentMetaType, parentMetaId) {
+        if (parentMetaType == com.nuvio.app.features.localfiles.LOCAL_FILE_META_TYPE) {
+            playerMeta = null
+            playerMetaVideos = emptyList()
+            return@LaunchedEffect
+        }
         playerMeta = MetaDetailsRepository.peek(parentMetaType, parentMetaId)
         playerMetaVideos = playerMeta?.videos.orEmpty()
         if (playerMetaVideos.isEmpty()) {
