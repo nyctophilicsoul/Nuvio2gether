@@ -54,6 +54,7 @@ import com.nuvio.app.features.servers.ServerPlayback
 import com.nuvio.app.features.servers.serverPlaybackMessage
 import com.nuvio.app.features.streams.QualityFirstAutoPlayPolicy
 import com.nuvio.app.features.streams.StreamAutoPlayMode
+import com.nuvio.app.features.streams.StreamAutoPlayPolicy
 import com.nuvio.app.features.streams.StreamAutoPlayPreferredQuality
 import com.nuvio.app.features.streams.StreamAutoPlaySource
 import com.nuvio.app.features.streams.StreamBehaviorHints
@@ -449,24 +450,13 @@ internal fun StreamDestination(
         playerSettings.streamAutoPlaySelectedPlugins,
         installedAddonNames,
     ) {
-        val sourceScopedStreams = when (playerSettings.streamAutoPlaySource) {
-            StreamAutoPlaySource.ALL_SOURCES -> allQualityStreams
-            StreamAutoPlaySource.INSTALLED_ADDONS_ONLY ->
-                allQualityStreams.filter { it.serverTarget != null || it.addonName in installedAddonNames }
-            StreamAutoPlaySource.ENABLED_PLUGINS_ONLY ->
-                allQualityStreams.filter { it.addonName !in installedAddonNames }
-        }
-        sourceScopedStreams.filter { stream ->
-            if (stream.serverTarget != null) {
-                true
-            } else if (stream.addonName in installedAddonNames) {
-                playerSettings.streamAutoPlaySelectedAddons.isEmpty() ||
-                    stream.addonName in playerSettings.streamAutoPlaySelectedAddons
-            } else {
-                playerSettings.streamAutoPlaySelectedPlugins.isEmpty() ||
-                    stream.addonName in playerSettings.streamAutoPlaySelectedPlugins
-            }
-        }
+        StreamAutoPlayPolicy.filterEligibleSources(
+            streams = allQualityStreams,
+            source = playerSettings.streamAutoPlaySource,
+            installedAddonNames = installedAddonNames,
+            selectedAddons = playerSettings.streamAutoPlaySelectedAddons,
+            selectedPlugins = playerSettings.streamAutoPlaySelectedPlugins,
+        )
     }
     val debridEnabledForQualitySelection = DebridSettingsRepository.snapshot().canResolvePlayableLinks
     val qualitySearchFinished = streamsUiState.requestToken == expectedStreamsRequestToken &&
