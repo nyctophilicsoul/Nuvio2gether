@@ -190,6 +190,33 @@ class HomeAddonLayoutTest {
         )
     }
 
+    @Test
+    fun `individual row pins are removed from addon group and ordered in pin sections`() {
+        val items = listOf(
+            settingItem("A", "one", 0),
+            settingItem("A", "two", 1).copy(rowPlacement = HomeCatalogRowPlacement.PINNED_TOP),
+            HomeCatalogSettingsItem(
+                key = "collection_favorites",
+                defaultTitle = "Favorites",
+                addonName = "Favorites",
+                order = 2,
+                isCollection = true,
+            ),
+            settingItem("B", "one", 3).copy(rowPlacement = HomeCatalogRowPlacement.PINNED_BOTTOM),
+        )
+        val addonIds = items.filterNot { it.isCollection }
+            .associate { it.key to it.key.substringBefore(":movie:") }
+
+        val ordered = orderHomeCatalogSettingsItems(items, addonIds, emptyMap())
+
+        assertEquals(
+            listOf("A:two", "A:one", "collection_favorites", "B:one"),
+            ordered.map(::settingLabel),
+        )
+        assertEquals(1, ordered.count { it.key == "A:two" })
+        assertEquals(1, ordered.count { it.key == "B:one" })
+    }
+
     private fun settingItem(addonId: String, catalogId: String, order: Int) =
         HomeCatalogSettingsItem(
             key = "$addonId:movie:$catalogId",
