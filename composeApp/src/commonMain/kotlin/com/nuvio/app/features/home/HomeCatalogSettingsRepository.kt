@@ -320,7 +320,14 @@ object HomeCatalogSettingsRepository {
                 .minOfOrNull(HomeCatalogSettingsItem::order)
             val firstOrder = storedFirstOrder ?: visibleFirstOrder ?: 0
             val existing = addonLayouts[addonId]
-            val anchorOrder = existing?.anchorOrder ?: firstOrder
+            val anchorOrder = if (
+                mode == HomeAddonLayoutMode.LOCKED &&
+                existing?.mode != HomeAddonLayoutMode.LOCKED.storageValue
+            ) {
+                firstOrder
+            } else {
+                existing?.anchorOrder ?: firstOrder
+            }
             addonLayouts = addonLayouts + (
                 addonId to StoredHomeAddonLayoutPreference(
                     addonId = addonId,
