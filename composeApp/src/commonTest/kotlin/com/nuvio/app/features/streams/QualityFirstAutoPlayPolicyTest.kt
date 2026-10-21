@@ -118,6 +118,33 @@ class QualityFirstAutoPlayPolicyTest {
     }
 
     @Test
+    fun `filename resolution wins over incidental 4K in stream name`() {
+        val stream = stream("provider", "https://example.test/movie", "Movie 4K collection")
+            .copy(behaviorHints = StreamBehaviorHints(filename = "Movie.1920x1080.WEB-DL.mkv"))
+
+        assertEquals(1080, QualityFirstAutoPlayPolicy.detectQualityHeight(stream))
+    }
+
+    @Test
+    fun `selected quality fallback chain never includes a higher resolution`() {
+        val streams = listOf(
+            stream("4K", "https://example.test/4k", "2160p"),
+            stream("1080", "https://example.test/1080", "1080p"),
+            stream("720", "https://example.test/720", "720p"),
+            stream("480", "https://example.test/480", "480p"),
+        )
+
+        assertEquals(
+            listOf("1080", "720", "480"),
+            QualityFirstAutoPlayPolicy.rankCandidatesWithFallback(
+                streams = streams,
+                requestedQuality = StreamAutoPlayPreferredQuality.P1080,
+                debridEnabled = true,
+            ).map { it.addonName },
+        )
+    }
+
+    @Test
     fun `ambiguous HD label is not counted as confirmed 720p`() {
         val streams = listOf(
             stream("ambiguous", "https://a/hd", "HD"),
