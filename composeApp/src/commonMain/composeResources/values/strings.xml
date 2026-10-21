@@ -709,7 +709,7 @@
     <string name="settings_homescreen_limit_reached">%1$s • Limit reached (max %2$d)</string>
     <string name="settings_homescreen_no_sources_selected">No hero sources selected</string>
     <string name="settings_homescreen_not_in_hero">Not in hero</string>
-    <string name="settings_homescreen_pin_to_move_toast">Remove pin to top from collection to move</string>
+    <string name="settings_homescreen_pin_to_move_toast">Remove the pin or group lock to move this row</string>
     <string name="settings_homescreen_pinned">Pinned</string>
     <string name="settings_homescreen_pinned_to_top">Pinned to top</string>
     <string name="settings_homescreen_reorder">Reorder</string>
