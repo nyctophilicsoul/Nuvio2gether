@@ -35,6 +35,7 @@ import com.nuvio.app.features.streams.BingeGroupCacheRepository
 import com.nuvio.app.features.streams.StreamLinkCacheRepository
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamAutoPlaySource
+import com.nuvio.app.features.streams.StreamAutoPlayPolicy
 import com.nuvio.app.features.streams.QualityFirstAutoPlayPolicy
 import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.streams.hasLikelyExpiringPlaybackCredentials
@@ -76,24 +77,13 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
                             .enabledAddons()
                             .mapNotNull { it.manifest?.name }
                             .toSet()
-                        val sourceScoped = when (settings.streamAutoPlaySource) {
-                            StreamAutoPlaySource.ALL_SOURCES -> discovered
-                            StreamAutoPlaySource.INSTALLED_ADDONS_ONLY ->
-                                discovered.filter { it.serverTarget != null || it.addonName in installedAddonNames }
-                            StreamAutoPlaySource.ENABLED_PLUGINS_ONLY ->
-                                discovered.filter { it.addonName !in installedAddonNames }
-                        }
-                        val selectedSources = sourceScoped.filter { stream ->
-                            when {
-                                stream.serverTarget != null -> true
-                                stream.addonName in installedAddonNames ->
-                                    settings.streamAutoPlaySelectedAddons.isEmpty() ||
-                                        stream.addonName in settings.streamAutoPlaySelectedAddons
-                                else ->
-                                    settings.streamAutoPlaySelectedPlugins.isEmpty() ||
-                                        stream.addonName in settings.streamAutoPlaySelectedPlugins
-                            }
-                        }
+                        val selectedSources = StreamAutoPlayPolicy.filterEligibleSources(
+                            streams = discovered,
+                            source = settings.streamAutoPlaySource,
+                            installedAddonNames = installedAddonNames,
+                            selectedAddons = settings.streamAutoPlaySelectedAddons,
+                            selectedPlugins = settings.streamAutoPlaySelectedPlugins,
+                        )
                         val availableSourceNames = selectedSources.map { it.addonName }.distinct()
                         val preferredSourceOrder = settings.streamAutoPlayAddonPriority
                             .filter { it in availableSourceNames } +
