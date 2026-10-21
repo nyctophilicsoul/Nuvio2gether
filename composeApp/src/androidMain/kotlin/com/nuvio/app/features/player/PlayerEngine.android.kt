@@ -351,7 +351,10 @@ private fun ExoPlayerSurface(
             val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
             val videoSource = mediaSourceFactory.createMediaSource(videoMediaItem)
             val audioSource = mediaSourceFactory.createMediaSource(playbackMediaItemFromUrl(sourceAudioUrl))
-            val mergedSource = MergingMediaSource(videoSource, audioSource)
+            // Separate video and audio URLs can have different initial timestamps.
+            // Align their period timestamps so an offset in one source does not become
+            // an audible A/V sync error. Media3 still requires matching period counts.
+            val mergedSource = MergingMediaSource(true, videoSource, audioSource)
             if (startPositionMs != null) {
                 setMediaSource(mergedSource, startPositionMs.coerceAtLeast(0L))
             } else {
