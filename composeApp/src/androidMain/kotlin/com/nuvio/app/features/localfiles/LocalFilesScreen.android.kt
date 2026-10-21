@@ -250,7 +250,7 @@ actual fun LocalFilesScreen(
         if (files.isEmpty() && !isLoading) {
             Text("No videos loaded yet. Scan the device library or choose a folder to grant Nuvio access.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
                 items(files, key = { it.uri }) { file ->
                     val isMatch = preferredMatchKey != null && file.matchKey == preferredMatchKey
                     Card(modifier = Modifier.fillMaxWidth().clickable { onPlay(file) }) {
