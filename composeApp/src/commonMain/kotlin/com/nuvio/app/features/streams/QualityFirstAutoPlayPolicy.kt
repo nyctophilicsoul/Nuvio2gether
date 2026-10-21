@@ -149,18 +149,25 @@ object QualityFirstAutoPlayPolicy {
     }
 
     fun detectQualityHeight(stream: StreamItem): Int? {
-        // Explicit parser fields are more reliable than loose labels such as HD.
         val parsed = stream.clientResolve?.stream?.raw?.parsed
-        val structured = listOfNotNull(parsed?.resolution, parsed?.quality).joinToString(" ")
-        val descriptive = listOf(
-            stream.behaviorHints.filename,
-            stream.name,
-            stream.title,
-            stream.description,
-            parsed?.rawTitle,
-            parsed?.parsedTitle,
-        ).filterNotNull().joinToString(" ")
-        val metadata = if (structured.isNotBlank()) "$structured $descriptive" else descriptive
+
+        // Resolution is the strongest signal. The old implementation concatenated
+        // every metadata field and searched for the highest token, so a title or
+        // description containing "4K" could override a real 1080p filename.
+        parsed?.resolution?.let(::qualityHeightIn)?.let { return it }
+        stream.behaviorHints.filename?.let(::qualityHeightIn)?.let { return it }
+        parsed?.parsedTitle?.let(::qualityHeightIn)?.let { return it }
+        parsed?.rawTitle?.let(::qualityHeightIn)?.let { return it }
+        parsed?.quality?.let(::qualityHeightIn)?.let { return it }
+        stream.name?.let(::qualityHeightIn)?.let { return it }
+        stream.title?.let(::qualityHeightIn)?.let { return it }
+        return stream.description?.let(::qualityHeightIn)
+    }
+
+    private fun qualityHeightIn(metadata: String): Int? {
+        val dimensions = Regex("""(?i)\b\d{3,4}\s*[x×]\s*(4320|2160|1440|1080|720|480|360)\b""")
+            .find(metadata)?.groupValues?.getOrNull(1)?.toIntOrNull()
+        if (dimensions != null) return dimensions
 
         val markers = listOf(
             Regex("""(?i)(?:\b4320p?\b|\b8k\b)""") to 4320,
