@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
@@ -382,11 +381,9 @@ private fun AddonRowOrderSection(
                                             )
                                         }
                                     } else {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Lock,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
+                                        // Keep the saved order read-only without adding a lock icon
+                                        // to every add-on row. The section-level pencil is the edit entry point.
+                                        Spacer(modifier = Modifier.width(40.dp))
                                     }
                                 }
                             }
