@@ -46,6 +46,7 @@ import com.nuvio.app.features.home.HomeAddonLayoutItem
 import com.nuvio.app.features.home.HomeAddonLayoutMode
 import com.nuvio.app.features.home.HomeCatalogSettingsItem
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
+import com.nuvio.app.features.home.HomeCatalogRowPlacement
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_retry
@@ -441,7 +442,10 @@ private fun HomescreenCatalogList(
     ) { from, to ->
         val fromItem = items.getOrNull(from.index)
         val toItem = items.getOrNull(to.index)
-        if (fromItem?.isPinnedToTop == true || toItem?.isPinnedToTop == true) {
+        if (fromItem?.isPinnedToTop == true || toItem?.isPinnedToTop == true ||
+            fromItem?.rowPlacement != HomeCatalogRowPlacement.NORMAL ||
+            toItem?.rowPlacement != HomeCatalogRowPlacement.NORMAL
+        ) {
             onPinnedDragAttempt()
             return@rememberReorderableLazyListState
         }
@@ -461,7 +465,9 @@ private fun HomescreenCatalogList(
                 it.addonId == fromItem?.addonId &&
                     it.addonLayoutMode != HomeAddonLayoutMode.NORMAL
             }
-        if (crossedGroupedBoundary && !moveStaysWithinSameGroup) {
+        // Collections are independent layout entries and may move across add-on groups.
+        // Catalog rows remain grouped unless the drag stays within the same locked/pinned group.
+        if (crossedGroupedBoundary && !moveStaysWithinSameGroup && fromItem?.isCollection != true) {
             onPinnedDragAttempt()
             return@rememberReorderableLazyListState
         }
@@ -480,7 +486,7 @@ private fun HomescreenCatalogList(
                 ReorderableItem(
                     reorderableLazyListState,
                     key = item.key,
-                    enabled = !item.isPinnedToTop,
+                    enabled = !item.isPinnedToTop && item.rowPlacement == HomeCatalogRowPlacement.NORMAL,
                 ) { isDragging ->
                     val elevation by animateDpAsState(if (isDragging) 4.dp else 0.dp)
 
@@ -498,6 +504,7 @@ private fun HomescreenCatalogList(
                                 },
                                 onTitleChange = { HomeCatalogSettingsRepository.setCustomTitle(item.key, it) },
                                 onEnabledChange = { HomeCatalogSettingsRepository.setEnabled(item.key, it) },
+                                onRowPlacementChange = { HomeCatalogSettingsRepository.setRowPlacement(item.key, it) },
                                 dragHandleScope = this@ReorderableItem,
                                 onPinnedDragAttempt = onPinnedDragAttempt,
                             )
