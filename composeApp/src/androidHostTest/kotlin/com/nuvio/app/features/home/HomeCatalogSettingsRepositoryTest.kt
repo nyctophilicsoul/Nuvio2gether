@@ -78,6 +78,26 @@ class HomeCatalogSettingsRepositoryTest {
     }
 
     @Test
+    fun addonGroupLockSurvivesCatalogIdentifierChangesAndLocalReload() {
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(addon(listOf("old", "older"))))
+        HomeCatalogSettingsRepository.setAddonLayoutMode("test", HomeAddonLayoutMode.LOCKED)
+        val initialGroup = HomeCatalogSettingsRepository.uiState.value.addonGroups.single()
+        assertEquals(HomeAddonLayoutMode.LOCKED, initialGroup.mode)
+
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(addon(listOf("new", "latest"))))
+        val refreshedGroup = HomeCatalogSettingsRepository.uiState.value.addonGroups.single()
+        assertEquals("test", refreshedGroup.addonId)
+        assertEquals(HomeAddonLayoutMode.LOCKED, refreshedGroup.mode)
+        assertEquals(initialGroup.anchorOrder, refreshedGroup.anchorOrder)
+
+        HomeCatalogSettingsRepository.clearLocalState()
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(addon(listOf("new", "latest"))))
+        val reloadedGroup = HomeCatalogSettingsRepository.uiState.value.addonGroups.single()
+        assertEquals(HomeAddonLayoutMode.LOCKED, reloadedGroup.mode)
+        assertEquals(initialGroup.anchorOrder, reloadedGroup.anchorOrder)
+    }
+
+    @Test
     fun unchangedCollectionsDoNotRewriteSettings() {
         val collections = listOf(collection())
         HomeCatalogSettingsRepository.syncCollections(collections)
@@ -228,7 +248,7 @@ class HomeCatalogSettingsRepositoryTest {
         assertEquals(settings, HomeCatalogSettingsRepository.uiState.value)
     }
 
-    private fun addon() = ManagedAddon(
+    private fun addon(catalogIds: List<String> = listOf("popular")) = ManagedAddon(
         manifestUrl = "https://example.com/manifest.json",
         manifest = AddonManifest(
             id = "test",
@@ -237,7 +257,9 @@ class HomeCatalogSettingsRepositoryTest {
             version = "1",
             resources = emptyList(),
             types = listOf("movie"),
-            catalogs = listOf(AddonCatalog(type = "movie", id = "popular", name = "Popular")),
+            catalogs = catalogIds.map { catalogId ->
+                AddonCatalog(type = "movie", id = catalogId, name = catalogId)
+            },
             transportUrl = "https://example.com",
         ),
     )
