@@ -196,21 +196,7 @@ object HomeCatalogSettingsRepository {
     private var addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS
     private var upcomingRowKeys: Set<String> = emptySet()
 
-    fun onProfileChanged() {
-        hasLoaded = false
-        preferences = emptyMap()
-        heroEnabled = true
-        showCatalogType = true
-        hideUnreleasedContent = false
-        addonLayouts = emptyMap()
-        addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS
-        upcomingRowKeys = emptySet()
-        definitions = emptyList()
-        collectionDefinitions = emptyList()
-        lastCatalogSync = null
-        lastCollectionSync = null
-        _uiState.value = HomeCatalogSettingsUiState()
-    }
+    fun onProfileChanged() = clearLocalState()
 
     fun clearLocalState() {
         hasLoaded = false
@@ -545,46 +531,27 @@ object HomeCatalogSettingsRepository {
         if (items.isEmpty() || fromIndex !in items.indices || toIndex !in items.indices || fromIndex == toIndex) return
         val fromItem = items[fromIndex]
         val toItem = items[toIndex]
-        val fromPinSection = when {
-            fromItem.rowPlacement == HomeCatalogRowPlacement.PINNED_TOP ||
-                (fromItem.isCollection && fromItem.isPinnedToTop) -> HomeCatalogRowPlacement.PINNED_TOP
-            fromItem.rowPlacement == HomeCatalogRowPlacement.PINNED_BOTTOM -> HomeCatalogRowPlacement.PINNED_BOTTOM
+        fun pinSection(item: HomeCatalogSettingsItem): HomeCatalogRowPlacement = when {
+            item.rowPlacement == HomeCatalogRowPlacement.PINNED_TOP ||
+                (item.isCollection && item.isPinnedToTop) -> HomeCatalogRowPlacement.PINNED_TOP
+            item.rowPlacement == HomeCatalogRowPlacement.PINNED_BOTTOM -> HomeCatalogRowPlacement.PINNED_BOTTOM
             else -> HomeCatalogRowPlacement.NORMAL
         }
-        val toPinSection = when {
-            toItem.rowPlacement == HomeCatalogRowPlacement.PINNED_TOP ||
-                (toItem.isCollection && toItem.isPinnedToTop) -> HomeCatalogRowPlacement.PINNED_TOP
-            toItem.rowPlacement == HomeCatalogRowPlacement.PINNED_BOTTOM -> HomeCatalogRowPlacement.PINNED_BOTTOM
-            else -> HomeCatalogRowPlacement.NORMAL
-        }
-        // Pinned rows can be reordered inside their own section, but never moved
-        // across sections or into the normal/anchored catalog sequence.
+
+        val fromPinSection = pinSection(fromItem)
+        val toPinSection = pinSection(toItem)
+        // Top and bottom pins may be reordered only inside their own section.
         if (fromPinSection != toPinSection) return
-        if (fromPinSection == HomeCatalogRowPlacement.NORMAL &&
-            (fromItem.rowPlacement != HomeCatalogRowPlacement.NORMAL || fromItem.isPinnedToTop)
-        ) return
+
         val start = minOf(fromIndex, toIndex)
         val end = maxOf(fromIndex, toIndex)
-        val crossedPin = items.subList(start, end + 1).any { item ->
-            val itemSection = when {
-                item.rowPlacement == HomeCatalogRowPlacement.PINNED_TOP ||
-                    (item.isCollection && item.isPinnedToTop) -> HomeCatalogRowPlacement.PINNED_TOP
-                item.rowPlacement == HomeCatalogRowPlacement.PINNED_BOTTOM -> HomeCatalogRowPlacement.PINNED_BOTTOM
-                else -> HomeCatalogRowPlacement.NORMAL
-            }
-            itemSection != fromPinSection
+        // A position-pinned row is an anchor, not merely an unpinned row that
+        // avoids add-on grouping. Do not move it or let another row cross it.
+        val crossedPinnedBoundary = items.subList(start, end + 1).any { item ->
+            item.rowPlacement == HomeCatalogRowPlacement.PINNED_POSITION ||
+                pinSection(item) != fromPinSection
         }
-        if (crossedPin) return
-        val crossedManagedGroup = items.subList(start, end + 1).any {
-            it.addonId != null && it.addonLayoutMode != HomeAddonLayoutMode.NORMAL
-        }
-        val staysInsideManagedGroup = fromItem.addonId != null &&
-            fromItem.addonId == toItem.addonId &&
-            fromItem.addonLayoutMode != HomeAddonLayoutMode.NORMAL &&
-            items.subList(start, end + 1).all {
-                it.addonId == fromItem.addonId && it.addonLayoutMode != HomeAddonLayoutMode.NORMAL
-            }
-        if (fromPinSection == HomeCatalogRowPlacement.NORMAL && crossedManagedGroup && !staysInsideManagedGroup && !fromItem.isCollection) return
+        if (crossedPinnedBoundary) return
         val orderedKeys = items.map { it.key }.toMutableList().apply { add(toIndex, removeAt(fromIndex)) }
         persistVisibleOrder(orderedKeys)
         publish()
