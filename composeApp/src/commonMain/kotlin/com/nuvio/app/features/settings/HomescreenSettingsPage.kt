@@ -283,7 +283,11 @@ private fun AddonRowOrderSection(
         title = stringResource(Res.string.settings_homescreen_addon_row_order),
         isTablet = isTablet,
         actions = {
-            IconButton(
+            NuvioActionLabel(
+                text = stringResource(
+                    if (editing) Res.string.settings_homescreen_addon_order_cancel
+                    else Res.string.settings_homescreen_addon_order_edit,
+                ),
                 onClick = {
                     if (editing) {
                         editing = false
@@ -295,15 +299,7 @@ private fun AddonRowOrderSection(
                         editing = true
                     }
                 },
-            ) {
-                Icon(
-                    imageVector = if (editing) Icons.Rounded.Close else Icons.Rounded.Edit,
-                    contentDescription = stringResource(
-                        if (editing) Res.string.settings_homescreen_addon_order_cancel
-                        else Res.string.settings_homescreen_addon_order_edit,
-                    ),
-                )
-            }
+            )
         },
     ) {
         SettingsGroup(isTablet = isTablet) {
