@@ -1118,7 +1118,7 @@ internal fun orderHomeCatalogDefinitions(
     addonRows.forEach { (id, rows) ->
         if (id in reserved) return@forEach
         val layout = snapshot.addonLayouts[id]
-        if (HomeAddonLayoutMode.fromStorage(layout?.mode) == HomeAddonLayoutMode.LOCKED) {
+        if (layout?.mode == HomeAddonLayoutMode.LOCKED) {
             val anchor = layout?.anchorKey?.let(rowByKey::get)
             val anchorAddonId = anchor?.let(::addonId)
             val anchorAddonMode = anchorAddonId?.let {
