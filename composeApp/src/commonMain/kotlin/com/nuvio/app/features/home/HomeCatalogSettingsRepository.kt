@@ -466,9 +466,12 @@ object HomeCatalogSettingsRepository {
         val knownIds = groups.mapTo(linkedSetOf()) { it.addonId }
         val requestedOrder = addonIds.filter { it in knownIds }.distinct()
         val completeOrder = requestedOrder + groups.map { it.addonId }.filterNot { it in requestedOrder }
+        if (policy == HomeAddonRowOrderPolicy.UPCOMING_ROWS_ONLY) {
+            // Freeze visible order before switching policies. The saved add-on order will
+            // then affect only catalogs discovered after this save.
+            persistVisibleOrder(_uiState.value.items.map { it.key })
+        }
         addonRowOrderPolicy = policy
-        // Saving makes the currently displayed rows the new baseline. Only catalogs
-        // discovered by a later refresh should be affected by upcoming-only ordering.
         upcomingRowKeys = emptySet()
         val nextLayouts = addonLayouts.toMutableMap()
         completeOrder.forEachIndexed { index, addonId ->
