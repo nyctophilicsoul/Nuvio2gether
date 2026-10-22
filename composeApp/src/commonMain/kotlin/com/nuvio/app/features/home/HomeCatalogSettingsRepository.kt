@@ -470,12 +470,35 @@ object HomeCatalogSettingsRepository {
         val items = _uiState.value.items
         if (items.isEmpty() || fromIndex !in items.indices || toIndex !in items.indices || fromIndex == toIndex) return
         val fromItem = items[fromIndex]
-        if (fromItem.rowPlacement != HomeCatalogRowPlacement.NORMAL || fromItem.isPinnedToTop) return
         val toItem = items[toIndex]
+        val fromPinSection = when {
+            fromItem.rowPlacement == HomeCatalogRowPlacement.PINNED_TOP ||
+                (fromItem.isCollection && fromItem.isPinnedToTop) -> HomeCatalogRowPlacement.PINNED_TOP
+            fromItem.rowPlacement == HomeCatalogRowPlacement.PINNED_BOTTOM -> HomeCatalogRowPlacement.PINNED_BOTTOM
+            else -> HomeCatalogRowPlacement.NORMAL
+        }
+        val toPinSection = when {
+            toItem.rowPlacement == HomeCatalogRowPlacement.PINNED_TOP ||
+                (toItem.isCollection && toItem.isPinnedToTop) -> HomeCatalogRowPlacement.PINNED_TOP
+            toItem.rowPlacement == HomeCatalogRowPlacement.PINNED_BOTTOM -> HomeCatalogRowPlacement.PINNED_BOTTOM
+            else -> HomeCatalogRowPlacement.NORMAL
+        }
+        // Pinned rows can be reordered inside their own section, but never moved
+        // across sections or into the normal/anchored catalog sequence.
+        if (fromPinSection != toPinSection) return
+        if (fromPinSection == HomeCatalogRowPlacement.NORMAL &&
+            (fromItem.rowPlacement != HomeCatalogRowPlacement.NORMAL || fromItem.isPinnedToTop)
+        ) return
         val start = minOf(fromIndex, toIndex)
         val end = maxOf(fromIndex, toIndex)
-        val crossedPin = items.subList(start, end + 1).any {
-            it.rowPlacement != HomeCatalogRowPlacement.NORMAL || it.isPinnedToTop
+        val crossedPin = items.subList(start, end + 1).any { item ->
+            val itemSection = when {
+                item.rowPlacement == HomeCatalogRowPlacement.PINNED_TOP ||
+                    (item.isCollection && item.isPinnedToTop) -> HomeCatalogRowPlacement.PINNED_TOP
+                item.rowPlacement == HomeCatalogRowPlacement.PINNED_BOTTOM -> HomeCatalogRowPlacement.PINNED_BOTTOM
+                else -> HomeCatalogRowPlacement.NORMAL
+            }
+            itemSection != fromPinSection
         }
         if (crossedPin) return
         val crossedManagedGroup = items.subList(start, end + 1).any {
