@@ -29,16 +29,61 @@ data class HomeCatalogSettingsItem(
     val isCollection: Boolean = false,
     val collectionId: String? = null,
     val isPinnedToTop: Boolean = false,
+    val addonId: String? = null,
+    val addonLayoutMode: HomeAddonLayoutMode = HomeAddonLayoutMode.NORMAL,
+    val rowPlacement: HomeCatalogRowPlacement = HomeCatalogRowPlacement.NORMAL,
 ) {
     val displayTitle: String
         get() = customTitle.ifBlank { defaultTitle }
 }
+
+enum class HomeCatalogRowPlacement(val storageValue: String) {
+    NORMAL("normal"),
+    PINNED_POSITION("pinned_position"),
+    PINNED_TOP("pinned_top"),
+    PINNED_BOTTOM("pinned_bottom");
+
+    companion object {
+        fun fromStorage(value: String?): HomeCatalogRowPlacement =
+            values().firstOrNull { it.storageValue == value } ?: NORMAL
+    }
+}
+
+enum class HomeAddonLayoutMode(val storageValue: String) {
+    NORMAL("normal"),
+    LOCKED("locked"),
+    PINNED_TOP("pinned_top"),
+    PINNED_BOTTOM("pinned_bottom");
+
+    companion object {
+        fun fromStorage(value: String?): HomeAddonLayoutMode =
+            values().firstOrNull { it.storageValue == value } ?: NORMAL
+    }
+}
+
+data class HomeAddonLayoutItem(
+    val addonId: String,
+    val addonName: String,
+    val catalogCount: Int,
+    val mode: HomeAddonLayoutMode,
+    val order: Int,
+    val anchorOrder: Int,
+    val anchorKey: String? = null,
+)
+
+internal data class HomeAddonLayoutPreference(
+    val mode: HomeAddonLayoutMode,
+    val order: Int,
+    val anchorOrder: Int,
+    val anchorKey: String? = null,
+)
 
 data class HomeCatalogSettingsUiState(
     val heroEnabled: Boolean = true,
     val showCatalogType: Boolean = true,
     val hideUnreleasedContent: Boolean = false,
     val items: List<HomeCatalogSettingsItem> = emptyList(),
+    val addonGroups: List<HomeAddonLayoutItem> = emptyList(),
 ) {
     val signature: String
         get() = buildString {
@@ -50,9 +95,13 @@ data class HomeCatalogSettingsUiState(
             append('|')
             append(
                 items.joinToString(separator = "|") { item ->
-                    "${item.key}:${item.order}:${item.enabled}:${item.heroSourceEnabled}:${item.customTitle}"
+                    "${item.key}:${item.order}:${item.enabled}:${item.heroSourceEnabled}:${item.customTitle}:${item.rowPlacement}"
                 }
             )
+            append('|')
+            append(addonGroups.joinToString(separator = "|") { group ->
+                "${group.addonId}:${group.mode}:${group.order}:${group.anchorOrder}:${group.anchorKey.orEmpty()}"
+            })
         }
 }
 
@@ -61,6 +110,7 @@ internal data class HomeCatalogPreference(
     val enabled: Boolean,
     val heroSourceEnabled: Boolean,
     val order: Int,
+    val rowPlacement: HomeCatalogRowPlacement = HomeCatalogRowPlacement.NORMAL,
 )
 
 internal data class HomeCatalogSettingsSnapshot(
@@ -68,6 +118,7 @@ internal data class HomeCatalogSettingsSnapshot(
     val showCatalogType: Boolean,
     val hideUnreleasedContent: Boolean,
     val preferences: Map<String, HomeCatalogPreference>,
+    val addonLayouts: Map<String, HomeAddonLayoutPreference> = emptyMap(),
 )
 
 @Serializable
@@ -77,6 +128,16 @@ private data class StoredHomeCatalogPreference(
     val enabled: Boolean = true,
     val heroSourceEnabled: Boolean = true,
     val order: Int = 0,
+    val rowPlacement: String = HomeCatalogRowPlacement.NORMAL.storageValue,
+)
+
+@Serializable
+private data class StoredHomeAddonLayoutPreference(
+    val addonId: String,
+    val mode: String = HomeAddonLayoutMode.NORMAL.storageValue,
+    val order: Int = 0,
+    val anchorOrder: Int = 0,
+    val anchorKey: String? = null,
 )
 
 @Serializable
@@ -85,6 +146,7 @@ private data class StoredHomeCatalogSettingsPayload(
     val showCatalogType: Boolean = true,
     val hideUnreleasedContent: Boolean = false,
     val items: List<StoredHomeCatalogPreference> = emptyList(),
+    val addonLayouts: List<StoredHomeAddonLayoutPreference> = emptyList(),
 )
 
 object HomeCatalogSettingsRepository {
@@ -112,6 +174,7 @@ object HomeCatalogSettingsRepository {
     private var heroEnabled = true
     private var showCatalogType = true
     private var hideUnreleasedContent = false
+    private var addonLayouts: Map<String, StoredHomeAddonLayoutPreference> = emptyMap()
 
     fun onProfileChanged() {
         hasLoaded = false
@@ -119,6 +182,7 @@ object HomeCatalogSettingsRepository {
         heroEnabled = true
         showCatalogType = true
         hideUnreleasedContent = false
+        addonLayouts = emptyMap()
         definitions = emptyList()
         collectionDefinitions = emptyList()
         lastCatalogSync = null
@@ -136,6 +200,7 @@ object HomeCatalogSettingsRepository {
         heroEnabled = true
         showCatalogType = true
         hideUnreleasedContent = false
+        addonLayouts = emptyMap()
         _uiState.value = HomeCatalogSettingsUiState()
     }
 
@@ -188,6 +253,15 @@ object HomeCatalogSettingsRepository {
                     enabled = value.enabled,
                     heroSourceEnabled = value.heroSourceEnabled,
                     order = value.order,
+                    rowPlacement = HomeCatalogRowPlacement.fromStorage(value.rowPlacement),
+                )
+            },
+            addonLayouts = addonLayouts.mapValues { (_, value) ->
+                HomeAddonLayoutPreference(
+                    mode = HomeAddonLayoutMode.fromStorage(value.mode),
+                    order = value.order,
+                    anchorOrder = value.anchorOrder,
+                    anchorKey = value.anchorKey,
                 )
             },
         )
@@ -233,6 +307,19 @@ object HomeCatalogSettingsRepository {
         }
     }
 
+    fun setRowPlacement(key: String, placement: HomeCatalogRowPlacement) {
+        ensureLoaded()
+        val current = preferences[key] ?: defaultPreferenceForMissingKey(key) ?: return
+        if (current.rowPlacement == placement.storageValue) return
+        if (placement == HomeCatalogRowPlacement.PINNED_POSITION) {
+            val visibleKeys = _uiState.value.items.map { it.key }
+            if (key in visibleKeys) persistVisibleOrder(visibleKeys)
+        }
+        updatePreference(key) { preference ->
+            preference.copy(rowPlacement = placement.storageValue)
+        }
+    }
+
     fun setEnabled(key: String, enabled: Boolean) {
         updatePreference(key) { preference ->
             preference.copy(enabled = enabled)
@@ -245,12 +332,124 @@ object HomeCatalogSettingsRepository {
         }
     }
 
+    fun setAddonLayoutMode(addonId: String, mode: HomeAddonLayoutMode) {
+        ensureLoaded()
+        if (addonId.isBlank()) return
+        val addonDefinitions = definitions.filter { definition ->
+            !ServerCatalog.isServerKey(definition.key) && definition.addonGroupId() == addonId
+        }
+        if (addonDefinitions.isEmpty()) return
+        val existing = addonLayouts[addonId]
+        if (HomeAddonLayoutMode.fromStorage(existing?.mode) == mode && existing != null) return
+
+        val firstOrder = existing?.order ?: _uiState.value.addonGroups
+            .firstOrNull { it.addonId == addonId }?.order ?: 0
+        val groupKeys = addonDefinitions.mapTo(mutableSetOf(), HomeCatalogDefinition::key)
+        val currentRows = _uiState.value.items
+        val firstRowOrder = addonDefinitions.minOfOrNull { definition ->
+            preferences[definition.key]?.order ?: Int.MAX_VALUE
+        }?.takeIf { it != Int.MAX_VALUE } ?: firstOrder
+        val currentMode = HomeAddonLayoutMode.fromStorage(existing?.mode)
+        val anchorKey = when {
+            mode != HomeAddonLayoutMode.LOCKED -> null
+            currentMode == HomeAddonLayoutMode.LOCKED -> existing?.anchorKey
+            else -> {
+                val lastGroupIndex = currentRows.indexOfLast { it.key in groupKeys }
+                currentRows.drop((lastGroupIndex + 1).coerceAtLeast(0))
+                    .firstOrNull {
+                        it.key !in groupKeys &&
+                            it.rowPlacement == HomeCatalogRowPlacement.NORMAL &&
+                            it.addonLayoutMode == HomeAddonLayoutMode.NORMAL &&
+                            !it.isPinnedToTop
+                    }?.key
+            }
+        }
+        val anchorOrder = if (mode == HomeAddonLayoutMode.LOCKED && currentMode != HomeAddonLayoutMode.LOCKED) {
+            anchorKey?.let { key -> preferences[key]?.order } ?: firstRowOrder
+        } else {
+            existing?.anchorOrder ?: firstRowOrder
+        }
+
+        addonLayouts = addonLayouts + (
+            addonId to StoredHomeAddonLayoutPreference(
+                addonId = addonId,
+                mode = mode.storageValue,
+                order = firstOrder,
+                anchorOrder = anchorOrder,
+                anchorKey = anchorKey,
+            )
+        )
+        publish()
+        persist()
+        HomeRepository.applyCurrentSettings()
+        HomeCatalogSettingsSyncService.triggerPush()
+    }
+
+    /** Places this add-on's dynamic rows before a stable row, overriding row-order defaults. */
+    fun setAddonAnchorKey(addonId: String, anchorKey: String?) {
+        ensureLoaded()
+        if (addonId.isBlank()) return
+        val group = _uiState.value.addonGroups.firstOrNull { it.addonId == addonId } ?: return
+        val anchor = anchorKey?.let { key -> _uiState.value.items.firstOrNull { it.key == key } }
+        if (anchorKey != null && (
+                anchor == null ||
+                    anchor.addonId == addonId ||
+                    anchor.rowPlacement != HomeCatalogRowPlacement.NORMAL ||
+                    anchor.addonLayoutMode != HomeAddonLayoutMode.NORMAL ||
+                    anchor.isPinnedToTop
+            )
+        ) return
+        val current = addonLayouts[addonId]
+        val next = StoredHomeAddonLayoutPreference(
+            addonId = addonId,
+            mode = HomeAddonLayoutMode.LOCKED.storageValue,
+            order = current?.order ?: group.order,
+            anchorOrder = anchor?.order ?: current?.anchorOrder ?: group.anchorOrder,
+            anchorKey = anchorKey,
+        )
+        if (current == next) return
+        addonLayouts = addonLayouts + (addonId to next)
+        publish()
+        persist()
+        HomeRepository.applyCurrentSettings()
+        HomeCatalogSettingsSyncService.triggerPush()
+    }
+
+    fun moveAddonGroup(fromIndex: Int, toIndex: Int) {
+        ensureLoaded()
+        val groups = _uiState.value.addonGroups
+        if (fromIndex !in groups.indices || toIndex !in groups.indices || fromIndex == toIndex) return
+
+        val reordered = groups.toMutableList().apply {
+            add(toIndex, removeAt(fromIndex))
+        }
+        val currentLayouts = addonLayouts.toMutableMap()
+        reordered.forEachIndexed { index, group ->
+            val existing = currentLayouts[group.addonId]
+            currentLayouts[group.addonId] = StoredHomeAddonLayoutPreference(
+                addonId = group.addonId,
+                mode = existing?.mode ?: HomeAddonLayoutMode.NORMAL.storageValue,
+                order = index,
+                anchorOrder = if (
+                    HomeAddonLayoutMode.fromStorage(existing?.mode) == HomeAddonLayoutMode.LOCKED
+                ) index else existing?.anchorOrder ?: index,
+                anchorKey = existing?.anchorKey,
+            )
+        }
+        addonLayouts = currentLayouts
+        publish()
+        persist()
+        HomeRepository.applyCurrentSettings()
+        HomeCatalogSettingsSyncService.triggerPush()
+    }
+
     fun resetToDefaults() {
         ensureLoaded()
         heroEnabled = true
         showCatalogType = true
         hideUnreleasedContent = false
         preferences = emptyMap()
+        addonLayouts = emptyMap()
         normalizePreferences()
         publish()
         persist()
@@ -268,22 +467,68 @@ object HomeCatalogSettingsRepository {
 
     fun moveByIndex(fromIndex: Int, toIndex: Int) {
         ensureLoaded()
-        val allKeys = allOrderedKeys()
-        if (allKeys.isEmpty()) return
-        if (fromIndex !in allKeys.indices || toIndex !in allKeys.indices) return
-        if (fromIndex == toIndex) return
-        val orderedKeys = allKeys.toMutableList()
-        orderedKeys.add(toIndex, orderedKeys.removeAt(fromIndex))
-        val updatedPreferences = preferences.toMutableMap()
-        orderedKeys.forEachIndexed { index, itemKey ->
-            val current = updatedPreferences[itemKey] ?: return@forEachIndexed
-            updatedPreferences[itemKey] = current.copy(order = index)
+        val items = _uiState.value.items
+        if (items.isEmpty() || fromIndex !in items.indices || toIndex !in items.indices || fromIndex == toIndex) return
+        val fromItem = items[fromIndex]
+        if (fromItem.rowPlacement != HomeCatalogRowPlacement.NORMAL || fromItem.isPinnedToTop) return
+        val toItem = items[toIndex]
+        val start = minOf(fromIndex, toIndex)
+        val end = maxOf(fromIndex, toIndex)
+        val crossedPin = items.subList(start, end + 1).any {
+            it.rowPlacement != HomeCatalogRowPlacement.NORMAL || it.isPinnedToTop
         }
-        preferences = updatedPreferences
+        if (crossedPin) return
+        val crossedManagedGroup = items.subList(start, end + 1).any {
+            it.addonId != null && it.addonLayoutMode != HomeAddonLayoutMode.NORMAL
+        }
+        val staysInsideManagedGroup = fromItem.addonId != null &&
+            fromItem.addonId == toItem.addonId &&
+            fromItem.addonLayoutMode != HomeAddonLayoutMode.NORMAL &&
+            items.subList(start, end + 1).all {
+                it.addonId == fromItem.addonId && it.addonLayoutMode != HomeAddonLayoutMode.NORMAL
+            }
+        if (crossedManagedGroup && !staysInsideManagedGroup && !fromItem.isCollection) return
+        val orderedKeys = items.map { it.key }.toMutableList().apply { add(toIndex, removeAt(fromIndex)) }
+        persistVisibleOrder(orderedKeys)
         publish()
         persist()
         HomeRepository.applyCurrentSettings()
         HomeCatalogSettingsSyncService.triggerPush()
+    }
+
+    private fun persistVisibleOrder(orderedKeys: List<String>) {
+        val updatedPreferences = preferences.toMutableMap()
+        orderedKeys.forEachIndexed { index, key ->
+            val current = updatedPreferences[key] ?: return@forEachIndexed
+            updatedPreferences[key] = current.copy(order = index)
+        }
+        preferences = updatedPreferences
+
+        val addonIdByKey = definitions
+            .filterNot { ServerCatalog.isServerKey(it.key) }
+            .associate { it.key to it.addonGroupId() }
+        val firstIndexByAddon = orderedKeys.withIndex().mapNotNull { (index, key) ->
+            val addonId = addonIdByKey[key] ?: return@mapNotNull null
+            val row = preferences[key] ?: return@mapNotNull null
+            if (row.rowPlacement != HomeCatalogRowPlacement.NORMAL.storageValue) return@mapNotNull null
+            addonId to index
+        }.groupBy({ it.first }, { it.second })
+            .mapValues { (_, indexes) -> indexes.minOrNull() ?: Int.MAX_VALUE }
+        val updatedLayouts = addonLayouts.toMutableMap()
+        firstIndexByAddon.forEach { (addonId, groupOrder) ->
+            val existing = updatedLayouts[addonId]
+            updatedLayouts[addonId] = StoredHomeAddonLayoutPreference(
+                addonId = addonId,
+                mode = existing?.mode ?: HomeAddonLayoutMode.NORMAL.storageValue,
+                order = groupOrder,
+                anchorOrder = if (
+                    HomeAddonLayoutMode.fromStorage(existing?.mode) == HomeAddonLayoutMode.LOCKED &&
+                    existing.anchorKey == null
+                ) groupOrder else existing?.anchorOrder ?: groupOrder,
+                anchorKey = existing?.anchorKey,
+            )
+        }
+        addonLayouts = updatedLayouts
     }
 
     private fun ensureLoaded() {
@@ -302,6 +547,7 @@ object HomeCatalogSettingsRepository {
             showCatalogType = parsedPayload.showCatalogType
             hideUnreleasedContent = parsedPayload.hideUnreleasedContent
             preferences = parsedPayload.items.associateBy { it.key }
+            addonLayouts = parsedPayload.addonLayouts.associateBy { it.addonId }
             publish()
             return
         }
@@ -311,6 +557,7 @@ object HomeCatalogSettingsRepository {
         }.getOrDefault(emptyList())
 
         preferences = legacyItems.associateBy { it.key }
+        addonLayouts = emptyMap()
         publish()
     }
 
@@ -357,6 +604,7 @@ object HomeCatalogSettingsRepository {
                 enabled = stored?.enabled ?: true,
                 heroSourceEnabled = heroSourceEnabled,
                 order = stored?.order ?: nextOrder++,
+                rowPlacement = stored?.rowPlacement ?: HomeCatalogRowPlacement.NORMAL.storageValue,
             )
         }
         preferences = normalized.toMap()
@@ -375,6 +623,13 @@ object HomeCatalogSettingsRepository {
                     enabled = preference?.enabled ?: true,
                     heroSourceEnabled = preference?.heroSourceEnabled ?: true,
                     order = preference?.order ?: 0,
+                    addonId = if (ServerCatalog.isServerKey(definition.key)) null else definition.addonGroupId(),
+                    rowPlacement = HomeCatalogRowPlacement.fromStorage(preference?.rowPlacement),
+                    addonLayoutMode = if (ServerCatalog.isServerKey(definition.key)) {
+                        HomeAddonLayoutMode.NORMAL
+                    } else {
+                        HomeAddonLayoutMode.fromStorage(addonLayouts[definition.addonGroupId()]?.mode)
+                    },
                 )
             }
 
@@ -391,17 +646,50 @@ object HomeCatalogSettingsRepository {
                 isCollection = true,
                 collectionId = colDef.collectionId,
                 isPinnedToTop = colDef.isPinnedToTop,
+                rowPlacement = HomeCatalogRowPlacement.fromStorage(preference?.rowPlacement),
             )
         }
 
-        val items = (catalogItems + collectionItems)
-            .sortedBy { it.order }
+        val items = orderHomeCatalogSettingsItems(
+            items = catalogItems + collectionItems,
+            addonIdByCatalogKey = definitions
+                .filterNot { ServerCatalog.isServerKey(it.key) }
+                .associate { definition -> definition.key to definition.addonGroupId() },
+            addonLayouts = addonLayouts.mapValues { (_, stored) ->
+                HomeAddonLayoutPreference(
+                    mode = HomeAddonLayoutMode.fromStorage(stored.mode),
+                    order = stored.order,
+                    anchorOrder = stored.anchorOrder,
+                    anchorKey = stored.anchorKey,
+                )
+            },
+        )
+        val addonGroups = definitions
+            .filterNot { ServerCatalog.isServerKey(it.key) }
+            .groupBy { it.addonGroupId() }
+            .map { (addonId, addonDefinitions) ->
+                val firstOrder = addonDefinitions.minOfOrNull { definition ->
+                    preferences[definition.key]?.order ?: Int.MAX_VALUE
+                }?.takeIf { it != Int.MAX_VALUE } ?: 0
+                val storedLayout = addonLayouts[addonId]
+                HomeAddonLayoutItem(
+                    addonId = addonId,
+                    addonName = addonDefinitions.first().addonName,
+                    catalogCount = addonDefinitions.size,
+                    mode = HomeAddonLayoutMode.fromStorage(storedLayout?.mode),
+                    order = storedLayout?.order ?: firstOrder,
+                    anchorOrder = storedLayout?.anchorOrder ?: firstOrder,
+                    anchorKey = storedLayout?.anchorKey,
+                )
+            }
+            .sortedWith(compareBy<HomeAddonLayoutItem> { it.order }.thenBy { it.addonName.lowercase() })
 
         _uiState.value = HomeCatalogSettingsUiState(
             heroEnabled = heroEnabled,
             showCatalogType = showCatalogType,
             hideUnreleasedContent = hideUnreleasedContent,
             items = items,
+            addonGroups = addonGroups,
         )
     }
 
@@ -413,6 +701,9 @@ object HomeCatalogSettingsRepository {
                     showCatalogType = showCatalogType,
                     hideUnreleasedContent = hideUnreleasedContent,
                     items = preferences.values.sortedBy { it.order },
+                    addonLayouts = addonLayouts.values.sortedWith(
+                        compareBy<StoredHomeAddonLayoutPreference> { it.order }.thenBy { it.addonId },
+                    ),
                 ),
             ),
         )
@@ -447,30 +738,8 @@ object HomeCatalogSettingsRepository {
         key: String,
         direction: Int,
     ) {
-        ensureLoaded()
-        val orderedKeys = allOrderedKeys().toMutableList()
-        if (orderedKeys.isEmpty()) return
-
-        val currentIndex = orderedKeys.indexOf(key)
-        if (currentIndex == -1) return
-
-        val targetIndex = currentIndex + direction
-        if (targetIndex !in orderedKeys.indices) return
-
-        val movingKey = orderedKeys.removeAt(currentIndex)
-        orderedKeys.add(targetIndex, movingKey)
-
-        val updatedPreferences = preferences.toMutableMap()
-        orderedKeys.forEachIndexed { index, itemKey ->
-            val current = updatedPreferences[itemKey] ?: return@forEachIndexed
-            updatedPreferences[itemKey] = current.copy(order = index)
-        }
-        preferences = updatedPreferences
-
-        publish()
-        persist()
-        HomeRepository.applyCurrentSettings()
-        HomeCatalogSettingsSyncService.triggerPush()
+        val currentIndex = _uiState.value.items.indexOfFirst { it.key == key }
+        moveByIndex(currentIndex, currentIndex + direction)
     }
 
     fun exportToSyncPayload(): SyncHomeCatalogPayload {
@@ -491,6 +760,7 @@ object HomeCatalogSettingsRepository {
                     customTitle = pref.customTitle,
                     isCollection = true,
                     collectionId = collectionDefinition?.collectionId ?: pref.key.removePrefix("collection_"),
+                    rowPlacement = pref.rowPlacement,
                     key = pref.key,
                 )
             } else {
@@ -503,6 +773,7 @@ object HomeCatalogSettingsRepository {
                     order = pref.order,
                     customTitle = pref.customTitle,
                     isCollection = false,
+                    rowPlacement = pref.rowPlacement,
                     key = pref.key,
                 )
             }
@@ -511,6 +782,17 @@ object HomeCatalogSettingsRepository {
             showCatalogType = showCatalogType,
             hideUnreleasedContent = hideUnreleasedContent,
             items = items,
+            addonLayouts = addonLayouts.values
+                .sortedWith(compareBy<StoredHomeAddonLayoutPreference> { it.order }.thenBy { it.addonId })
+                .map { stored ->
+                    SyncAddonLayoutPreference(
+                        addonId = stored.addonId,
+                        mode = stored.mode,
+                        order = stored.order,
+                        anchorOrder = stored.anchorOrder,
+                        anchorKey = stored.anchorKey,
+                    )
+                },
         )
     }
 
@@ -518,6 +800,21 @@ object HomeCatalogSettingsRepository {
         ensureLoaded()
         showCatalogType = payload.showCatalogType
         hideUnreleasedContent = payload.hideUnreleasedContent
+        payload.addonLayouts
+            ?.takeIf { layouts -> layouts.isNotEmpty() || payload.items.isNotEmpty() }
+            ?.let { remoteLayouts ->
+                addonLayouts = remoteLayouts
+                    .filter { it.addonId.isNotBlank() }
+                    .associate { layout ->
+                        layout.addonId to StoredHomeAddonLayoutPreference(
+                            addonId = layout.addonId,
+                            mode = HomeAddonLayoutMode.fromStorage(layout.mode).storageValue,
+                            order = layout.order,
+                            anchorOrder = layout.anchorOrder,
+                             anchorKey = layout.anchorKey,
+                        )
+                    }
+            }
         if (payload.items.isNotEmpty()) {
             val existingHeroState = preferences.mapValues { it.value.heroSourceEnabled }
             val remotePreferences = payload.items.associate { item ->
@@ -528,6 +825,7 @@ object HomeCatalogSettingsRepository {
                     enabled = item.enabled,
                     heroSourceEnabled = existingHeroState[key] ?: true,
                     order = item.order,
+                    rowPlacement = HomeCatalogRowPlacement.fromStorage(item.rowPlacement).storageValue,
                 )
             }
             val remoteKeys = remotePreferences.keys
@@ -575,6 +873,20 @@ object HomeCatalogSettingsRepository {
             updatedPreferences[itemKey] = current.copy(order = index)
         }
         preferences = updatedPreferences
+
+        val addonKeysById = definitions
+            .filterNot { ServerCatalog.isServerKey(it.key) }
+            .groupBy { it.addonGroupId() }
+            .mapValues { (_, addonDefinitions) -> addonDefinitions.mapTo(mutableSetOf(), HomeCatalogDefinition::key) }
+        addonLayouts = addonLayouts.mapValues { (addonId, layout) ->
+            if (HomeAddonLayoutMode.fromStorage(layout.mode) != HomeAddonLayoutMode.LOCKED) {
+                layout
+            } else {
+                val groupKeys = addonKeysById[addonId].orEmpty()
+                val refreshedAnchor = reorderedKeys.indexOfFirst { it in groupKeys }
+                if (refreshedAnchor >= 0 && layout.anchorKey == null) layout.copy(anchorOrder = refreshedAnchor) else layout
+            }
+        }
     }
 
     private fun defaultPreferenceForMissingKey(key: String): StoredHomeCatalogPreference? {
@@ -602,6 +914,8 @@ object HomeCatalogSettingsRepository {
         return key.removeSuffix(suffix)
     }
 
+    private fun HomeCatalogDefinition.addonGroupId(): String = addonIdForSync()
+
     private fun SyncCatalogItem.preferenceKey(): String =
         key.ifBlank {
             if (isCollection) {
@@ -613,6 +927,279 @@ object HomeCatalogSettingsRepository {
 
     private fun String.requiresExplicitSyncKey(): Boolean =
         !startsWith("collection_") && count { it == ':' } > 2
+}
+
+internal fun orderHomeCatalogSettingsItems(
+    items: List<HomeCatalogSettingsItem>,
+    addonIdByCatalogKey: Map<String, String>,
+    addonLayouts: Map<String, HomeAddonLayoutPreference>,
+): List<HomeCatalogSettingsItem> {
+    data class OrderedUnit(val order: Double, val stableIndex: Int, val rows: List<HomeCatalogSettingsItem>)
+
+    val original = items.withIndex()
+        .sortedWith(compareBy<IndexedValue<HomeCatalogSettingsItem>> { it.value.order }.thenBy { it.index })
+    if (original.isEmpty()) return emptyList()
+    val orderedRows = original.map { it.value }
+    val rankByKey = original.mapIndexed { rank, indexed -> indexed.value.key to rank }.toMap()
+    val itemByKey = orderedRows.associateBy { it.key }
+    val pinnedTopRows = orderedRows.filter {
+        it.rowPlacement == HomeCatalogRowPlacement.PINNED_TOP || (it.isCollection && it.isPinnedToTop)
+    }
+    val pinnedPositionRows = orderedRows.filter {
+        it.rowPlacement == HomeCatalogRowPlacement.PINNED_POSITION && !it.isPinnedToTop
+    }
+    val pinnedBottomRows = orderedRows.filter {
+        it.rowPlacement == HomeCatalogRowPlacement.PINNED_BOTTOM && !(it.isCollection && it.isPinnedToTop)
+    }
+    val pinnedKeys = (pinnedTopRows + pinnedPositionRows + pinnedBottomRows)
+        .mapTo(mutableSetOf(), HomeCatalogSettingsItem::key)
+    val addonRows = original.mapNotNull { indexed ->
+        val item = indexed.value
+        if (item.isCollection || item.key in pinnedKeys) null
+        else addonIdByCatalogKey[item.key]?.let { it to item }
+    }.groupBy({ it.first }, { it.second })
+    val addonsWithPositionPins = pinnedPositionRows.mapNotNull { addonIdByCatalogKey[it.key] }.toSet()
+
+    fun rowOrder(rows: List<HomeCatalogSettingsItem>): Int =
+        rows.minOfOrNull { rankByKey[it.key] ?: Int.MAX_VALUE } ?: Int.MAX_VALUE
+    fun sortedRows(rows: List<HomeCatalogSettingsItem>) = rows.sortedWith(
+        compareBy<HomeCatalogSettingsItem> { it.order }.thenBy { rankByKey[it.key] ?: Int.MAX_VALUE },
+    )
+
+    val pinnedTopGroups = addonRows.filter { (id, _) ->
+        HomeAddonLayoutMode.fromStorage(addonLayouts[id]?.mode) == HomeAddonLayoutMode.PINNED_TOP
+    }.entries.sortedWith(compareBy<Map.Entry<String, List<HomeCatalogSettingsItem>>> {
+        addonLayouts[it.key]?.order ?: rowOrder(it.value)
+    }.thenBy { it.key })
+    val pinnedBottomGroups = addonRows.filter { (id, _) ->
+        HomeAddonLayoutMode.fromStorage(addonLayouts[id]?.mode) == HomeAddonLayoutMode.PINNED_BOTTOM
+    }.entries.sortedWith(compareBy<Map.Entry<String, List<HomeCatalogSettingsItem>>> {
+        addonLayouts[it.key]?.order ?: rowOrder(it.value)
+    }.thenBy { it.key })
+    val reserved = (pinnedTopGroups + pinnedBottomGroups).mapTo(mutableSetOf()) { it.key }
+    val units = mutableListOf<OrderedUnit>()
+    pinnedPositionRows.forEach { row ->
+        units += OrderedUnit(row.order.toDouble(), rankByKey[row.key] ?: Int.MAX_VALUE, listOf(row))
+    }
+
+    addonRows.forEach { (addonId, rows) ->
+        if (addonId in reserved) return@forEach
+        val layout = addonLayouts[addonId]
+        if (HomeAddonLayoutMode.fromStorage(layout?.mode) == HomeAddonLayoutMode.LOCKED) {
+            val anchor = layout?.anchorKey?.let(itemByKey::get)
+            val resolvedAnchorOrder = anchor?.takeUnless {
+                addonIdByCatalogKey[it.key] == addonId ||
+                    it.rowPlacement != HomeCatalogRowPlacement.NORMAL ||
+                    it.addonLayoutMode != HomeAddonLayoutMode.NORMAL ||
+                    it.isPinnedToTop
+            }?.order?.toDouble()
+            if (addonId in addonsWithPositionPins) {
+                val positionPinOrder = pinnedPositionRows
+                    .filter { addonIdByCatalogKey[it.key] == addonId }
+                    .maxOfOrNull { it.order.toDouble() }
+                val slotOrder = resolvedAnchorOrder ?: maxOf(
+                    layout?.anchorOrder?.toDouble() ?: layout?.order?.toDouble() ?: rowOrder(rows).toDouble(),
+                    (positionPinOrder ?: Double.NEGATIVE_INFINITY) + 1.0,
+                )
+                rows.forEach { row ->
+                    val effectiveOrder = if (row.order.toDouble() >= slotOrder) slotOrder - 0.5 else row.order.toDouble()
+                    units += OrderedUnit(effectiveOrder, rankByKey[row.key] ?: Int.MAX_VALUE, listOf(row))
+                }
+            } else {
+                val order = resolvedAnchorOrder?.minus(0.5)
+                    ?: (layout?.anchorOrder?.toDouble() ?: layout?.order?.toDouble() ?: rowOrder(rows).toDouble())
+                units += OrderedUnit(order, rowOrder(rows), sortedRows(rows))
+            }
+        } else {
+            // By default, every catalog is an independent row, not an add-on block.
+            rows.forEach { row ->
+                units += OrderedUnit(row.order.toDouble(), rankByKey[row.key] ?: Int.MAX_VALUE, listOf(row))
+            }
+        }
+    }
+
+    original.forEach { indexed ->
+        val item = indexed.value
+        if (item.key !in pinnedKeys && (item.isCollection || item.key !in addonIdByCatalogKey)) {
+            units += OrderedUnit(item.order.toDouble(), rankByKey[item.key] ?: indexed.index, listOf(item))
+        }
+    }
+
+    val pinnedTopUnits = pinnedTopRows.map { row ->
+        OrderedUnit(row.order.toDouble(), rankByKey[row.key] ?: Int.MAX_VALUE, listOf(row))
+    } + pinnedTopGroups.map { group ->
+        OrderedUnit(
+            (addonLayouts[group.key]?.order ?: rowOrder(group.value)).toDouble(),
+            rowOrder(group.value),
+            sortedRows(group.value),
+        )
+    }
+    val pinnedBottomUnits = pinnedBottomRows.map { row ->
+        OrderedUnit(row.order.toDouble(), rankByKey[row.key] ?: Int.MAX_VALUE, listOf(row))
+    } + pinnedBottomGroups.map { group ->
+        OrderedUnit(
+            (addonLayouts[group.key]?.order ?: rowOrder(group.value)).toDouble(),
+            rowOrder(group.value),
+            sortedRows(group.value),
+        )
+    }
+    return pinnedTopUnits.sortedWith(compareBy<OrderedUnit> { it.order }.thenBy { it.stableIndex })
+        .flatMap { it.rows } +
+        units.sortedWith(compareBy<OrderedUnit> { it.order }.thenBy { it.stableIndex }).flatMap { it.rows } +
+        pinnedBottomUnits.sortedWith(compareBy<OrderedUnit> { it.order }.thenBy { it.stableIndex })
+            .flatMap { it.rows }
+}
+
+internal fun orderHomeCatalogDefinitions(
+    definitions: List<HomeCatalogDefinition>,
+    snapshot: HomeCatalogSettingsSnapshot,
+): List<HomeCatalogDefinition> {
+    data class OrderedUnit(val order: Double, val stableIndex: Int, val rows: List<HomeCatalogDefinition>)
+
+    val original = definitions.withIndex().sortedWith(
+        compareBy<IndexedValue<HomeCatalogDefinition>> {
+            snapshot.preferences[it.value.key]?.order ?: Int.MAX_VALUE
+        }.thenBy { it.index },
+    )
+    if (original.isEmpty()) return emptyList()
+    val orderedRows = original.map { it.value }
+    val rankByKey = original.mapIndexed { rank, indexed -> indexed.value.key to rank }.toMap()
+    val rowByKey = orderedRows.associateBy { it.key }
+
+    fun addonId(definition: HomeCatalogDefinition): String? {
+        if (ServerCatalog.isServerKey(definition.key)) return null
+        val suffix = ":" + definition.type + ":" + definition.catalogId
+        return definition.key.removeSuffix(suffix)
+    }
+    fun rowOrder(rows: List<HomeCatalogDefinition>): Int =
+        rows.minOfOrNull { rankByKey[it.key] ?: Int.MAX_VALUE } ?: Int.MAX_VALUE
+    fun sortedRows(rows: List<HomeCatalogDefinition>) = rows.sortedWith(
+        compareBy<HomeCatalogDefinition> { snapshot.preferences[it.key]?.order ?: Int.MAX_VALUE }
+            .thenBy { rankByKey[it.key] ?: Int.MAX_VALUE },
+    )
+
+    val pinnedTopRows = orderedRows.filter {
+        snapshot.preferences[it.key]?.rowPlacement == HomeCatalogRowPlacement.PINNED_TOP
+    }
+    val pinnedPositionRows = orderedRows.filter {
+        snapshot.preferences[it.key]?.rowPlacement == HomeCatalogRowPlacement.PINNED_POSITION
+    }
+    val pinnedBottomRows = orderedRows.filter {
+        snapshot.preferences[it.key]?.rowPlacement == HomeCatalogRowPlacement.PINNED_BOTTOM
+    }
+    val pinnedKeys = (pinnedTopRows + pinnedPositionRows + pinnedBottomRows)
+        .mapTo(mutableSetOf(), HomeCatalogDefinition::key)
+    val addonRows = original.mapNotNull { indexed ->
+        val definition = indexed.value
+        if (definition.key in pinnedKeys) null else addonId(definition)?.let { it to definition }
+    }.groupBy({ it.first }, { it.second })
+    val addonsWithPositionPins = pinnedPositionRows.mapNotNull(::addonId).toSet()
+
+    val pinnedTopGroups = addonRows.filter { (id, _) ->
+        HomeAddonLayoutMode.fromStorage(snapshot.addonLayouts[id]?.mode) == HomeAddonLayoutMode.PINNED_TOP
+    }.entries.sortedWith(compareBy<Map.Entry<String, List<HomeCatalogDefinition>>> {
+        snapshot.addonLayouts[it.key]?.order ?: rowOrder(it.value)
+    }.thenBy { it.key })
+    val pinnedBottomGroups = addonRows.filter { (id, _) ->
+        HomeAddonLayoutMode.fromStorage(snapshot.addonLayouts[id]?.mode) == HomeAddonLayoutMode.PINNED_BOTTOM
+    }.entries.sortedWith(compareBy<Map.Entry<String, List<HomeCatalogDefinition>>> {
+        snapshot.addonLayouts[it.key]?.order ?: rowOrder(it.value)
+    }.thenBy { it.key })
+    val reserved = (pinnedTopGroups + pinnedBottomGroups).mapTo(mutableSetOf()) { it.key }
+    val units = mutableListOf<OrderedUnit>()
+    pinnedPositionRows.forEach { row ->
+        units += OrderedUnit(
+            (snapshot.preferences[row.key]?.order ?: Int.MAX_VALUE).toDouble(),
+            rankByKey[row.key] ?: Int.MAX_VALUE,
+            listOf(row),
+        )
+    }
+
+    addonRows.forEach { (id, rows) ->
+        if (id in reserved) return@forEach
+        val layout = snapshot.addonLayouts[id]
+        if (HomeAddonLayoutMode.fromStorage(layout?.mode) == HomeAddonLayoutMode.LOCKED) {
+            val anchor = layout?.anchorKey?.let(rowByKey::get)
+            val anchorAddonId = anchor?.let(::addonId)
+            val anchorAddonMode = anchorAddonId?.let {
+                HomeAddonLayoutMode.fromStorage(snapshot.addonLayouts[it]?.mode)
+            } ?: HomeAddonLayoutMode.NORMAL
+            val resolvedAnchorOrder = anchor?.takeUnless {
+                anchorAddonId == id ||
+                    snapshot.preferences[it.key]?.rowPlacement != HomeCatalogRowPlacement.NORMAL ||
+                    anchorAddonMode != HomeAddonLayoutMode.NORMAL
+            }?.let { (snapshot.preferences[it.key]?.order ?: Int.MAX_VALUE).toDouble() }
+            if (id in addonsWithPositionPins) {
+                val positionPinOrder = pinnedPositionRows
+                    .filter { addonId(it) == id }
+                    .maxOfOrNull { (snapshot.preferences[it.key]?.order ?: Int.MAX_VALUE).toDouble() }
+                val slotOrder = resolvedAnchorOrder ?: maxOf(
+                    layout?.anchorOrder?.toDouble() ?: layout?.order?.toDouble() ?: rowOrder(rows).toDouble(),
+                    (positionPinOrder ?: Double.NEGATIVE_INFINITY) + 1.0,
+                )
+                rows.forEach { row ->
+                    val rowOrderValue = (snapshot.preferences[row.key]?.order ?: Int.MAX_VALUE).toDouble()
+                    val effectiveOrder = if (rowOrderValue >= slotOrder) slotOrder - 0.5 else rowOrderValue
+                    units += OrderedUnit(effectiveOrder, rankByKey[row.key] ?: Int.MAX_VALUE, listOf(row))
+                }
+            } else {
+                val order = resolvedAnchorOrder?.minus(0.5)
+                    ?: (layout?.anchorOrder?.toDouble() ?: layout?.order?.toDouble() ?: rowOrder(rows).toDouble())
+                units += OrderedUnit(order, rowOrder(rows), sortedRows(rows))
+            }
+        } else {
+            rows.forEach { row ->
+                units += OrderedUnit(
+                    (snapshot.preferences[row.key]?.order ?: Int.MAX_VALUE).toDouble(),
+                    rankByKey[row.key] ?: Int.MAX_VALUE,
+                    listOf(row),
+                )
+            }
+        }
+    }
+
+    original.forEach { indexed ->
+        val definition = indexed.value
+        if (definition.key !in pinnedKeys && addonId(definition) == null) {
+            units += OrderedUnit(
+                (snapshot.preferences[definition.key]?.order ?: Int.MAX_VALUE).toDouble(),
+                rankByKey[definition.key] ?: indexed.index,
+                listOf(definition),
+            )
+        }
+    }
+
+    val pinnedTopUnits = pinnedTopRows.map { row ->
+        OrderedUnit(
+            (snapshot.preferences[row.key]?.order ?: Int.MAX_VALUE).toDouble(),
+            rankByKey[row.key] ?: Int.MAX_VALUE,
+            listOf(row),
+        )
+    } + pinnedTopGroups.map { group ->
+        OrderedUnit(
+            (snapshot.addonLayouts[group.key]?.order ?: rowOrder(group.value)).toDouble(),
+            rowOrder(group.value),
+            sortedRows(group.value),
+        )
+    }
+    val pinnedBottomUnits = pinnedBottomRows.map { row ->
+        OrderedUnit(
+            (snapshot.preferences[row.key]?.order ?: Int.MAX_VALUE).toDouble(),
+            rankByKey[row.key] ?: Int.MAX_VALUE,
+            listOf(row),
+        )
+    } + pinnedBottomGroups.map { group ->
+        OrderedUnit(
+            (snapshot.addonLayouts[group.key]?.order ?: rowOrder(group.value)).toDouble(),
+            rowOrder(group.value),
+            sortedRows(group.value),
+        )
+    }
+    return pinnedTopUnits.sortedWith(compareBy<OrderedUnit> { it.order }.thenBy { it.stableIndex })
+        .flatMap { it.rows } +
+        units.sortedWith(compareBy<OrderedUnit> { it.order }.thenBy { it.stableIndex }).flatMap { it.rows } +
+        pinnedBottomUnits.sortedWith(compareBy<OrderedUnit> { it.order }.thenBy { it.stableIndex })
+            .flatMap { it.rows }
 }
 
 internal data class CollectionCatalogDefinition(

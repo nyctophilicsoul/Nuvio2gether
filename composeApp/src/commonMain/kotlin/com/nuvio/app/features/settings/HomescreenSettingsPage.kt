@@ -18,10 +18,14 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -38,8 +42,11 @@ import com.nuvio.app.core.ui.NuvioActionLabel
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.features.addons.AddonRepository
+import com.nuvio.app.features.home.HomeAddonLayoutItem
+import com.nuvio.app.features.home.HomeAddonLayoutMode
 import com.nuvio.app.features.home.HomeCatalogSettingsItem
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
+import com.nuvio.app.features.home.HomeCatalogRowPlacement
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_retry
@@ -48,6 +55,13 @@ import nuvio.composeapp.generated.resources.layout_hide_unreleased
 import nuvio.composeapp.generated.resources.layout_hide_unreleased_sub
 import nuvio.composeapp.generated.resources.layout_catalog_type
 import nuvio.composeapp.generated.resources.layout_catalog_type_sub
+import nuvio.composeapp.generated.resources.settings_homescreen_addon_groups
+import nuvio.composeapp.generated.resources.settings_homescreen_addon_groups_description
+import nuvio.composeapp.generated.resources.settings_homescreen_group_mode_bottom
+import nuvio.composeapp.generated.resources.settings_homescreen_group_mode_locked
+import nuvio.composeapp.generated.resources.settings_homescreen_group_mode_normal
+import nuvio.composeapp.generated.resources.settings_homescreen_group_mode_top
+import nuvio.composeapp.generated.resources.settings_homescreen_group_rows_count
 import nuvio.composeapp.generated.resources.settings_homescreen_empty_message
 import nuvio.composeapp.generated.resources.settings_homescreen_empty_title
 import nuvio.composeapp.generated.resources.settings_homescreen_keep_home_focused
@@ -70,12 +84,21 @@ import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
+@Composable
+private fun HomeAddonLayoutMode.displayLabel(): String = when (this) {
+    HomeAddonLayoutMode.NORMAL -> stringResource(Res.string.settings_homescreen_group_mode_normal)
+    HomeAddonLayoutMode.LOCKED -> stringResource(Res.string.settings_homescreen_group_mode_locked)
+    HomeAddonLayoutMode.PINNED_TOP -> stringResource(Res.string.settings_homescreen_group_mode_top)
+    HomeAddonLayoutMode.PINNED_BOTTOM -> stringResource(Res.string.settings_homescreen_group_mode_bottom)
+}
+
 internal fun LazyListScope.homescreenSettingsContent(
     isTablet: Boolean,
     heroEnabled: Boolean,
     showCatalogType: Boolean,
     hideUnreleasedContent: Boolean,
     items: List<HomeCatalogSettingsItem>,
+    addonGroups: List<HomeAddonLayoutItem>,
     isCatalogLoading: Boolean,
     catalogErrorMessage: String?,
 ) {
@@ -136,6 +159,128 @@ internal fun LazyListScope.homescreenSettingsContent(
                     expanded = heroSourcesExpanded,
                     onExpandedChange = { heroSourcesExpanded = it },
                 )
+            }
+        }
+    }
+    item {
+        if (addonGroups.isNotEmpty()) {
+            var expandedAddonId by remember { mutableStateOf<String?>(null) }
+            SettingsSection(
+                title = stringResource(Res.string.settings_homescreen_addon_groups),
+                isTablet = isTablet,
+            ) {
+                SettingsGroup(isTablet = isTablet) {
+                    Text(
+                        text = stringResource(Res.string.settings_homescreen_addon_groups_description),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    )
+                    addonGroups.forEachIndexed { index, group ->
+                        if (index > 0) SettingsGroupDivider(isTablet = isTablet)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = if (isTablet) 20.dp else 16.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                Text(
+                                    text = group.addonName,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Text(
+                                    text = stringResource(
+                                        Res.string.settings_homescreen_group_rows_count,
+                                        group.catalogCount,
+                                    ) + " • " + group.mode.displayLabel() +
+                                        (group.anchorKey?.let { key ->
+                                            items.firstOrNull { it.key == key }?.displayTitle?.let { " • Before $it" }
+                                        } ?: ""),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                androidx.compose.foundation.layout.Box {
+                                    TextButton(
+                                        onClick = {
+                                            expandedAnchorAddonId = group.addonId.takeIf { expandedAnchorAddonId != it }
+                                            expandedAddonId = null
+                                        },
+                                    ) {
+                                        Text(if (group.anchorKey == null) "Insert before…" else "Change position")
+                                        Icon(
+                                            imageVector = Icons.Rounded.KeyboardArrowDown,
+                                            contentDescription = null,
+                                        )
+                                    }
+                                    DropdownMenu(
+                                        expanded = expandedAnchorAddonId == group.addonId,
+                                        onDismissRequest = { expandedAnchorAddonId = null },
+                                    ) {
+                                        items.filter { candidate ->
+                                            candidate.addonId != group.addonId &&
+                                                candidate.rowPlacement == HomeCatalogRowPlacement.NORMAL &&
+                                                candidate.addonLayoutMode == HomeAddonLayoutMode.NORMAL &&
+                                                !candidate.isPinnedToTop
+                                        }.forEach { anchor ->
+                                            DropdownMenuItem(
+                                                text = { Text("${anchor.displayTitle} — ${anchor.addonName}") },
+                                                onClick = {
+                                                    HomeCatalogSettingsRepository.setAddonAnchorKey(group.addonId, anchor.key)
+                                                    expandedAnchorAddonId = null
+                                                },
+                                            )
+                                        }
+                                        if (group.anchorKey != null) {
+                                            DropdownMenuItem(
+                                                text = { Text("Use normal row order") },
+                                                onClick = {
+                                                    HomeCatalogSettingsRepository.setAddonLayoutMode(
+                                                        group.addonId,
+                                                        HomeAddonLayoutMode.NORMAL,
+                                                    )
+                                                    expandedAnchorAddonId = null
+                                                },
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            androidx.compose.foundation.layout.Box {
+                                TextButton(onClick = {
+                                    expandedAddonId = group.addonId.takeIf { expandedAddonId != it }
+                                    expandedAnchorAddonId = null
+                                }) {
+                                    Text(group.mode.displayLabel())
+                                    Icon(
+                                        imageVector = Icons.Rounded.KeyboardArrowDown,
+                                        contentDescription = null,
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = expandedAddonId == group.addonId,
+                                    onDismissRequest = { expandedAddonId = null },
+                                ) {
+                                    HomeAddonLayoutMode.values().forEach { mode ->
+                                        DropdownMenuItem(
+                                            text = { Text(mode.displayLabel()) },
+                                            onClick = {
+                                                HomeCatalogSettingsRepository.setAddonLayoutMode(group.addonId, mode)
+                                                expandedAddonId = null
+                                            },
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -326,7 +471,35 @@ private fun HomescreenCatalogList(
     ) { from, to ->
         val fromItem = items.getOrNull(from.index)
         val toItem = items.getOrNull(to.index)
-        if (fromItem?.isPinnedToTop == true || toItem?.isPinnedToTop == true) {
+        if (fromItem?.isPinnedToTop == true || toItem?.isPinnedToTop == true ||
+            fromItem?.rowPlacement != HomeCatalogRowPlacement.NORMAL ||
+            toItem?.rowPlacement != HomeCatalogRowPlacement.NORMAL
+        ) {
+            onPinnedDragAttempt()
+            return@rememberReorderableLazyListState
+        }
+        val rangeStart = minOf(from.index, to.index).coerceAtLeast(0)
+        val rangeEnd = maxOf(from.index, to.index).coerceAtMost(items.lastIndex)
+        val crossesPinnedRow = rangeStart <= rangeEnd && items
+            .subList(rangeStart, rangeEnd + 1)
+            .any { it.rowPlacement != HomeCatalogRowPlacement.NORMAL || it.isPinnedToTop }
+        if (crossesPinnedRow) {
+            onPinnedDragAttempt()
+            return@rememberReorderableLazyListState
+        }
+        val crossesManagedGroup = rangeStart <= rangeEnd && items
+            .subList(rangeStart, rangeEnd + 1)
+            .any { it.addonId != null && it.addonLayoutMode != HomeAddonLayoutMode.NORMAL }
+        val staysInsideSameManagedGroup = fromItem?.addonId != null &&
+            fromItem.addonId == toItem?.addonId &&
+            fromItem.addonLayoutMode != HomeAddonLayoutMode.NORMAL &&
+            rangeStart <= rangeEnd && items.subList(rangeStart, rangeEnd + 1).all {
+                it.addonId == fromItem.addonId && it.addonLayoutMode != HomeAddonLayoutMode.NORMAL
+            }
+        // A managed dynamic group can be reordered internally, but cannot be dragged out
+        // of its configured insertion slot. Row pins remain independent overrides.
+        if (crossesManagedGroup && !staysInsideSameManagedGroup && fromItem?.isCollection != true) {
+            onPinnedDragAttempt()
             return@rememberReorderableLazyListState
         }
         HomeCatalogSettingsRepository.moveByIndex(from.index, to.index)
@@ -344,7 +517,7 @@ private fun HomescreenCatalogList(
                 ReorderableItem(
                     reorderableLazyListState,
                     key = item.key,
-                    enabled = !item.isPinnedToTop,
+                    enabled = !item.isPinnedToTop && item.rowPlacement == HomeCatalogRowPlacement.NORMAL,
                 ) { isDragging ->
                     val elevation by animateDpAsState(if (isDragging) 4.dp else 0.dp)
 
@@ -362,6 +535,7 @@ private fun HomescreenCatalogList(
                                 },
                                 onTitleChange = { HomeCatalogSettingsRepository.setCustomTitle(item.key, it) },
                                 onEnabledChange = { HomeCatalogSettingsRepository.setEnabled(item.key, it) },
+                                onRowPlacementChange = { HomeCatalogSettingsRepository.setRowPlacement(item.key, it) },
                                 dragHandleScope = this@ReorderableItem,
                                 onPinnedDragAttempt = onPinnedDragAttempt,
                             )
