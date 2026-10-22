@@ -380,10 +380,6 @@ private fun AddonRowOrderSection(
                                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
                                         }
-                                    } else {
-                                        // Keep the saved order read-only without adding a lock icon
-                                        // to every add-on row. The section-level pencil is the edit entry point.
-                                        Spacer(modifier = Modifier.width(40.dp))
                                     }
                                 }
                             }
