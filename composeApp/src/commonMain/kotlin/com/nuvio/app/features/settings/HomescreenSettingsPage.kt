@@ -16,12 +16,18 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -44,6 +50,7 @@ import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.home.HomeAddonLayoutItem
 import com.nuvio.app.features.home.HomeAddonLayoutMode
+import com.nuvio.app.features.home.HomeAddonRowOrderPolicy
 import com.nuvio.app.features.home.HomeCatalogSettingsItem
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.HomeCatalogRowPlacement
@@ -82,15 +89,9 @@ import nuvio.composeapp.generated.resources.settings_homescreen_summary_hint
 import org.jetbrains.compose.resources.stringResource
 import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.draggableHandle
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
-@Composable
-private fun HomeAddonLayoutMode.displayLabel(): String = when (this) {
-    HomeAddonLayoutMode.NORMAL -> stringResource(Res.string.settings_homescreen_group_mode_normal)
-    HomeAddonLayoutMode.LOCKED -> stringResource(Res.string.settings_homescreen_group_mode_locked)
-    HomeAddonLayoutMode.PINNED_TOP -> stringResource(Res.string.settings_homescreen_group_mode_top)
-    HomeAddonLayoutMode.PINNED_BOTTOM -> stringResource(Res.string.settings_homescreen_group_mode_bottom)
-}
 
 internal fun LazyListScope.homescreenSettingsContent(
     isTablet: Boolean,
@@ -99,6 +100,7 @@ internal fun LazyListScope.homescreenSettingsContent(
     hideUnreleasedContent: Boolean,
     items: List<HomeCatalogSettingsItem>,
     addonGroups: List<HomeAddonLayoutItem>,
+    addonRowOrderPolicy: HomeAddonRowOrderPolicy,
     isCatalogLoading: Boolean,
     catalogErrorMessage: String?,
 ) {
@@ -164,153 +166,11 @@ internal fun LazyListScope.homescreenSettingsContent(
     }
     item {
         if (addonGroups.isNotEmpty()) {
-            var expandedAddonId by remember { mutableStateOf<String?>(null) }
-            var expandedAnchorAddonId by remember { mutableStateOf<String?>(null) }
-            SettingsSection(
-                title = stringResource(Res.string.settings_homescreen_addon_groups),
+            AddonRowOrderSection(
                 isTablet = isTablet,
-            ) {
-                SettingsGroup(isTablet = isTablet) {
-                    Text(
-                        text = stringResource(Res.string.settings_homescreen_addon_groups_description),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    )
-                    addonGroups.forEachIndexed { index, group ->
-                        if (index > 0) SettingsGroupDivider(isTablet = isTablet)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = if (isTablet) 20.dp else 16.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
-                            ) {
-                                Text(
-                                    text = group.addonName,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
-                                Text(
-                                    text = stringResource(
-                                        Res.string.settings_homescreen_group_rows_count,
-                                        group.catalogCount,
-                                    ) + " • " + group.mode.displayLabel() +
-                                        (group.anchorKey?.let { key ->
-                                            items.firstOrNull { it.key == key }?.displayTitle?.let { " • Before $it" }
-                                        } ?: ""),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                androidx.compose.foundation.layout.Box {
-                                    TextButton(
-                                        onClick = {
-                                            expandedAnchorAddonId = group.addonId.takeIf { expandedAnchorAddonId != it }
-                                            expandedAddonId = null
-                                        },
-                                    ) {
-                                        Text(if (group.anchorKey == null) "Insert before…" else "Change position")
-                                        Icon(
-                                            imageVector = Icons.Rounded.KeyboardArrowDown,
-                                            contentDescription = null,
-                                        )
-                                    }
-                                    DropdownMenu(
-                                        expanded = expandedAnchorAddonId == group.addonId,
-                                        onDismissRequest = { expandedAnchorAddonId = null },
-                                    ) {
-                                        items.filter { candidate ->
-                                            candidate.addonId != group.addonId &&
-                                                candidate.rowPlacement == HomeCatalogRowPlacement.NORMAL &&
-                                                candidate.addonLayoutMode == HomeAddonLayoutMode.NORMAL &&
-                                                !candidate.isPinnedToTop
-                                        }.forEach { anchor ->
-                                            DropdownMenuItem(
-                                                text = { Text("${anchor.displayTitle} — ${anchor.addonName}") },
-                                                onClick = {
-                                                    HomeCatalogSettingsRepository.setAddonAnchorKey(group.addonId, anchor.key)
-                                                    expandedAnchorAddonId = null
-                                                },
-                                            )
-                                        }
-                                        if (group.anchorKey != null) {
-                                            DropdownMenuItem(
-                                                text = { Text("Use normal row order") },
-                                                onClick = {
-                                                    HomeCatalogSettingsRepository.setAddonLayoutMode(
-                                                        group.addonId,
-                                                        HomeAddonLayoutMode.NORMAL,
-                                                    )
-                                                    expandedAnchorAddonId = null
-                                                },
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                            androidx.compose.foundation.layout.Box {
-                                TextButton(onClick = {
-                                    expandedAddonId = group.addonId.takeIf { expandedAddonId != it }
-                                    expandedAnchorAddonId = null
-                                }) {
-                                    Text(group.mode.displayLabel())
-                                    Icon(
-                                        imageVector = Icons.Rounded.KeyboardArrowDown,
-                                        contentDescription = null,
-                                    )
-                                }
-                                DropdownMenu(
-                                    expanded = expandedAddonId == group.addonId,
-                                    onDismissRequest = { expandedAddonId = null },
-                                ) {
-                                    HomeAddonLayoutMode.values().forEach { mode ->
-                                        DropdownMenuItem(
-                                            text = { Text(mode.displayLabel()) },
-                                            onClick = {
-                                                HomeCatalogSettingsRepository.setAddonLayoutMode(group.addonId, mode)
-                                                expandedAddonId = null
-                                            },
-                                        )
-                                    }
-                                }
-                            }
-                            Column(
-                                verticalArrangement = Arrangement.spacedBy(0.dp),
-                            ) {
-                                IconButton(
-                                    enabled = index > 0,
-                                    onClick = {
-                                        HomeCatalogSettingsRepository.moveAddonGroup(index, index - 1)
-                                    },
-                                    modifier = Modifier.size(32.dp),
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.KeyboardArrowUp,
-                                        contentDescription = "Move ${group.addonName} up",
-                                    )
-                                }
-                                IconButton(
-                                    enabled = index < addonGroups.lastIndex,
-                                    onClick = {
-                                        HomeCatalogSettingsRepository.moveAddonGroup(index, index + 1)
-                                    },
-                                    modifier = Modifier.size(32.dp),
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.KeyboardArrowDown,
-                                        contentDescription = "Move ${group.addonName} down",
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+                addonGroups = addonGroups,
+                savedPolicy = addonRowOrderPolicy,
+            )
         }
     }
     item {
@@ -367,6 +227,250 @@ internal fun LazyListScope.homescreenSettingsContent(
                     },
                 )
             }
+        }
+    }
+}
+
+
+@Composable
+private fun AddonRowOrderSection(
+    isTablet: Boolean,
+    addonGroups: List<HomeAddonLayoutItem>,
+    savedPolicy: HomeAddonRowOrderPolicy,
+) {
+    var editing by remember { mutableStateOf(false) }
+    var draftAddonIds by remember { mutableStateOf(emptyList<String>()) }
+    var draftPolicy by remember(savedPolicy) { mutableStateOf(savedPolicy) }
+    val haptics = LocalHapticFeedback.current
+    val groupById = addonGroups.associateBy { it.addonId }
+    val orderIds = if (editing) {
+        draftAddonIds.filter { it in groupById } +
+            addonGroups.map { it.addonId }.filterNot { it in draftAddonIds }
+    } else {
+        addonGroups.map { it.addonId }
+    }
+    val orderedGroups = orderIds.mapNotNull(groupById::get)
+    val listState = rememberLazyListState()
+    val reorderState = rememberReorderableLazyListState(listState) { from, to ->
+        if (!editing || from.index !in orderedGroups.indices || to.index !in orderedGroups.indices) {
+            return@rememberReorderableLazyListState
+        }
+        draftAddonIds = orderedGroups.map { it.addonId }.toMutableList().apply {
+            add(to.index, removeAt(from.index))
+        }
+        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    }
+
+    SettingsSection(
+        title = stringResource(Res.string.settings_homescreen_addon_row_order),
+        isTablet = isTablet,
+        actions = {
+            IconButton(
+                onClick = {
+                    if (editing) {
+                        editing = false
+                        draftAddonIds = emptyList()
+                        draftPolicy = savedPolicy
+                    } else {
+                        draftAddonIds = addonGroups.map { it.addonId }
+                        draftPolicy = savedPolicy
+                        editing = true
+                    }
+                },
+            ) {
+                Icon(
+                    imageVector = if (editing) Icons.Rounded.Close else Icons.Rounded.Edit,
+                    contentDescription = stringResource(
+                        if (editing) Res.string.settings_homescreen_addon_order_cancel
+                        else Res.string.settings_homescreen_addon_order_edit,
+                    ),
+                )
+            }
+        },
+    ) {
+        SettingsGroup(isTablet = isTablet) {
+            Text(
+                text = stringResource(Res.string.settings_homescreen_addon_row_order_description),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            )
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = if (isTablet) 760.dp else 560.dp),
+                state = listState,
+            ) {
+                itemsIndexed(orderedGroups, key = { _, group -> group.addonId }) { index, group ->
+                    ReorderableItem(
+                        state = reorderState,
+                        key = group.addonId,
+                        enabled = editing,
+                    ) { isDragging ->
+                        val elevation by animateDpAsState(if (isDragging) 4.dp else 0.dp)
+                        Surface(shadowElevation = elevation) {
+                            Column {
+                                if (index > 0) SettingsGroupDivider(isTablet = isTablet)
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(
+                                            horizontal = if (isTablet) 20.dp else 16.dp,
+                                            vertical = 12.dp,
+                                        ),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                                    ) {
+                                        Text(
+                                            text = group.addonName,
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                        )
+                                        Text(
+                                            text = stringResource(
+                                                Res.string.settings_homescreen_group_rows_count,
+                                                group.catalogCount,
+                                            ),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    if (editing) {
+                                        IconButton(
+                                            modifier = with(this@ReorderableItem) {
+                                                Modifier.draggableHandle(
+                                                    onDragStarted = {
+                                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    },
+                                                    onDragStopped = {
+                                                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    },
+                                                )
+                                            },
+                                            onClick = {},
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Menu,
+                                                contentDescription = stringResource(
+                                                    Res.string.settings_homescreen_addon_order_reorder,
+                                                ),
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Lock,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (editing) {
+                SettingsGroupDivider(isTablet = isTablet)
+                Text(
+                    text = stringResource(Res.string.settings_homescreen_addon_order_policy_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                )
+                AddonRowOrderPolicyOption(
+                    isTablet = isTablet,
+                    selected = draftPolicy == HomeAddonRowOrderPolicy.MOVE_ALL_ROWS,
+                    title = stringResource(Res.string.settings_homescreen_addon_order_all_title),
+                    description = stringResource(Res.string.settings_homescreen_addon_order_all_description),
+                    onSelected = { draftPolicy = HomeAddonRowOrderPolicy.MOVE_ALL_ROWS },
+                )
+                AddonRowOrderPolicyOption(
+                    isTablet = isTablet,
+                    selected = draftPolicy == HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS,
+                    title = stringResource(Res.string.settings_homescreen_addon_order_unpinned_title),
+                    description = stringResource(Res.string.settings_homescreen_addon_order_unpinned_description),
+                    onSelected = { draftPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS },
+                )
+                AddonRowOrderPolicyOption(
+                    isTablet = isTablet,
+                    selected = draftPolicy == HomeAddonRowOrderPolicy.UPCOMING_ROWS_ONLY,
+                    title = stringResource(Res.string.settings_homescreen_addon_order_upcoming_title),
+                    description = stringResource(Res.string.settings_homescreen_addon_order_upcoming_description),
+                    onSelected = { draftPolicy = HomeAddonRowOrderPolicy.UPCOMING_ROWS_ONLY },
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(
+                        onClick = {
+                            editing = false
+                            draftAddonIds = emptyList()
+                            draftPolicy = savedPolicy
+                        },
+                    ) {
+                        Text(stringResource(Res.string.settings_homescreen_addon_order_cancel))
+                    }
+                    Button(
+                        onClick = {
+                            HomeCatalogSettingsRepository.saveAddonRowOrder(
+                                addonIds = orderedGroups.map { it.addonId },
+                                policy = draftPolicy,
+                            )
+                            editing = false
+                            draftAddonIds = emptyList()
+                        },
+                    ) {
+                        Text(stringResource(Res.string.settings_homescreen_addon_order_save))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddonRowOrderPolicyOption(
+    isTablet: Boolean,
+    selected: Boolean,
+    title: String,
+    description: String,
+    onSelected: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onSelected)
+            .padding(horizontal = if (isTablet) 20.dp else 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        RadioButton(selected = selected, onClick = onSelected)
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

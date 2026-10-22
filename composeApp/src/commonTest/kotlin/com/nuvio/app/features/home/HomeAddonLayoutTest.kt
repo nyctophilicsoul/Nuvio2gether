@@ -323,6 +323,114 @@ class HomeAddonLayoutTest {
         )
     }
 
+
+    @Test
+    fun `moving all rows groups pinned and unpinned catalogs by add-on order`() {
+        val definitions = listOf(
+            definition("A", "one"),
+            definition("C", "top"),
+            definition("B", "one"),
+            definition("C", "normal"),
+            definition("D", "one"),
+            definition("C", "bottom"),
+        )
+        val base = snapshot(
+            definitions = definitions,
+            layouts = mapOf(
+                "C" to HomeAddonLayoutPreference(HomeAddonLayoutMode.NORMAL, order = 0, anchorOrder = 0),
+                "A" to HomeAddonLayoutPreference(HomeAddonLayoutMode.NORMAL, order = 1, anchorOrder = 1),
+                "B" to HomeAddonLayoutPreference(HomeAddonLayoutMode.NORMAL, order = 2, anchorOrder = 2),
+                "D" to HomeAddonLayoutPreference(HomeAddonLayoutMode.NORMAL, order = 3, anchorOrder = 3),
+            ),
+        )
+        val pinned = base.copy(
+            addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_ALL_ROWS,
+            preferences = base.preferences +
+                ("C:movie:top" to base.preferences.getValue("C:movie:top").copy(
+                    rowPlacement = HomeCatalogRowPlacement.PINNED_TOP,
+                )) +
+                ("C:movie:bottom" to base.preferences.getValue("C:movie:bottom").copy(
+                    rowPlacement = HomeCatalogRowPlacement.PINNED_BOTTOM,
+                )),
+        )
+
+        assertEquals(
+            listOf("C:top", "C:normal", "C:bottom", "A:one", "B:one", "D:one"),
+            orderHomeCatalogDefinitions(definitions, pinned).map(::label),
+        )
+    }
+
+    @Test
+    fun `unpinned-only add-on ordering leaves individual row pins in their own sections`() {
+        val definitions = listOf(
+            definition("A", "one"),
+            definition("C", "top"),
+            definition("B", "one"),
+            definition("C", "normal"),
+            definition("D", "one"),
+            definition("C", "bottom"),
+        )
+        val base = snapshot(
+            definitions = definitions,
+            layouts = mapOf(
+                "C" to HomeAddonLayoutPreference(HomeAddonLayoutMode.NORMAL, order = 0, anchorOrder = 0),
+                "A" to HomeAddonLayoutPreference(HomeAddonLayoutMode.NORMAL, order = 1, anchorOrder = 1),
+                "B" to HomeAddonLayoutPreference(HomeAddonLayoutMode.NORMAL, order = 2, anchorOrder = 2),
+                "D" to HomeAddonLayoutPreference(HomeAddonLayoutMode.NORMAL, order = 3, anchorOrder = 3),
+            ),
+        )
+        val pinned = base.copy(
+            addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS,
+            preferences = base.preferences +
+                ("C:movie:top" to base.preferences.getValue("C:movie:top").copy(
+                    rowPlacement = HomeCatalogRowPlacement.PINNED_TOP,
+                )) +
+                ("C:movie:bottom" to base.preferences.getValue("C:movie:bottom").copy(
+                    rowPlacement = HomeCatalogRowPlacement.PINNED_BOTTOM,
+                )),
+        )
+
+        assertEquals(
+            listOf("C:top", "C:normal", "A:one", "B:one", "D:one", "C:bottom"),
+            orderHomeCatalogDefinitions(definitions, pinned).map(::label),
+        )
+    }
+
+    @Test
+    fun `upcoming-only order leaves existing rows in place and groups new rows by add-on order`() {
+        val definitions = listOf(
+            definition("A", "existing"),
+            definition("C", "existing"),
+            definition("B", "existing"),
+            definition("A", "new"),
+            definition("C", "new"),
+        )
+        val base = snapshot(
+            definitions = definitions,
+            layouts = mapOf(
+                "C" to HomeAddonLayoutPreference(HomeAddonLayoutMode.NORMAL, order = 0, anchorOrder = 0),
+                "A" to HomeAddonLayoutPreference(HomeAddonLayoutMode.NORMAL, order = 1, anchorOrder = 1),
+                "B" to HomeAddonLayoutPreference(HomeAddonLayoutMode.NORMAL, order = 2, anchorOrder = 2),
+            ),
+            explicitOrders = mapOf(
+                "A:movie:existing" to 0,
+                "C:movie:existing" to 1,
+                "B:movie:existing" to 2,
+                "A:movie:new" to 3,
+                "C:movie:new" to 4,
+            ),
+        )
+        val futureOnly = base.copy(
+            addonRowOrderPolicy = HomeAddonRowOrderPolicy.UPCOMING_ROWS_ONLY,
+            upcomingRowKeys = setOf("A:movie:new", "C:movie:new"),
+        )
+
+        assertEquals(
+            listOf("A:existing", "C:existing", "B:existing", "C:new", "A:new"),
+            orderHomeCatalogDefinitions(definitions, futureOnly).map(::label),
+        )
+    }
+
     private fun settingItem(addonId: String, catalogId: String, order: Int) =
         HomeCatalogSettingsItem(
             key = "$addonId:movie:$catalogId",
