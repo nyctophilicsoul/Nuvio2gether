@@ -303,7 +303,7 @@ private fun AddonRowOrderSection(
             ) {
                 itemsIndexed(orderedGroups, key = { _, group -> group.addonId }) { index, group ->
                     ReorderableItem(
-                        state = reorderState,
+                        reorderState,
                         key = group.addonId,
                         enabled = editing,
                     ) { isDragging ->

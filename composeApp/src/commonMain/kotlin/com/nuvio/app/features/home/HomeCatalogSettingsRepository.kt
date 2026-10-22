@@ -701,11 +701,9 @@ object HomeCatalogSettingsRepository {
                     order = preference?.order ?: 0,
                     addonId = if (ServerCatalog.isServerKey(definition.key)) null else definition.addonGroupId(),
                     rowPlacement = HomeCatalogRowPlacement.fromStorage(preference?.rowPlacement),
-                    addonLayoutMode = if (ServerCatalog.isServerKey(definition.key)) {
-                        HomeAddonLayoutMode.NORMAL
-                    } else {
-                        HomeAddonLayoutMode.fromStorage(addonLayouts[definition.addonGroupId()]?.mode)
-                    },
+                    // Add-on ordering is now controlled by the separate Add-ons Row Order section.
+                    // Do not let legacy group modes block individual row pinning or reordering.
+                    addonLayoutMode = HomeAddonLayoutMode.NORMAL,
                 )
             }
 

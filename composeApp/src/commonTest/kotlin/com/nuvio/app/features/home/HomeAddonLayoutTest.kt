@@ -74,7 +74,7 @@ class HomeAddonLayoutTest {
     }
 
     @Test
-    fun `locked add-on inserts new catalogs before a stable row and individual pins override the group`() {
+    fun `unpinned rows stay grouped while individually pinned rows keep their placement`() {
         val definitions = listOf(
             definition("A", "one"),
             definition("C", "one"),
@@ -173,7 +173,7 @@ class HomeAddonLayoutTest {
     }
 
     @Test
-    fun `actual home settings order keeps locked add-on anchor after catalog IDs change`() {
+    fun `home settings retain grouped ordering when catalog identifiers change`() {
         val items = listOf(
             settingItem("A", "one", 0),
             settingItem("B", "one", 1),
@@ -198,7 +198,7 @@ class HomeAddonLayoutTest {
     }
 
     @Test
-    fun `pinned collections retain priority when add-ons are pinned as a group`() {
+    fun `pinned collections retain priority when add-on order changes`() {
         val items = listOf(
             HomeCatalogSettingsItem(
                 key = "collection_favorites",
@@ -256,7 +256,7 @@ class HomeAddonLayoutTest {
     }
 
     @Test
-    fun `pin-at-position row keeps its place when its add-on is pinned to bottom`() {
+    fun `pin-at-position rows stay independent of add-on ordering`() {
         val items = listOf(
             settingItem("A", "one", 0),
             settingItem("C", "one", 1),
