@@ -77,6 +77,7 @@ fun HomescreenSettingsScreen(
             showCatalogType = homescreenSettingsUiState.showCatalogType,
             hideUnreleasedContent = homescreenSettingsUiState.hideUnreleasedContent,
             items = homescreenSettingsUiState.items,
+            addonGroups = homescreenSettingsUiState.addonGroups,
             isCatalogLoading = addonManifestsLoading,
             catalogErrorMessage = addonManifestErrorMessage,
         )
