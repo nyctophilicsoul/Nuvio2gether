@@ -843,12 +843,12 @@ internal fun orderHomeCatalogSettingsItems(
     val pinnedCollections = original.map { it.value }.filter { it.isCollection && it.isPinnedToTop }
     val pinnedCollectionKeys = pinnedCollections.mapTo(mutableSetOf(), HomeCatalogSettingsItem::key)
     val topGroups = addonRows.filter { (id, _) ->
-        HomeAddonLayoutMode.fromStorage(addonLayouts[id]?.mode) == HomeAddonLayoutMode.PINNED_TOP
+        addonLayouts[id]?.mode ?: HomeAddonLayoutMode.NORMAL == HomeAddonLayoutMode.PINNED_TOP
     }.entries.sortedWith(compareBy<Map.Entry<String, List<HomeCatalogSettingsItem>>> {
         addonLayouts[it.key]?.order ?: rowOrder(it.value)
     }.thenBy { it.key })
     val bottomGroups = addonRows.filter { (id, _) ->
-        HomeAddonLayoutMode.fromStorage(addonLayouts[id]?.mode) == HomeAddonLayoutMode.PINNED_BOTTOM
+        addonLayouts[id]?.mode ?: HomeAddonLayoutMode.NORMAL == HomeAddonLayoutMode.PINNED_BOTTOM
     }.entries.sortedWith(compareBy<Map.Entry<String, List<HomeCatalogSettingsItem>>> {
         addonLayouts[it.key]?.order ?: rowOrder(it.value)
     }.thenBy { it.key })
@@ -857,7 +857,7 @@ internal fun orderHomeCatalogSettingsItems(
 
     addonRows.forEach { (addonId, rows) ->
         if (addonId in reserved) return@forEach
-        val mode = HomeAddonLayoutMode.fromStorage(addonLayouts[addonId]?.mode)
+        val mode = addonLayouts[addonId]?.mode ?: HomeAddonLayoutMode.NORMAL
         val storedOrder = addonLayouts[addonId]?.order
         val order = when (mode) {
             HomeAddonLayoutMode.LOCKED -> addonLayouts[addonId]?.anchorOrder ?: storedOrder ?: rowOrder(rows)
@@ -920,12 +920,12 @@ internal fun orderHomeCatalogDefinitions(
     )
 
     val topGroups = addonRows.filter { (id, _) ->
-        HomeAddonLayoutMode.fromStorage(snapshot.addonLayouts[id]?.mode) == HomeAddonLayoutMode.PINNED_TOP
+        snapshot.addonLayouts[id]?.mode ?: HomeAddonLayoutMode.NORMAL == HomeAddonLayoutMode.PINNED_TOP
     }.entries.sortedWith(compareBy<Map.Entry<String, List<HomeCatalogDefinition>>> {
         snapshot.addonLayouts[it.key]?.order ?: rowOrder(it.value)
     }.thenBy { it.key })
     val bottomGroups = addonRows.filter { (id, _) ->
-        HomeAddonLayoutMode.fromStorage(snapshot.addonLayouts[id]?.mode) == HomeAddonLayoutMode.PINNED_BOTTOM
+        snapshot.addonLayouts[id]?.mode ?: HomeAddonLayoutMode.NORMAL == HomeAddonLayoutMode.PINNED_BOTTOM
     }.entries.sortedWith(compareBy<Map.Entry<String, List<HomeCatalogDefinition>>> {
         snapshot.addonLayouts[it.key]?.order ?: rowOrder(it.value)
     }.thenBy { it.key })
