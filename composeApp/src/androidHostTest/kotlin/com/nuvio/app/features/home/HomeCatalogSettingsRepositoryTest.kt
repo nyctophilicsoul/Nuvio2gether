@@ -119,6 +119,28 @@ class HomeCatalogSettingsRepositoryTest {
     }
 
     @Test
+    fun movingAnotherRowAcrossPositionPinnedRowDoesNotDisplaceTheAnchor() {
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(addon(listOf("popular", "middle", "latest"))))
+        val pinnedKey = "test:movie:middle"
+        HomeCatalogSettingsRepository.setRowPlacement(
+            pinnedKey,
+            HomeCatalogRowPlacement.PINNED_POSITION,
+        )
+
+        val before = HomeCatalogSettingsRepository.uiState.value.items.map { it.key }
+        val pinnedIndex = before.indexOf(pinnedKey)
+        assertTrue(pinnedIndex > 0)
+
+        HomeCatalogSettingsRepository.moveByIndex(fromIndex = 0, toIndex = pinnedIndex)
+
+        assertEquals(before, HomeCatalogSettingsRepository.uiState.value.items.map { it.key })
+        assertEquals(
+            HomeCatalogRowPlacement.PINNED_POSITION,
+            HomeCatalogSettingsRepository.uiState.value.items.single { it.key == pinnedKey }.rowPlacement,
+        )
+    }
+
+    @Test
     fun addonGroupLockSurvivesCatalogIdentifierChangesAndLocalReload() {
         HomeCatalogSettingsRepository.syncCatalogs(listOf(addon(listOf("old", "older"))))
         HomeCatalogSettingsRepository.setAddonLayoutMode("test", HomeAddonLayoutMode.LOCKED)
