@@ -429,11 +429,11 @@ object HomeCatalogSettingsRepository {
             currentLayouts[group.addonId] = StoredHomeAddonLayoutPreference(
                 addonId = group.addonId,
                 mode = existing?.mode ?: HomeAddonLayoutMode.NORMAL.storageValue,
+                // Group ordering is independent from the row anchor. Moving a group must
+                // never rewrite its saved anchor or the placement of individually pinned rows.
                 order = index,
-                anchorOrder = if (
-                    HomeAddonLayoutMode.fromStorage(existing?.mode) == HomeAddonLayoutMode.LOCKED
-                ) index else existing?.anchorOrder ?: index,
-                anchorKey = existing?.anchorKey,
+                anchorOrder = existing?.anchorOrder ?: group.anchorOrder,
+                anchorKey = existing?.anchorKey ?: group.anchorKey,
             )
         }
         addonLayouts = currentLayouts
