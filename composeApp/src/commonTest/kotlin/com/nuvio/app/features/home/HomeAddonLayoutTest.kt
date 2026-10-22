@@ -5,7 +5,7 @@ import kotlin.test.assertEquals
 
 class HomeAddonLayoutTest {
     @Test
-    fun `normal add-ons preserve existing per-row order`() {
+    fun `default add-on row ordering groups unpinned catalogs by add-on`() {
         val definitions = listOf(
             definition("A", "one"),
             definition("C", "one"),
@@ -15,13 +15,13 @@ class HomeAddonLayoutTest {
         )
 
         assertEquals(
-            listOf("A:one", "C:one", "B:one", "C:two", "D:one"),
+            listOf("A:one", "C:one", "C:two", "B:one", "D:one"),
             orderHomeCatalogDefinitions(definitions, snapshot(definitions)).map(::label),
         )
     }
 
     @Test
-    fun `locked add-on rows stay together at their saved position`() {
+    fun `saved add-on order groups its unpinned rows together`() {
         val definitions = listOf(
             definition("A", "one"),
             definition("C", "one"),
@@ -45,7 +45,7 @@ class HomeAddonLayoutTest {
     }
 
     @Test
-    fun `locked add-on keeps its anchor when the add-on replaces catalog identifiers`() {
+    fun `legacy anchors no longer override the new add-on row order`() {
         val definitions = listOf(
             definition("A", "one"),
             definition("B", "one"),
@@ -68,7 +68,7 @@ class HomeAddonLayoutTest {
         )
 
         assertEquals(
-            listOf("A:one", "B:one", "C:new", "D:one"),
+            listOf("A:one", "B:one", "D:one", "C:new"),
             orderHomeCatalogDefinitions(definitions, state).map(::label),
         )
     }
@@ -112,7 +112,7 @@ class HomeAddonLayoutTest {
     }
 
     @Test
-    fun `pinning add-on to top or bottom groups its current and future rows`() {
+    fun `legacy add-on placement modes no longer override individual row pins`() {
         val definitions = listOf(
             definition("A", "one"),
             definition("C", "one"),
@@ -138,17 +138,17 @@ class HomeAddonLayoutTest {
         )
 
         assertEquals(
-            listOf("C:one", "C:two", "A:one", "B:one", "D:one"),
+            listOf("A:one", "C:one", "C:two", "B:one", "D:one"),
             orderHomeCatalogDefinitions(definitions, top).map(::label),
         )
         assertEquals(
-            listOf("A:one", "B:one", "D:one", "C:one", "C:two"),
+            listOf("A:one", "C:one", "C:two", "B:one", "D:one"),
             orderHomeCatalogDefinitions(definitions, bottom).map(::label),
         )
     }
 
     @Test
-    fun `actual home settings order groups pinned add-on rows`() {
+    fun `actual home settings order follows saved add-on row order`() {
         val items = listOf(
             settingItem("A", "one", 0),
             settingItem("C", "one", 1),
@@ -167,7 +167,7 @@ class HomeAddonLayoutTest {
         )
 
         assertEquals(
-            listOf("C:one", "C:two", "A:one", "B:one", "D:one"),
+            listOf("A:one", "C:one", "C:two", "B:one", "D:one"),
             orderHomeCatalogSettingsItems(items, addonIds, layouts).map(::settingLabel),
         )
     }
@@ -223,7 +223,7 @@ class HomeAddonLayoutTest {
         )
 
         assertEquals(
-            listOf("collection_favorites", "C:one", "A:one", "B:one"),
+            listOf("collection_favorites", "A:one", "C:one", "B:one"),
             orderHomeCatalogSettingsItems(items, addonIds, layouts).map(::settingLabel),
         )
     }
@@ -272,7 +272,7 @@ class HomeAddonLayoutTest {
             order = 1,
             anchorOrder = 1,
         ))
-        val expected = listOf("A:one", "B:one", "C:two", "D:one", "C:one", "C:new")
+        val expected = listOf("A:one", "C:one", "C:new", "B:one", "C:two", "D:one")
 
         assertEquals(expected, orderHomeCatalogSettingsItems(items, addonIds, layouts).map(::settingLabel))
 

@@ -1055,8 +1055,8 @@ internal fun orderHomeCatalogSettingsItems(
         addonIdByCatalogKey[row.key]?.let { addonId ->
             addonId to (addonLayouts[addonId]?.order ?: rankByKey[row.key] ?: row.order)
         }
-    }.groupBy({ it.first }, { it.second }).mapValues { (_, values) ->
-        addonLayouts[it.key]?.order ?: values.minOrNull() ?: Int.MAX_VALUE
+    }.groupBy({ it.first }, { it.second }).mapValues { (addonId, values) ->
+        addonLayouts[addonId]?.order ?: values.minOrNull() ?: Int.MAX_VALUE
     }
 
     fun unitsFor(
