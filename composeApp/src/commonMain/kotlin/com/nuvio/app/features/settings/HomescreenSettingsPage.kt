@@ -500,19 +500,26 @@ private fun HomescreenCatalogList(
     ) { from, to ->
         val fromItem = items.getOrNull(from.index)
         val toItem = items.getOrNull(to.index)
-        if (fromItem?.isPinnedToTop == true || toItem?.isPinnedToTop == true ||
-            fromItem?.rowPlacement != HomeCatalogRowPlacement.NORMAL ||
-            toItem?.rowPlacement != HomeCatalogRowPlacement.NORMAL
-        ) {
+        fun pinSection(item: HomeCatalogSettingsItem?): HomeCatalogRowPlacement? = when {
+            item == null -> null
+            item.rowPlacement == HomeCatalogRowPlacement.PINNED_TOP ||
+                (item.isCollection && item.isPinnedToTop) -> HomeCatalogRowPlacement.PINNED_TOP
+            item.rowPlacement == HomeCatalogRowPlacement.PINNED_BOTTOM -> HomeCatalogRowPlacement.PINNED_BOTTOM
+            item.rowPlacement == HomeCatalogRowPlacement.NORMAL && !item.isPinnedToTop -> HomeCatalogRowPlacement.NORMAL
+            else -> item.rowPlacement
+        }
+        val fromSection = pinSection(fromItem)
+        val toSection = pinSection(toItem)
+        if (fromSection != toSection) {
             onPinnedDragAttempt()
             return@rememberReorderableLazyListState
         }
         val rangeStart = minOf(from.index, to.index).coerceAtLeast(0)
         val rangeEnd = maxOf(from.index, to.index).coerceAtMost(items.lastIndex)
-        val crossesPinnedRow = rangeStart <= rangeEnd && items
+        val crossesPinnedSection = rangeStart <= rangeEnd && items
             .subList(rangeStart, rangeEnd + 1)
-            .any { it.rowPlacement != HomeCatalogRowPlacement.NORMAL || it.isPinnedToTop }
-        if (crossesPinnedRow) {
+            .any { pinSection(it) != fromSection }
+        if (crossesPinnedSection) {
             onPinnedDragAttempt()
             return@rememberReorderableLazyListState
         }
@@ -546,7 +553,9 @@ private fun HomescreenCatalogList(
                 ReorderableItem(
                     reorderableLazyListState,
                     key = item.key,
-                    enabled = !item.isPinnedToTop && item.rowPlacement == HomeCatalogRowPlacement.NORMAL,
+                    enabled = item.rowPlacement == HomeCatalogRowPlacement.NORMAL ||
+                        item.rowPlacement == HomeCatalogRowPlacement.PINNED_TOP ||
+                        item.rowPlacement == HomeCatalogRowPlacement.PINNED_BOTTOM,
                 ) { isDragging ->
                     val elevation by animateDpAsState(if (isDragging) 4.dp else 0.dp)
 
