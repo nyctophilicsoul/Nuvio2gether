@@ -37,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
@@ -86,10 +87,22 @@ import nuvio.composeapp.generated.resources.settings_homescreen_show_hero
 import nuvio.composeapp.generated.resources.settings_homescreen_show_hero_description
 import nuvio.composeapp.generated.resources.settings_homescreen_summary
 import nuvio.composeapp.generated.resources.settings_homescreen_summary_hint
+import nuvio.composeapp.generated.resources.settings_homescreen_addon_row_order
+import nuvio.composeapp.generated.resources.settings_homescreen_addon_row_order_description
+import nuvio.composeapp.generated.resources.settings_homescreen_addon_order_edit
+import nuvio.composeapp.generated.resources.settings_homescreen_addon_order_cancel
+import nuvio.composeapp.generated.resources.settings_homescreen_addon_order_save
+import nuvio.composeapp.generated.resources.settings_homescreen_addon_order_reorder
+import nuvio.composeapp.generated.resources.settings_homescreen_addon_order_policy_title
+import nuvio.composeapp.generated.resources.settings_homescreen_addon_order_all_title
+import nuvio.composeapp.generated.resources.settings_homescreen_addon_order_all_description
+import nuvio.composeapp.generated.resources.settings_homescreen_addon_order_unpinned_title
+import nuvio.composeapp.generated.resources.settings_homescreen_addon_order_unpinned_description
+import nuvio.composeapp.generated.resources.settings_homescreen_addon_order_upcoming_title
+import nuvio.composeapp.generated.resources.settings_homescreen_addon_order_upcoming_description
 import org.jetbrains.compose.resources.stringResource
 import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.ReorderableItem
-import sh.calvin.reorderable.draggableHandle
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
 
@@ -250,12 +263,18 @@ private fun AddonRowOrderSection(
         addonGroups.map { it.addonId }
     }
     val orderedGroups = orderIds.mapNotNull(groupById::get)
+    // Keep the reorder callback in sync with draft state; rememberReorderableLazyListState
+    // may retain its callback while Compose recomposes the list after each drag.
+    val latestOrderIds by rememberUpdatedState(orderIds)
     val listState = rememberLazyListState()
     val reorderState = rememberReorderableLazyListState(listState) { from, to ->
-        if (!editing || from.index !in orderedGroups.indices || to.index !in orderedGroups.indices) {
+        val currentIds = latestOrderIds.toMutableList()
+        if (!editing || from.index !in currentIds.indices ||
+            to.index !in currentIds.indices || from.index == to.index
+        ) {
             return@rememberReorderableLazyListState
         }
-        draftAddonIds = orderedGroups.map { it.addonId }.toMutableList().apply {
+        draftAddonIds = currentIds.apply {
             add(to.index, removeAt(from.index))
         }
         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
