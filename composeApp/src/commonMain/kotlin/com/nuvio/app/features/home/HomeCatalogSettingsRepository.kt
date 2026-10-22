@@ -510,7 +510,7 @@ object HomeCatalogSettingsRepository {
             items.subList(start, end + 1).all {
                 it.addonId == fromItem.addonId && it.addonLayoutMode != HomeAddonLayoutMode.NORMAL
             }
-        if (crossedManagedGroup && !staysInsideManagedGroup && !fromItem.isCollection) return
+        if (fromPinSection == HomeCatalogRowPlacement.NORMAL && crossedManagedGroup && !staysInsideManagedGroup && !fromItem.isCollection) return
         val orderedKeys = items.map { it.key }.toMutableList().apply { add(toIndex, removeAt(fromIndex)) }
         persistVisibleOrder(orderedKeys)
         publish()
