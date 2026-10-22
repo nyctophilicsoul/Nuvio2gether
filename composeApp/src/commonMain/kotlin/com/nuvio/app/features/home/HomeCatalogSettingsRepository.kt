@@ -466,21 +466,42 @@ object HomeCatalogSettingsRepository {
         val knownIds = groups.mapTo(linkedSetOf()) { it.addonId }
         val requestedOrder = addonIds.filter { it in knownIds }.distinct()
         val completeOrder = requestedOrder + groups.map { it.addonId }.filterNot { it in requestedOrder }
-        if (policy == HomeAddonRowOrderPolicy.UPCOMING_ROWS_ONLY) {
-            // Freeze visible order before switching policies. The saved add-on order will
-            // then affect only catalogs discovered after this save.
-            persistVisibleOrder(_uiState.value.items.map { it.key })
+        when (policy) {
+            HomeAddonRowOrderPolicy.MOVE_ALL_ROWS -> {
+                // Option 1 is an explicit reset: every catalog row owned by an add-on in
+                // this ordering list joins its group, so clear only those rows' individual
+                // pin placements. Other add-ons and collections retain their settings.
+                val affectedKeys = definitions.asSequence()
+                    .filter { it.addonGroupId() in completeOrder }
+                    .map { it.key }
+                    .toSet()
+                preferences = preferences.mapValues { (key, preference) ->
+                    if (key in affectedKeys &&
+                        HomeCatalogRowPlacement.fromStorage(preference.rowPlacement) != HomeCatalogRowPlacement.NORMAL
+                    ) {
+                        preference.copy(rowPlacement = HomeCatalogRowPlacement.NORMAL.storageValue)
+                    } else {
+                        preference
+                    }
+                }
+            }
+            HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS -> {
+                // Option 2 deliberately preserves every individual row pin.
+            }
+            HomeAddonRowOrderPolicy.UPCOMING_ROWS_ONLY -> {
+                // Option 3 freezes the current visible order and leaves existing pins alone.
+                // Newly discovered catalog keys are tracked during the next catalog sync.
+                persistVisibleOrder(_uiState.value.items.map { it.key })
+            }
         }
         addonRowOrderPolicy = policy
         upcomingRowKeys = emptySet()
         val nextLayouts = addonLayouts.toMutableMap()
         completeOrder.forEachIndexed { index, addonId ->
-            val existing = nextLayouts[addonId]
             nextLayouts[addonId] = StoredHomeAddonLayoutPreference(
                 addonId = addonId,
-                // Legacy placement modes and anchors are intentionally retired by this UI.
-                // Keep their fields in the stored schema for downgrade compatibility, but
-                // normalize them when the user saves the new add-on row order controls.
+                // The new UI uses group order only; legacy mode/anchor values remain in
+                // the stored schema for downgrade compatibility, but are normalized here.
                 mode = HomeAddonLayoutMode.NORMAL.storageValue,
                 order = index,
                 anchorOrder = index,
