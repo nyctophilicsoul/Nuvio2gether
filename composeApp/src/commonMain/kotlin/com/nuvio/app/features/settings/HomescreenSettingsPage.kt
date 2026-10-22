@@ -279,6 +279,34 @@ internal fun LazyListScope.homescreenSettingsContent(
                                     }
                                 }
                             }
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(0.dp),
+                            ) {
+                                IconButton(
+                                    enabled = index > 0,
+                                    onClick = {
+                                        HomeCatalogSettingsRepository.moveAddonGroup(index, index - 1)
+                                    },
+                                    modifier = Modifier.size(32.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.KeyboardArrowUp,
+                                        contentDescription = "Move ${group.addonName} up",
+                                    )
+                                }
+                                IconButton(
+                                    enabled = index < addonGroups.lastIndex,
+                                    onClick = {
+                                        HomeCatalogSettingsRepository.moveAddonGroup(index, index + 1)
+                                    },
+                                    modifier = Modifier.size(32.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.KeyboardArrowDown,
+                                        contentDescription = "Move ${group.addonName} down",
+                                    )
+                                }
+                            }
                         }
                     }
                 }
