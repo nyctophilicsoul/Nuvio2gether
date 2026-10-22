@@ -295,6 +295,34 @@ class HomeAddonLayoutTest {
         assertEquals(expected, orderHomeCatalogDefinitions(definitions, state).map(::label))
     }
 
+    @Test
+    fun `pinned top and bottom rows can each be reordered without changing normal rows`() {
+        val items = listOf(
+            settingItem("A", "top-one", 0).copy(rowPlacement = HomeCatalogRowPlacement.PINNED_TOP),
+            settingItem("B", "normal", 1),
+            settingItem("C", "top-two", 2).copy(rowPlacement = HomeCatalogRowPlacement.PINNED_TOP),
+            settingItem("D", "bottom-one", 3).copy(rowPlacement = HomeCatalogRowPlacement.PINNED_BOTTOM),
+            settingItem("E", "bottom-two", 4).copy(rowPlacement = HomeCatalogRowPlacement.PINNED_BOTTOM),
+        )
+        val addonIds = items.filterNot { it.isCollection }
+            .associate { it.key to it.key.substringBefore(":movie:") }
+
+        val reordered = items.map { item ->
+            when (item.key) {
+                "C:movie:top-two" -> item.copy(order = 0)
+                "A:movie:top-one" -> item.copy(order = 2)
+                "E:movie:bottom-two" -> item.copy(order = 3)
+                "D:movie:bottom-one" -> item.copy(order = 4)
+                else -> item
+            }
+        }
+
+        assertEquals(
+            listOf("C:top-two", "A:top-one", "B:normal", "E:bottom-two", "D:bottom-one"),
+            orderHomeCatalogSettingsItems(reordered, addonIds, emptyMap()).map(::settingLabel),
+        )
+    }
+
     private fun settingItem(addonId: String, catalogId: String, order: Int) =
         HomeCatalogSettingsItem(
             key = "$addonId:movie:$catalogId",
