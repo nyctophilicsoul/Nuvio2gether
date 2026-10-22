@@ -935,7 +935,7 @@ internal fun orderHomeCatalogDefinitions(
     addonRows.forEach { (id, rows) ->
         if (id in reserved) return@forEach
         val layout = snapshot.addonLayouts[id]
-        val mode = HomeAddonLayoutMode.fromStorage(layout?.mode)
+        val mode = layout?.mode ?: HomeAddonLayoutMode.NORMAL
         val order = if (mode == HomeAddonLayoutMode.LOCKED) {
             layout?.anchorOrder ?: layout?.order ?: rowOrder(rows)
         } else {
