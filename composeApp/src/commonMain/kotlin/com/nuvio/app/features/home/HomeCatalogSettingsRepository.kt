@@ -466,11 +466,10 @@ object HomeCatalogSettingsRepository {
         val knownIds = groups.mapTo(linkedSetOf()) { it.addonId }
         val requestedOrder = addonIds.filter { it in knownIds }.distinct()
         val completeOrder = requestedOrder + groups.map { it.addonId }.filterNot { it in requestedOrder }
-        val policyChanged = addonRowOrderPolicy != policy
         addonRowOrderPolicy = policy
-        if (policyChanged || policy != HomeAddonRowOrderPolicy.UPCOMING_ROWS_ONLY) {
-            upcomingRowKeys = emptySet()
-        }
+        // Saving makes the currently displayed rows the new baseline. Only catalogs
+        // discovered by a later refresh should be affected by upcoming-only ordering.
+        upcomingRowKeys = emptySet()
         val nextLayouts = addonLayouts.toMutableMap()
         completeOrder.forEachIndexed { index, addonId ->
             val existing = nextLayouts[addonId]
