@@ -165,6 +165,7 @@ internal fun LazyListScope.homescreenSettingsContent(
     item {
         if (addonGroups.isNotEmpty()) {
             var expandedAddonId by remember { mutableStateOf<String?>(null) }
+            var expandedAnchorAddonId by remember { mutableStateOf<String?>(null) }
             SettingsSection(
                 title = stringResource(Res.string.settings_homescreen_addon_groups),
                 isTablet = isTablet,
