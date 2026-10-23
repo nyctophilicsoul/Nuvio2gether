@@ -617,6 +617,14 @@ object HomeCatalogSettingsRepository {
             preferences = preferences + (fromKey to current.copy(rowPlacement = newPlacement.storageValue))
         }
         persistVisibleOrder(orderedKeys)
+        // A manual move across add-ons must take precedence over the default grouping.
+        // Preserve the current order of existing catalog rows; newly discovered rows
+        // can still be placed using the saved add-on order.
+        if (!movingCollection && fromItem.addonId != toItem.addonId) {
+            preservedOrderRowKeys = definitions
+                .filterNot { ServerCatalog.isServerKey(it.key) }
+                .mapTo(mutableSetOf()) { it.key }
+        }
         publish()
         persist()
         HomeRepository.applyCurrentSettings()
