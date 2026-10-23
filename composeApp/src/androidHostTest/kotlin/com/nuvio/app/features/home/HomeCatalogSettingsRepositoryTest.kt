@@ -31,6 +31,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -440,6 +441,84 @@ class HomeCatalogSettingsRepositoryTest {
             listOf("a:movie:popular", "b:movie:popular", "b:movie:new", "a:movie:new"),
             HomeCatalogSettingsRepository.uiState.value.items.map { it.key },
         )
+    }
+
+    @Test
+    fun addonCatalogVisibilityIsIndependentAndPersistsAcrossReloadAndSync() {
+        val managedAddon = addon(listOf("popular", "latest"))
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(managedAddon))
+
+        HomeCatalogSettingsRepository.setAddonCatalogsEnabled("test", false)
+
+        val state = HomeCatalogSettingsRepository.uiState.value
+        assertFalse(state.addonGroups.single { it.addonId == "test" }.catalogsEnabled)
+        assertTrue(state.items.filterNot { it.isCollection }.all { it.enabled })
+        assertTrue(state.items.filterNot { it.isCollection }.none { it.isVisible })
+        assertTrue(
+            orderHomeCatalogDefinitions(
+                definitions = buildHomeCatalogDefinitions(listOf(managedAddon)),
+                snapshot = HomeCatalogSettingsRepository.snapshot(),
+            ).none { it.key.startsWith("test:") },
+        )
+        assertFalse(
+            HomeCatalogSettingsRepository.exportToSyncPayload()
+                .addonLayouts
+                ?.single { it.addonId == "test" }
+                ?.catalogsEnabled ?: true,
+        )
+
+        HomeCatalogSettingsRepository.clearLocalState()
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(managedAddon))
+        assertFalse(HomeCatalogSettingsRepository.uiState.value.addonGroups.single().catalogsEnabled)
+        assertTrue(HomeCatalogSettingsRepository.uiState.value.items.filterNot { it.isCollection }.all { it.enabled })
+
+        HomeCatalogSettingsRepository.setAddonCatalogsEnabled("test", true)
+        assertTrue(HomeCatalogSettingsRepository.uiState.value.items.filterNot { it.isCollection }.all { it.isVisible })
+        assertTrue(managedAddon.enabled)
+    }
+
+    @Test
+    fun collectionCanMoveAbovePinnedCatalogWithoutChangingCatalogPin() {
+        val managedAddon = addon(listOf("popular", "latest"))
+        val favorites = collection()
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(managedAddon))
+        HomeCatalogSettingsRepository.syncCollections(listOf(favorites))
+        HomeCatalogSettingsRepository.setRowPlacement("test:movie:popular", HomeCatalogRowPlacement.PINNED_TOP)
+
+        HomeCatalogSettingsRepository.moveByKeys(
+            fromKey = "collection_favorites",
+            toKey = "test:movie:popular",
+        )
+
+        val items = HomeCatalogSettingsRepository.uiState.value.items
+        assertEquals("collection_favorites", items.first().key)
+        assertEquals(HomeCatalogRowPlacement.PINNED_TOP, items.single { it.key == "test:movie:popular" }.rowPlacement)
+        assertEquals(HomeCatalogRowPlacement.PINNED_TOP, items.single { it.key == "collection_favorites" }.rowPlacement)
+        assertEquals(false, items.single { it.key == "collection_favorites" }.isPinnedToTop)
+    }
+
+    @Test
+    fun keyBasedReorderUsesOnlyVisibleRowsWhenHiddenRowsAreSeparated() {
+        val managedAddon = addon(listOf("first", "second"))
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(managedAddon))
+        HomeCatalogSettingsRepository.syncCollections(listOf(collection()))
+        HomeCatalogSettingsRepository.setEnabled("test:movie:first", false)
+
+        val beforeVisible = HomeCatalogSettingsRepository.uiState.value.items
+            .filter { it.isVisible }
+            .map { it.key }
+        assertEquals(listOf("test:movie:second", "collection_favorites"), beforeVisible)
+
+        HomeCatalogSettingsRepository.moveByKeys(
+            fromKey = "collection_favorites",
+            toKey = "test:movie:second",
+        )
+
+        assertEquals(
+            listOf("collection_favorites", "test:movie:second"),
+            HomeCatalogSettingsRepository.uiState.value.items.filter { it.isVisible }.map { it.key },
+        )
+        assertFalse(HomeCatalogSettingsRepository.uiState.value.items.single { it.key == "test:movie:first" }.isVisible)
     }
 
     private fun addon(

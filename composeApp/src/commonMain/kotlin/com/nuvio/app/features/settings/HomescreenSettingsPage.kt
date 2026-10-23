@@ -30,6 +30,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -80,6 +81,12 @@ import nuvio.composeapp.generated.resources.settings_homescreen_pin_to_move_toas
 import nuvio.composeapp.generated.resources.settings_homescreen_section_catalogs
 import nuvio.composeapp.generated.resources.settings_homescreen_section_catalogs_collections
 import nuvio.composeapp.generated.resources.settings_homescreen_section_collections
+import nuvio.composeapp.generated.resources.settings_homescreen_section_hidden
+import nuvio.composeapp.generated.resources.settings_homescreen_hidden_rows_count
+import nuvio.composeapp.generated.resources.settings_homescreen_hidden_rows_show
+import nuvio.composeapp.generated.resources.settings_homescreen_hidden_rows_hide
+import nuvio.composeapp.generated.resources.settings_homescreen_no_visible_rows
+import nuvio.composeapp.generated.resources.settings_homescreen_addon_catalogs_toggle
 import nuvio.composeapp.generated.resources.settings_homescreen_section_hero
 import nuvio.composeapp.generated.resources.settings_homescreen_section_hero_sources
 import nuvio.composeapp.generated.resources.settings_homescreen_selected_count
@@ -121,7 +128,7 @@ internal fun LazyListScope.homescreenSettingsContent(
     catalogErrorMessage: String?,
 ) {
     val selectedHeroSourceCount = items.count { it.heroSourceEnabled }
-    val enabledCatalogCount = items.count { it.enabled }
+    val enabledCatalogCount = items.count { it.isVisible }
     item {
         HomescreenSummaryCard(
             isTablet = isTablet,
@@ -195,9 +202,7 @@ internal fun LazyListScope.homescreenSettingsContent(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                NuvioLoadingIndicator(
-                    modifier = Modifier.size(28.dp),
-                )
+                NuvioLoadingIndicator(modifier = Modifier.size(28.dp))
             }
         } else if (catalogErrorMessage != null && items.isEmpty()) {
             HomeEmptyStateCard(
@@ -214,13 +219,17 @@ internal fun LazyListScope.homescreenSettingsContent(
                 message = stringResource(Res.string.settings_homescreen_empty_message),
             )
         } else {
-            val catalogCount = items.count { !it.isCollection }
-            val collectionCount = items.count { it.isCollection }
+            val visibleItems = items.filter { it.isVisible }
+            val hiddenItems = items.filterNot { it.isVisible }
+            val titleItems = visibleItems.ifEmpty { items }
+            val catalogCount = titleItems.count { !it.isCollection }
+            val collectionCount = titleItems.count { it.isCollection }
             val sectionTitle = when {
                 collectionCount > 0 && catalogCount > 0 -> stringResource(Res.string.settings_homescreen_section_catalogs_collections)
                 collectionCount > 0 -> stringResource(Res.string.settings_homescreen_section_collections)
                 else -> stringResource(Res.string.settings_homescreen_section_catalogs)
             }
+            var hiddenExpanded by remember { mutableStateOf(false) }
             SettingsSection(
                 title = sectionTitle,
                 isTablet = isTablet,
@@ -231,17 +240,62 @@ internal fun LazyListScope.homescreenSettingsContent(
                     )
                 },
             ) {
-                val hapticFeedback = LocalHapticFeedback.current
-                val pinToMoveToast = stringResource(Res.string.settings_homescreen_pin_to_move_toast)
-
-                HomescreenCatalogList(
+                if (visibleItems.isEmpty()) {
+                    Text(
+                        text = stringResource(Res.string.settings_homescreen_no_visible_rows),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                    )
+                } else {
+                    val hapticFeedback = LocalHapticFeedback.current
+                    val pinToMoveToast = stringResource(Res.string.settings_homescreen_pin_to_move_toast)
+                    HomescreenCatalogList(
+                        isTablet = isTablet,
+                        items = visibleItems,
+                        onPinnedDragAttempt = {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                            NuvioToastController.show(pinToMoveToast)
+                        },
+                    )
+                }
+            }
+            if (hiddenItems.isNotEmpty()) {
+                SettingsSection(
+                    title = stringResource(Res.string.settings_homescreen_section_hidden),
                     isTablet = isTablet,
-                    items = items,
-                    onPinnedDragAttempt = {
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                        NuvioToastController.show(pinToMoveToast)
+                    actions = {
+                        NuvioActionLabel(
+                            text = stringResource(
+                                if (hiddenExpanded) Res.string.settings_homescreen_hidden_rows_hide
+                                else Res.string.settings_homescreen_hidden_rows_show,
+                            ),
+                            onClick = { hiddenExpanded = !hiddenExpanded },
+                        )
                     },
-                )
+                ) {
+                    if (hiddenExpanded) {
+                        val hapticFeedback = LocalHapticFeedback.current
+                        val pinToMoveToast = stringResource(Res.string.settings_homescreen_pin_to_move_toast)
+                        HomescreenCatalogList(
+                            isTablet = isTablet,
+                            items = hiddenItems,
+                            onPinnedDragAttempt = {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                NuvioToastController.show(pinToMoveToast)
+                            },
+                        )
+                    } else {
+                        SettingsGroup(isTablet = isTablet) {
+                            Text(
+                                text = stringResource(Res.string.settings_homescreen_hidden_rows_count, hiddenItems.size),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -365,6 +419,22 @@ private fun AddonRowOrderSection(
                                             ),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                                    ) {
+                                        Text(
+                                            text = stringResource(Res.string.settings_homescreen_addon_catalogs_toggle),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                        Switch(
+                                            checked = group.catalogsEnabled,
+                                            onCheckedChange = { enabled ->
+                                                HomeCatalogSettingsRepository.setAddonCatalogsEnabled(group.addonId, enabled)
+                                            },
                                         )
                                     }
                                     if (editing) {
@@ -660,7 +730,7 @@ private fun HomescreenCatalogList(
         }
         val fromSection = pinSection(fromItem)
         val toSection = pinSection(toItem)
-        if (fromSection != toSection) {
+        if (fromSection != toSection && fromItem?.isCollection != true) {
             onPinnedDragAttempt()
             return@rememberReorderableLazyListState
         }
@@ -669,7 +739,14 @@ private fun HomescreenCatalogList(
         val crossesPinnedSection = rangeStart <= rangeEnd && items
             .subList(rangeStart, rangeEnd + 1)
             .any { pinSection(it) != fromSection }
-        if (crossesPinnedSection) {
+        if (crossesPinnedSection && fromItem?.isCollection != true) {
+            onPinnedDragAttempt()
+            return@rememberReorderableLazyListState
+        }
+        val crossesPositionPinnedAnchor = rangeStart <= rangeEnd && items
+            .subList(rangeStart, rangeEnd + 1)
+            .any { it.rowPlacement == HomeCatalogRowPlacement.PINNED_POSITION }
+        if (crossesPositionPinnedAnchor) {
             onPinnedDragAttempt()
             return@rememberReorderableLazyListState
         }
@@ -688,7 +765,9 @@ private fun HomescreenCatalogList(
             onPinnedDragAttempt()
             return@rememberReorderableLazyListState
         }
-        HomeCatalogSettingsRepository.moveByIndex(from.index, to.index)
+        if (fromItem != null && toItem != null) {
+            HomeCatalogSettingsRepository.moveByKeys(fromItem.key, toItem.key)
+        }
         hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
     }
 

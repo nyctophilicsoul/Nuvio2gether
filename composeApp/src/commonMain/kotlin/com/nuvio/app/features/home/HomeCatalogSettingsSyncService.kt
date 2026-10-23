@@ -45,6 +45,7 @@ data class SyncAddonLayoutPreference(
     val order: Int = 0,
     @SerialName("anchor_order") val anchorOrder: Int = 0,
     @SerialName("anchor_key") val anchorKey: String? = null,
+    @SerialName("catalogs_enabled") val catalogsEnabled: Boolean = true,
 )
 
 @Serializable

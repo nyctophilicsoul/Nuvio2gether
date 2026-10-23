@@ -63,6 +63,7 @@ import nuvio.composeapp.generated.resources.settings_homescreen_collection_with_
 import nuvio.composeapp.generated.resources.settings_homescreen_display_name
 import nuvio.composeapp.generated.resources.settings_homescreen_hero_source
 import nuvio.composeapp.generated.resources.settings_homescreen_hidden
+import nuvio.composeapp.generated.resources.settings_homescreen_addon_catalogs_disabled
 import nuvio.composeapp.generated.resources.settings_homescreen_not_in_hero
 import nuvio.composeapp.generated.resources.settings_homescreen_pinned
 import nuvio.composeapp.generated.resources.settings_homescreen_pinned_at_position
@@ -478,10 +479,11 @@ internal fun HomescreenCatalogRow(
                 Text(
                     text = buildString {
                         append(
-                            if (item.enabled) {
-                                stringResource(Res.string.settings_homescreen_visible)
-                            } else {
-                                stringResource(Res.string.settings_homescreen_hidden)
+                            when {
+                                !item.isCollection && !item.addonCatalogsEnabled ->
+                                    stringResource(Res.string.settings_homescreen_addon_catalogs_disabled)
+                                item.enabled -> stringResource(Res.string.settings_homescreen_visible)
+                                else -> stringResource(Res.string.settings_homescreen_hidden)
                             },
                         )
                         if (item.isCollection) {
@@ -525,6 +527,7 @@ internal fun HomescreenCatalogRow(
                 Switch(
                     checked = item.enabled,
                     onCheckedChange = onEnabledChange,
+                    enabled = item.isCollection || item.addonCatalogsEnabled,
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = tokens.colors.onAccent,
                         checkedTrackColor = tokens.colors.accent,
