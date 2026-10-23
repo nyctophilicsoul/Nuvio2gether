@@ -616,11 +616,14 @@ object HomeCatalogSettingsRepository {
             }
             preferences = preferences + (fromKey to current.copy(rowPlacement = newPlacement.storageValue))
         }
-        persistVisibleOrder(orderedKeys)
-        // A manual move across add-ons must take precedence over the default grouping.
-        // Preserve the current order of existing catalog rows; newly discovered rows
-        // can still be placed using the saved add-on order.
-        if (!movingCollection && fromItem.addonId != toItem.addonId) {
+        // A manual cross-add-on row move changes row order, not the separate add-on
+        // order. Keep those two preferences independent.
+        val preserveManualCatalogOrder = !movingCollection && fromItem.addonId != toItem.addonId
+        persistVisibleOrder(orderedKeys, updateAddonOrder = !preserveManualCatalogOrder)
+        // Default grouping must not undo a manual move across add-ons. Preserve the
+        // current order of existing catalog rows; newly discovered rows can still use
+        // the saved add-on order.
+        if (preserveManualCatalogOrder) {
             preservedOrderRowKeys = definitions
                 .filterNot { ServerCatalog.isServerKey(it.key) }
                 .mapTo(mutableSetOf()) { it.key }
@@ -631,13 +634,17 @@ object HomeCatalogSettingsRepository {
         HomeCatalogSettingsSyncService.triggerPush()
     }
 
-    private fun persistVisibleOrder(orderedKeys: List<String>) {
+    private fun persistVisibleOrder(
+        orderedKeys: List<String>,
+        updateAddonOrder: Boolean = true,
+    ) {
         val updatedPreferences = preferences.toMutableMap()
         orderedKeys.forEachIndexed { index, key ->
             val current = updatedPreferences[key] ?: return@forEachIndexed
             updatedPreferences[key] = current.copy(order = index)
         }
         preferences = updatedPreferences
+        if (!updateAddonOrder) return
 
         val addonIdByKey = definitions
             .filterNot { ServerCatalog.isServerKey(it.key) }
