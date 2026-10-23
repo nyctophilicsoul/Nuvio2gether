@@ -2481,11 +2481,11 @@
     <string name="settings_homescreen_addon_order_reorder">Reorder add-on</string>
     <string name="settings_homescreen_addon_order_policy_title">How to apply changes</string>
     <string name="settings_homescreen_addon_order_all_title">Move all rows together</string>
-    <string name="settings_homescreen_addon_order_all_description">Include individually pinned rows when changing an add-on's order.</string>
+    <string name="settings_homescreen_addon_order_all_description">Reset individual catalog-row pins and reorder all catalog rows using the new add-on order. Collection pins stay unchanged.</string>
     <string name="settings_homescreen_addon_order_unpinned_title">Move only unpinned rows</string>
     <string name="settings_homescreen_addon_order_unpinned_description">Keep individually pinned rows in their current pinned positions.</string>
     <string name="settings_homescreen_addon_order_upcoming_title">Apply to upcoming rows only</string>
-    <string name="settings_homescreen_addon_order_upcoming_description">Leave current rows as they are. New rows follow the add-on order.</string>
+    <string name="settings_homescreen_addon_order_upcoming_description">Leave current rows as they are. New rows follow the saved add-on order.</string>
     <string name="settings_homescreen_addon_groups">ADD-ON GROUPS</string>
     <string name="settings_homescreen_addon_groups_description">Choose where dynamic catalogs from an add-on appear. Individual row pins override add-on placement rules.</string>
     <string name="settings_homescreen_group_rows_count">%1$d catalog rows</string>
@@ -2493,4 +2493,7 @@
     <string name="settings_homescreen_group_mode_locked">Lock group here</string>
     <string name="settings_homescreen_group_mode_top">Pin all rows to top</string>
     <string name="settings_homescreen_group_mode_bottom">Pin all rows to bottom</string>
+    <string name="settings_homescreen_addon_order_reset_title">Reset row pin preferences?</string>
+    <string name="settings_homescreen_addon_order_reset_message">Changing the add-on order using Move all rows together resets individual pin placements for existing catalog rows, including pinned positions and top or bottom pins. Collection pin preferences stay unchanged. Do you want to continue?</string>
+    <string name="settings_homescreen_addon_order_reset_confirm">Reset and apply</string>
 </resources>

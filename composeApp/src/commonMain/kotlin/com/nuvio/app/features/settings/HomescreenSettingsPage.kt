@@ -26,6 +26,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -99,6 +100,9 @@ import nuvio.composeapp.generated.resources.settings_homescreen_addon_order_unpi
 import nuvio.composeapp.generated.resources.settings_homescreen_addon_order_unpinned_description
 import nuvio.composeapp.generated.resources.settings_homescreen_addon_order_upcoming_title
 import nuvio.composeapp.generated.resources.settings_homescreen_addon_order_upcoming_description
+import nuvio.composeapp.generated.resources.settings_homescreen_addon_order_reset_title
+import nuvio.composeapp.generated.resources.settings_homescreen_addon_order_reset_message
+import nuvio.composeapp.generated.resources.settings_homescreen_addon_order_reset_confirm
 import org.jetbrains.compose.resources.stringResource
 import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.ReorderableItem
@@ -253,6 +257,7 @@ private fun AddonRowOrderSection(
     var editing by remember { mutableStateOf(false) }
     var draftAddonIds by remember { mutableStateOf(emptyList<String>()) }
     var draftPolicy by remember(savedPolicy) { mutableStateOf(savedPolicy) }
+    var showResetConfirmation by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
     val groupById = addonGroups.associateBy { it.addonId }
     val orderIds = if (editing) {
@@ -262,6 +267,14 @@ private fun AddonRowOrderSection(
         addonGroups.map { it.addonId }
     }
     val orderedGroups = orderIds.mapNotNull(groupById::get)
+    val commitDraftOrder: () -> Unit = {
+        HomeCatalogSettingsRepository.saveAddonRowOrder(
+            addonIds = orderedGroups.map { it.addonId },
+            policy = draftPolicy,
+        )
+        editing = false
+        draftAddonIds = emptyList()
+    }
     // Keep the reorder callback in sync with draft state; rememberReorderableLazyListState
     // may retain its callback while Compose recomposes the list after each drag.
     val latestOrderIds by rememberUpdatedState(orderIds)
@@ -431,17 +444,42 @@ private fun AddonRowOrderSection(
                     }
                     Button(
                         onClick = {
-                            HomeCatalogSettingsRepository.saveAddonRowOrder(
-                                addonIds = orderedGroups.map { it.addonId },
-                                policy = draftPolicy,
-                            )
-                            editing = false
-                            draftAddonIds = emptyList()
+                            if (draftPolicy == HomeAddonRowOrderPolicy.MOVE_ALL_ROWS) {
+                                showResetConfirmation = true
+                            } else {
+                                commitDraftOrder()
+                            }
                         },
                     ) {
                         Text(stringResource(Res.string.settings_homescreen_addon_order_save))
                     }
                 }
+            }
+            if (showResetConfirmation) {
+                AlertDialog(
+                    onDismissRequest = { showResetConfirmation = false },
+                    title = {
+                        Text(stringResource(Res.string.settings_homescreen_addon_order_reset_title))
+                    },
+                    text = {
+                        Text(stringResource(Res.string.settings_homescreen_addon_order_reset_message))
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                showResetConfirmation = false
+                                commitDraftOrder()
+                            },
+                        ) {
+                            Text(stringResource(Res.string.settings_homescreen_addon_order_reset_confirm))
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showResetConfirmation = false }) {
+                            Text(stringResource(Res.string.settings_homescreen_addon_order_cancel))
+                        }
+                    },
+                )
             }
         }
     }

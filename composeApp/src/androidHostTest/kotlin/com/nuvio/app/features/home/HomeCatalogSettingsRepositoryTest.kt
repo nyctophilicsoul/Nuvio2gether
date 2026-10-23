@@ -311,11 +311,146 @@ class HomeCatalogSettingsRepositoryTest {
         assertEquals(settings, HomeCatalogSettingsRepository.uiState.value)
     }
 
-    private fun addon(catalogIds: List<String> = listOf("popular")) = ManagedAddon(
+
+    @Test
+    fun allRowsOptionClearsCatalogPinsButKeepsCollectionPinsAndDoesNotPersistPolicy() {
+        val addons = listOf(addon(listOf("popular", "latest")))
+        val favorites = collection()
+        HomeCatalogSettingsRepository.syncCatalogs(addons)
+        HomeCatalogSettingsRepository.syncCollections(listOf(favorites))
+
+        HomeCatalogSettingsRepository.setRowPlacement(
+            "test:movie:popular",
+            HomeCatalogRowPlacement.PINNED_POSITION,
+        )
+        HomeCatalogSettingsRepository.setRowPlacement(
+            "test:movie:latest",
+            HomeCatalogRowPlacement.PINNED_BOTTOM,
+        )
+        HomeCatalogSettingsRepository.setRowPlacement(
+            "collection_favorites",
+            HomeCatalogRowPlacement.PINNED_BOTTOM,
+        )
+
+        HomeCatalogSettingsRepository.saveAddonRowOrder(
+            addonIds = listOf("test"),
+            policy = HomeAddonRowOrderPolicy.MOVE_ALL_ROWS,
+        )
+
+        val items = HomeCatalogSettingsRepository.uiState.value.items
+        assertEquals(
+            HomeCatalogRowPlacement.NORMAL,
+            items.single { it.key == "test:movie:popular" }.rowPlacement,
+        )
+        assertEquals(
+            HomeCatalogRowPlacement.NORMAL,
+            items.single { it.key == "test:movie:latest" }.rowPlacement,
+        )
+        assertEquals(
+            HomeCatalogRowPlacement.PINNED_BOTTOM,
+            items.single { it.key == "collection_favorites" }.rowPlacement,
+        )
+        assertEquals(
+            HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS,
+            HomeCatalogSettingsRepository.uiState.value.addonRowOrderPolicy,
+        )
+
+        HomeCatalogSettingsRepository.clearLocalState()
+        HomeCatalogSettingsRepository.syncCatalogs(addons)
+        HomeCatalogSettingsRepository.syncCollections(listOf(favorites))
+        assertEquals(
+            HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS,
+            HomeCatalogSettingsRepository.uiState.value.addonRowOrderPolicy,
+        )
+        assertEquals(
+            HomeCatalogRowPlacement.PINNED_BOTTOM,
+            HomeCatalogSettingsRepository.uiState.value.items.single { it.key == "collection_favorites" }.rowPlacement,
+        )
+    }
+
+    @Test
+    fun unpinnedRowsOptionPreservesRowPinsAndAppliesOrderWithoutPersistingPolicy() {
+        val addons = listOf(
+            addon(listOf("popular", "latest"), addonId = "a", addonName = "A"),
+            addon(listOf("popular"), addonId = "b", addonName = "B"),
+        )
+        HomeCatalogSettingsRepository.syncCatalogs(addons)
+        HomeCatalogSettingsRepository.setRowPlacement(
+            "a:movie:popular",
+            HomeCatalogRowPlacement.PINNED_TOP,
+        )
+
+        HomeCatalogSettingsRepository.saveAddonRowOrder(
+            addonIds = listOf("b", "a"),
+            policy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS,
+        )
+
+        assertEquals(
+            HomeCatalogRowPlacement.PINNED_TOP,
+            HomeCatalogSettingsRepository.uiState.value.items.single { it.key == "a:movie:popular" }.rowPlacement,
+        )
+        assertEquals(
+            HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS,
+            HomeCatalogSettingsRepository.uiState.value.addonRowOrderPolicy,
+        )
+        assertEquals(
+            listOf("b", "a"),
+            HomeCatalogSettingsRepository.uiState.value.addonGroups.map { it.addonId },
+        )
+    }
+
+    @Test
+    fun upcomingRowsOptionKeepsCurrentOrderAndUsesNewAddonOrderForFutureCatalogs() {
+        val initialAddons = listOf(
+            addon(listOf("popular"), addonId = "a", addonName = "A"),
+            addon(listOf("popular"), addonId = "b", addonName = "B"),
+        )
+        HomeCatalogSettingsRepository.syncCatalogs(initialAddons)
+        val before = HomeCatalogSettingsRepository.uiState.value.items.map { it.key }
+        assertEquals(listOf("a:movie:popular", "b:movie:popular"), before)
+
+        HomeCatalogSettingsRepository.saveAddonRowOrder(
+            addonIds = listOf("b", "a"),
+            policy = HomeAddonRowOrderPolicy.UPCOMING_ROWS_ONLY,
+        )
+        assertEquals(before, HomeCatalogSettingsRepository.uiState.value.items.map { it.key })
+        assertEquals(
+            HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS,
+            HomeCatalogSettingsRepository.uiState.value.addonRowOrderPolicy,
+        )
+
+        val refreshedAddons = listOf(
+            addon(listOf("popular", "new"), addonId = "a", addonName = "A"),
+            addon(listOf("popular", "new"), addonId = "b", addonName = "B"),
+        )
+        HomeCatalogSettingsRepository.syncCatalogs(refreshedAddons)
+
+        assertEquals(
+            listOf("a:movie:popular", "b:movie:popular", "b:movie:new", "a:movie:new"),
+            HomeCatalogSettingsRepository.uiState.value.items.map { it.key },
+        )
+        assertEquals(
+            HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS,
+            HomeCatalogSettingsRepository.uiState.value.addonRowOrderPolicy,
+        )
+
+        HomeCatalogSettingsRepository.clearLocalState()
+        HomeCatalogSettingsRepository.syncCatalogs(refreshedAddons)
+        assertEquals(
+            listOf("a:movie:popular", "b:movie:popular", "b:movie:new", "a:movie:new"),
+            HomeCatalogSettingsRepository.uiState.value.items.map { it.key },
+        )
+    }
+
+    private fun addon(
+        catalogIds: List<String> = listOf("popular"),
+        addonId: String = "test",
+        addonName: String = "Catalogs",
+    ) = ManagedAddon(
         manifestUrl = "https://example.com/manifest.json",
         manifest = AddonManifest(
-            id = "test",
-            name = "Catalogs",
+            id = addonId,
+            name = addonName,
             description = "",
             version = "1",
             resources = emptyList(),

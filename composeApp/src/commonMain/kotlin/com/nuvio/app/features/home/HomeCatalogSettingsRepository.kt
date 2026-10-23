@@ -135,6 +135,7 @@ internal data class HomeCatalogSettingsSnapshot(
     val addonLayouts: Map<String, HomeAddonLayoutPreference> = emptyMap(),
     val addonRowOrderPolicy: HomeAddonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS,
     val upcomingRowKeys: Set<String> = emptySet(),
+    val preservedOrderRowKeys: Set<String> = emptySet(),
 )
 
 @Serializable
@@ -165,6 +166,7 @@ private data class StoredHomeCatalogSettingsPayload(
     val addonLayouts: List<StoredHomeAddonLayoutPreference> = emptyList(),
     val addonRowOrderPolicy: String = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS.storageValue,
     val upcomingRowKeys: List<String> = emptyList(),
+    val preservedOrderRowKeys: List<String> = emptyList(),
 )
 
 object HomeCatalogSettingsRepository {
@@ -195,6 +197,7 @@ object HomeCatalogSettingsRepository {
     private var addonLayouts: Map<String, StoredHomeAddonLayoutPreference> = emptyMap()
     private var addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS
     private var upcomingRowKeys: Set<String> = emptySet()
+    private var preservedOrderRowKeys: Set<String> = emptySet()
 
     fun onProfileChanged() = clearLocalState()
 
@@ -211,6 +214,7 @@ object HomeCatalogSettingsRepository {
         addonLayouts = emptyMap()
         addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS
         upcomingRowKeys = emptySet()
+        preservedOrderRowKeys = emptySet()
         _uiState.value = HomeCatalogSettingsUiState()
     }
 
@@ -219,18 +223,15 @@ object HomeCatalogSettingsRepository {
         val collections = CollectionRepository.collections.value
         val syncInput = CatalogSyncInput(addons, collections, Locale.current.toLanguageTag(), ServerRepository.uiState.value.revision)
         if (lastCatalogSync == syncInput) return
-        val previouslySavedKeys = preferences.keys
         definitions = buildHomeCatalogDefinitions(addons)
         collectionDefinitions = buildCollectionDefinitions(collections)
-        if (addonRowOrderPolicy == HomeAddonRowOrderPolicy.UPCOMING_ROWS_ONLY) {
-            val newlyDiscoveredKeys = definitions.asSequence()
-                .map { it.key }
-                .filterNot { it in previouslySavedKeys }
-                .toSet()
-            upcomingRowKeys = upcomingRowKeys + newlyDiscoveredKeys
-        } else {
-            upcomingRowKeys = emptySet()
+        if (definitions.isNotEmpty()) {
+            val currentCatalogKeys = definitions.mapTo(mutableSetOf()) { it.key }
+            preservedOrderRowKeys = preservedOrderRowKeys.intersect(currentCatalogKeys)
         }
+        // Migrate previously saved persistent policies to the one-time operation model.
+        addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS
+        upcomingRowKeys = emptySet()
         lastCatalogSync = syncInput
         lastCollectionSync = lastCollectionSync?.takeIf {
             it.first == collections && it.second == syncInput.locale
@@ -269,6 +270,7 @@ object HomeCatalogSettingsRepository {
             hideUnreleasedContent = hideUnreleasedContent,
             addonRowOrderPolicy = addonRowOrderPolicy,
             upcomingRowKeys = upcomingRowKeys,
+            preservedOrderRowKeys = preservedOrderRowKeys,
             preferences = preferences.mapValues { (_, value) ->
                 HomeCatalogPreference(
                     customTitle = value.customTitle,
@@ -441,10 +443,10 @@ object HomeCatalogSettingsRepository {
         val groups = _uiState.value.addonGroups
         if (fromIndex !in groups.indices || toIndex !in groups.indices || fromIndex == toIndex) return
         val reordered = groups.map { it.addonId }.toMutableList().apply { add(toIndex, removeAt(fromIndex)) }
-        saveAddonRowOrder(reordered, addonRowOrderPolicy)
+        saveAddonRowOrder(reordered, HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS)
     }
 
-    /** Commit the add-on order and the policy selected in the explicit edit flow. */
+    /** Apply the selected scope once; the saved add-on order remains the default for new rows. */
     fun saveAddonRowOrder(addonIds: List<String>, policy: HomeAddonRowOrderPolicy) {
         ensureLoaded()
         val groups = _uiState.value.addonGroups
@@ -454,9 +456,6 @@ object HomeCatalogSettingsRepository {
         val completeOrder = requestedOrder + groups.map { it.addonId }.filterNot { it in requestedOrder }
         when (policy) {
             HomeAddonRowOrderPolicy.MOVE_ALL_ROWS -> {
-                // Option 1 is an explicit reset: every catalog row owned by an add-on in
-                // this ordering list joins its group, so clear only those rows' individual
-                // pin placements. Other add-ons and collections retain their settings.
                 val affectedKeys = definitions.asSequence()
                     .filter { it.addonGroupId() in completeOrder }
                     .map { it.key }
@@ -470,24 +469,29 @@ object HomeCatalogSettingsRepository {
                         preference
                     }
                 }
+                preservedOrderRowKeys = emptySet()
             }
             HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS -> {
-                // Option 2 deliberately preserves every individual row pin.
+                // Clear any previous preserve-existing-order boundary before reordering
+                // all unpinned rows. Individual pins are deliberately left unchanged.
+                preservedOrderRowKeys = emptySet()
             }
             HomeAddonRowOrderPolicy.UPCOMING_ROWS_ONLY -> {
-                // Option 3 freezes the current visible order and leaves existing pins alone.
-                // Newly discovered catalog keys are tracked during the next catalog sync.
+                // Materialize today's visible order. Only current catalog rows are frozen;
+                // future catalog rows use the saved add-on group order.
                 persistVisibleOrder(_uiState.value.items.map { it.key })
+                preservedOrderRowKeys = definitions
+                    .filterNot { ServerCatalog.isServerKey(it.key) }
+                    .mapTo(mutableSetOf()) { it.key }
             }
         }
-        addonRowOrderPolicy = policy
+        // The choice controls this save only; it is never persisted as an active policy.
+        addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS
         upcomingRowKeys = emptySet()
         val nextLayouts = addonLayouts.toMutableMap()
         completeOrder.forEachIndexed { index, addonId ->
             nextLayouts[addonId] = StoredHomeAddonLayoutPreference(
                 addonId = addonId,
-                // The new UI uses group order only; legacy mode/anchor values remain in
-                // the stored schema for downgrade compatibility, but are normalized here.
                 mode = HomeAddonLayoutMode.NORMAL.storageValue,
                 order = index,
                 anchorOrder = index,
@@ -510,6 +514,7 @@ object HomeCatalogSettingsRepository {
         addonLayouts = emptyMap()
         addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS
         upcomingRowKeys = emptySet()
+        preservedOrderRowKeys = emptySet()
         normalizePreferences()
         publish()
         persist()
@@ -610,9 +615,18 @@ object HomeCatalogSettingsRepository {
             heroEnabled = parsedPayload.heroEnabled
             showCatalogType = parsedPayload.showCatalogType
             hideUnreleasedContent = parsedPayload.hideUnreleasedContent
-            addonRowOrderPolicy = HomeAddonRowOrderPolicy.fromStorage(parsedPayload.addonRowOrderPolicy)
-            upcomingRowKeys = parsedPayload.upcomingRowKeys.toSet()
+            val legacyPolicy = HomeAddonRowOrderPolicy.fromStorage(parsedPayload.addonRowOrderPolicy)
+            val legacyUpcomingKeys = parsedPayload.upcomingRowKeys.toSet()
+            addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS
+            upcomingRowKeys = emptySet()
             preferences = parsedPayload.items.associateBy { it.key }
+            preservedOrderRowKeys = parsedPayload.preservedOrderRowKeys.toSet().ifEmpty {
+                if (legacyPolicy == HomeAddonRowOrderPolicy.UPCOMING_ROWS_ONLY) {
+                    preferences.keys.filterNot { it in legacyUpcomingKeys }.toSet()
+                } else {
+                    emptySet()
+                }
+            }
             addonLayouts = parsedPayload.addonLayouts.associateBy { it.addonId }
             publish()
             return
@@ -729,6 +743,7 @@ object HomeCatalogSettingsRepository {
             },
             policy = addonRowOrderPolicy,
             upcomingRowKeys = upcomingRowKeys,
+            preservedOrderRowKeys = preservedOrderRowKeys,
         )
         val addonGroups = definitions
             .filterNot { ServerCatalog.isServerKey(it.key) }
@@ -771,8 +786,9 @@ object HomeCatalogSettingsRepository {
                     addonLayouts = addonLayouts.values.sortedWith(
                         compareBy<StoredHomeAddonLayoutPreference> { it.order }.thenBy { it.addonId },
                     ),
-                    addonRowOrderPolicy = addonRowOrderPolicy.storageValue,
-                    upcomingRowKeys = upcomingRowKeys.toList().sorted(),
+                    addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS.storageValue,
+                    upcomingRowKeys = emptyList(),
+                    preservedOrderRowKeys = preservedOrderRowKeys.toList().sorted(),
                 ),
             ),
         )
@@ -851,8 +867,9 @@ object HomeCatalogSettingsRepository {
             showCatalogType = showCatalogType,
             hideUnreleasedContent = hideUnreleasedContent,
             items = items,
-            addonRowOrderPolicy = addonRowOrderPolicy.storageValue,
-            upcomingRowKeys = upcomingRowKeys.toList().sorted(),
+            addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS.storageValue,
+            upcomingRowKeys = emptyList(),
+            preservedOrderRowKeys = preservedOrderRowKeys.toList().sorted(),
             addonLayouts = addonLayouts.values
                 .sortedWith(compareBy<StoredHomeAddonLayoutPreference> { it.order }.thenBy { it.addonId })
                 .map { stored ->
@@ -871,8 +888,18 @@ object HomeCatalogSettingsRepository {
         ensureLoaded()
         showCatalogType = payload.showCatalogType
         hideUnreleasedContent = payload.hideUnreleasedContent
-        addonRowOrderPolicy = HomeAddonRowOrderPolicy.fromStorage(payload.addonRowOrderPolicy)
-        upcomingRowKeys = payload.upcomingRowKeys.toSet()
+        val remotePolicy = HomeAddonRowOrderPolicy.fromStorage(payload.addonRowOrderPolicy)
+        addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS
+        upcomingRowKeys = emptySet()
+        preservedOrderRowKeys = payload.preservedOrderRowKeys.toSet().ifEmpty {
+            if (remotePolicy == HomeAddonRowOrderPolicy.UPCOMING_ROWS_ONLY) {
+                payload.items.map { it.preferenceKey() }
+                    .filterNot { it in payload.upcomingRowKeys }
+                    .toSet()
+            } else {
+                emptySet()
+            }
+        }
         payload.addonLayouts
             ?.takeIf { layouts -> layouts.isNotEmpty() || payload.items.isNotEmpty() }
             ?.let { remoteLayouts ->
@@ -1032,6 +1059,7 @@ internal fun orderHomeCatalogSettingsItems(
     addonLayouts: Map<String, HomeAddonLayoutPreference>,
     policy: HomeAddonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS,
     upcomingRowKeys: Set<String> = emptySet(),
+    preservedOrderRowKeys: Set<String> = emptySet(),
 ): List<HomeCatalogSettingsItem> {
     val original = items.withIndex().sortedWith(
         compareBy<IndexedValue<HomeCatalogSettingsItem>> { it.value.order }.thenBy { it.index },
@@ -1131,8 +1159,9 @@ internal fun orderHomeCatalogSettingsItems(
     }
 
     val units = unitsFor(middle) { row ->
-        if (row.rowPlacement == HomeCatalogRowPlacement.NORMAL && !row.isPinnedToTop && !row.isCollection)
-            addonIdByCatalogKey[row.key] else null
+        if (row.rowPlacement == HomeCatalogRowPlacement.NORMAL && !row.isPinnedToTop &&
+            !row.isCollection && row.key !in preservedOrderRowKeys
+        ) addonIdByCatalogKey[row.key] else null
     }
     return pinnedTop + flatten(reorderAddonUnitsInSlots(units, groupOrder)) + pinnedBottom
 }
@@ -1226,7 +1255,9 @@ internal fun orderHomeCatalogDefinitions(
     }
 
     val units = unitsFor(middle) {
-        if (placement(it) == HomeCatalogRowPlacement.NORMAL) addonId(it) else null
+        if (placement(it) == HomeCatalogRowPlacement.NORMAL &&
+            it.key !in snapshot.preservedOrderRowKeys
+        ) addonId(it) else null
     }
     return pinnedTop + flatten(reorderAddonUnitsInSlots(units, groupOrder)) + pinnedBottom
 }
