@@ -470,7 +470,7 @@ object HomeCatalogSettingsRepository {
         val groups = _uiState.value.addonGroups
         if (fromIndex !in groups.indices || toIndex !in groups.indices || fromIndex == toIndex) return
         val reordered = groups.map { it.addonId }.toMutableList().apply { add(toIndex, removeAt(fromIndex)) }
-        saveAddonRowOrder(reordered, HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS)
+        saveAddonRowOrder(reordered, HomeAddonRowOrderPolicy.UPCOMING_ROWS_ONLY)
     }
 
     /**
