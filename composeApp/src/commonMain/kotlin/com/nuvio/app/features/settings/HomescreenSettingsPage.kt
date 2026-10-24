@@ -715,59 +715,52 @@ private fun HomescreenCatalogList(
     var expandedKey by remember { mutableStateOf<String?>(null) }
     val hapticFeedback = LocalHapticFeedback.current
     val lazyListState = rememberLazyListState()
+    // Reorderable state can retain its callback across recompositions. Resolve every
+    // pointer update against the list currently rendered by Compose.
+    val latestItems by rememberUpdatedState(items)
+    var pinnedDragFeedbackShown by remember { mutableStateOf(false) }
     val reorderableLazyListState = rememberReorderableLazyListState(
         lazyListState = lazyListState,
     ) { from, to ->
-        val fromItem = items.getOrNull(from.index)
-        val toItem = items.getOrNull(to.index)
-        fun pinSection(item: HomeCatalogSettingsItem?): HomeCatalogRowPlacement? = when {
-            item == null -> null
-            item.rowPlacement == HomeCatalogRowPlacement.PINNED_TOP ||
-                (item.isCollection && item.isPinnedToTop) -> HomeCatalogRowPlacement.PINNED_TOP
-            item.rowPlacement == HomeCatalogRowPlacement.PINNED_BOTTOM -> HomeCatalogRowPlacement.PINNED_BOTTOM
-            item.rowPlacement == HomeCatalogRowPlacement.NORMAL && !item.isPinnedToTop -> HomeCatalogRowPlacement.NORMAL
-            else -> item.rowPlacement
-        }
-        val fromSection = pinSection(fromItem)
-        val toSection = pinSection(toItem)
-        if (fromSection != toSection && fromItem?.isCollection != true) {
-            onPinnedDragAttempt()
+        val currentItems = latestItems
+        if (from.index == to.index) return@rememberReorderableLazyListState
+        val fromItem = currentItems.getOrNull(from.index)
+            ?: return@rememberReorderableLazyListState
+        val toItem = currentItems.getOrNull(to.index)
+            ?: return@rememberReorderableLazyListState
+        if (!HomeCatalogSettingsRepository.canMoveByKeys(fromItem.key, toItem.key)) {
+            if (!pinnedDragFeedbackShown) {
+                pinnedDragFeedbackShown = true
+                onPinnedDragAttempt()
+            }
             return@rememberReorderableLazyListState
         }
+
         val rangeStart = minOf(from.index, to.index).coerceAtLeast(0)
-        val rangeEnd = maxOf(from.index, to.index).coerceAtMost(items.lastIndex)
-        val crossesPinnedSection = rangeStart <= rangeEnd && items
-            .subList(rangeStart, rangeEnd + 1)
-            .any { pinSection(it) != fromSection }
-        if (crossesPinnedSection && fromItem?.isCollection != true) {
-            onPinnedDragAttempt()
-            return@rememberReorderableLazyListState
-        }
-        val crossesPositionPinnedAnchor = rangeStart <= rangeEnd && items
-            .subList(rangeStart, rangeEnd + 1)
-            .any { it.rowPlacement == HomeCatalogRowPlacement.PINNED_POSITION }
-        if (crossesPositionPinnedAnchor) {
-            onPinnedDragAttempt()
-            return@rememberReorderableLazyListState
-        }
-        val crossesManagedGroup = rangeStart <= rangeEnd && items
+        val rangeEnd = maxOf(from.index, to.index).coerceAtMost(currentItems.lastIndex)
+        val crossesManagedGroup = rangeStart <= rangeEnd && currentItems
             .subList(rangeStart, rangeEnd + 1)
             .any { it.addonId != null && it.addonLayoutMode != HomeAddonLayoutMode.NORMAL }
-        val staysInsideSameManagedGroup = fromItem?.addonId != null &&
-            fromItem.addonId == toItem?.addonId &&
+        val staysInsideSameManagedGroup = fromItem.addonId != null &&
+            fromItem.addonId == toItem.addonId &&
             fromItem.addonLayoutMode != HomeAddonLayoutMode.NORMAL &&
-            rangeStart <= rangeEnd && items.subList(rangeStart, rangeEnd + 1).all {
+            rangeStart <= rangeEnd && currentItems.subList(rangeStart, rangeEnd + 1).all {
                 it.addonId == fromItem.addonId && it.addonLayoutMode != HomeAddonLayoutMode.NORMAL
             }
-        // A managed dynamic group can be reordered internally, but cannot be dragged out
-        // of its configured insertion slot. Row pins remain independent overrides.
-        if (crossesManagedGroup && !staysInsideSameManagedGroup && fromItem?.isCollection != true) {
-            onPinnedDragAttempt()
+        // Managed dynamic groups can move internally but cannot leave their configured slot.
+        if (crossesManagedGroup && !staysInsideSameManagedGroup && !fromItem.isCollection) {
+            if (!pinnedDragFeedbackShown) {
+                pinnedDragFeedbackShown = true
+                onPinnedDragAttempt()
+            }
             return@rememberReorderableLazyListState
         }
-        if (fromItem != null && toItem != null) {
-            HomeCatalogSettingsRepository.moveByKeys(fromItem.key, toItem.key)
-        }
+
+        HomeCatalogSettingsRepository.moveByKeys(
+            fromKey = fromItem.key,
+            toKey = toItem.key,
+            commitImmediately = false,
+        )
         hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
     }
 
@@ -805,6 +798,10 @@ private fun HomescreenCatalogList(
                                 onRowPlacementChange = { HomeCatalogSettingsRepository.setRowPlacement(item.key, it) },
                                 dragHandleScope = this@ReorderableItem,
                                 onPinnedDragAttempt = onPinnedDragAttempt,
+                                onReorderFinished = {
+                                    HomeCatalogSettingsRepository.commitPendingRowOrder()
+                                    pinnedDragFeedbackShown = false
+                                },
                             )
                         }
                     }

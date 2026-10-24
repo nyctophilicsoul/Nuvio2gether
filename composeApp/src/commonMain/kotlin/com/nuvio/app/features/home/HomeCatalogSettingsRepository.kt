@@ -205,6 +205,7 @@ object HomeCatalogSettingsRepository {
     private var addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS
     private var upcomingRowKeys: Set<String> = emptySet()
     private var preservedOrderRowKeys: Set<String> = emptySet()
+    private var hasPendingRowOrderChanges = false
 
     fun onProfileChanged() = clearLocalState()
 
@@ -222,6 +223,7 @@ object HomeCatalogSettingsRepository {
         addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS
         upcomingRowKeys = emptySet()
         preservedOrderRowKeys = emptySet()
+        hasPendingRowOrderChanges = false
         _uiState.value = HomeCatalogSettingsUiState()
     }
 
@@ -528,6 +530,7 @@ object HomeCatalogSettingsRepository {
         }
         addonLayouts = nextLayouts
         publish()
+        hasPendingRowOrderChanges = false
         persist()
         HomeRepository.applyCurrentSettings()
         HomeCatalogSettingsSyncService.triggerPush()
@@ -543,6 +546,7 @@ object HomeCatalogSettingsRepository {
         addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS
         upcomingRowKeys = emptySet()
         preservedOrderRowKeys = emptySet()
+        hasPendingRowOrderChanges = false
         normalizePreferences()
         publish()
         persist()
@@ -565,8 +569,54 @@ object HomeCatalogSettingsRepository {
         moveByKeys(items[fromIndex].key, items[toIndex].key)
     }
 
+    /**
+     * Shared validation for drag previews and persisted moves. A drag must stay inside the
+     * same pin section and may not cross a position-pinned row. Pin changes are explicit
+     * settings actions; dragging a collection must never silently unpin or repin it.
+     */
+    fun canMoveByKeys(fromKey: String, toKey: String): Boolean {
+        ensureLoaded()
+        val items = _uiState.value.items
+        val fromItem = items.firstOrNull { it.key == fromKey } ?: return false
+        val toItem = items.firstOrNull { it.key == toKey } ?: return false
+        if (fromKey == toKey || fromItem.isVisible != toItem.isVisible) return false
+
+        val cohort = items.filter { it.isVisible == fromItem.isVisible }
+        val fromIndex = cohort.indexOfFirst { it.key == fromKey }
+        val toIndex = cohort.indexOfFirst { it.key == toKey }
+        return isMoveAllowedWithinPinSection(cohort, fromIndex, toIndex)
+    }
+
+    private fun isMoveAllowedWithinPinSection(
+        cohort: List<HomeCatalogSettingsItem>,
+        fromIndex: Int,
+        toIndex: Int,
+    ): Boolean {
+        if (fromIndex !in cohort.indices || toIndex !in cohort.indices || fromIndex == toIndex) return false
+
+        fun pinSection(item: HomeCatalogSettingsItem): HomeCatalogRowPlacement = when {
+            item.rowPlacement == HomeCatalogRowPlacement.PINNED_TOP ||
+                (item.isCollection && item.isPinnedToTop) -> HomeCatalogRowPlacement.PINNED_TOP
+            item.rowPlacement == HomeCatalogRowPlacement.PINNED_BOTTOM -> HomeCatalogRowPlacement.PINNED_BOTTOM
+            else -> HomeCatalogRowPlacement.NORMAL
+        }
+
+        val fromSection = pinSection(cohort[fromIndex])
+        if (pinSection(cohort[toIndex]) != fromSection) return false
+        val start = minOf(fromIndex, toIndex)
+        val end = maxOf(fromIndex, toIndex)
+        return cohort.subList(start, end + 1).none { item ->
+            item.rowPlacement == HomeCatalogRowPlacement.PINNED_POSITION ||
+                pinSection(item) != fromSection
+        }
+    }
+
     /** Reorder by stable keys because visible and hidden rows are rendered in separate lists. */
-    fun moveByKeys(fromKey: String, toKey: String) {
+    fun moveByKeys(
+        fromKey: String,
+        toKey: String,
+        commitImmediately: Boolean = true,
+    ) {
         ensureLoaded()
         val items = _uiState.value.items
         val fromIndex = items.indexOfFirst { it.key == fromKey }
@@ -583,53 +633,62 @@ object HomeCatalogSettingsRepository {
         val localFrom = cohort.indexOfFirst { it.key == fromKey }
         val localTo = cohort.indexOfFirst { it.key == toKey }
         if (localFrom < 0 || localTo < 0 || localFrom == localTo) return
+        if (!isMoveAllowedWithinPinSection(cohort, localFrom, localTo)) return
 
-        fun pinSection(item: HomeCatalogSettingsItem): HomeCatalogRowPlacement = when {
-            item.rowPlacement == HomeCatalogRowPlacement.PINNED_TOP ||
-                (item.isCollection && item.isPinnedToTop) -> HomeCatalogRowPlacement.PINNED_TOP
-            item.rowPlacement == HomeCatalogRowPlacement.PINNED_BOTTOM -> HomeCatalogRowPlacement.PINNED_BOTTOM
-            else -> HomeCatalogRowPlacement.NORMAL
-        }
-        val fromPinSection = pinSection(cohort[localFrom])
-        val toPinSection = pinSection(cohort[localTo])
         val movingCollection = fromItem.isCollection
-        if (fromPinSection != toPinSection && !movingCollection) return
-        val start = minOf(localFrom, localTo)
-        val end = maxOf(localFrom, localTo)
-        val crossedProtectedAnchor = cohort.subList(start, end + 1).any { item ->
-            item.rowPlacement == HomeCatalogRowPlacement.PINNED_POSITION ||
-                (!movingCollection && pinSection(item) != fromPinSection)
-        }
-        if (crossedProtectedAnchor) return
-
         val reorderedCohortKeys = cohort.map { it.key }.toMutableList().apply {
             add(localTo, removeAt(localFrom))
         }
         val orderedKeys = items.map { it.key }.toMutableList()
-        cohortIndices.forEachIndexed { index, globalIndex -> orderedKeys[globalIndex] = reorderedCohortKeys[index] }
-        if (movingCollection && fromPinSection != toPinSection) {
-            val current = preferences[fromKey] ?: defaultPreferenceForMissingKey(fromKey) ?: return
-            val newPlacement = when (toPinSection) {
-                HomeCatalogRowPlacement.PINNED_TOP -> HomeCatalogRowPlacement.PINNED_TOP
-                HomeCatalogRowPlacement.PINNED_BOTTOM -> HomeCatalogRowPlacement.PINNED_BOTTOM
-                else -> HomeCatalogRowPlacement.NORMAL
-            }
-            preferences = preferences + (fromKey to current.copy(rowPlacement = newPlacement.storageValue))
+        cohortIndices.forEachIndexed { index, globalIndex ->
+            orderedKeys[globalIndex] = reorderedCohortKeys[index]
         }
-        persistVisibleOrder(orderedKeys)
+
+        // Manual row placement and add-on priority are independent. Never derive saved
+        // add-on priority from a row drag: the Add-ons Row Order section owns that setting.
+        val preserveManualCatalogOrder = movingCollection || fromItem.addonId != toItem.addonId
+        persistVisibleOrder(orderedKeys, updateAddonOrder = false)
+        // Collections and cross-add-on moves can split catalog groups. Freeze the current
+        // catalog sequence so future publishes do not undo that intentional row placement;
+        // newly discovered rows are not in this set and still follow saved add-on priority.
+        if (preserveManualCatalogOrder) {
+            preservedOrderRowKeys = definitions
+                .filterNot { ServerCatalog.isServerKey(it.key) }
+                .mapTo(mutableSetOf()) { it.key }
+        }
+
         publish()
+        if (commitImmediately) {
+            persistPendingRowOrderChanges()
+        } else {
+            hasPendingRowOrderChanges = true
+        }
+    }
+
+    /** Persist one completed drag, not every intermediate pointer movement. */
+    fun commitPendingRowOrder() {
+        if (!hasPendingRowOrderChanges) return
+        persistPendingRowOrderChanges()
+    }
+
+    private fun persistPendingRowOrderChanges() {
+        hasPendingRowOrderChanges = false
         persist()
         HomeRepository.applyCurrentSettings()
         HomeCatalogSettingsSyncService.triggerPush()
     }
 
-    private fun persistVisibleOrder(orderedKeys: List<String>) {
+    private fun persistVisibleOrder(
+        orderedKeys: List<String>,
+        updateAddonOrder: Boolean = true,
+    ) {
         val updatedPreferences = preferences.toMutableMap()
         orderedKeys.forEachIndexed { index, key ->
             val current = updatedPreferences[key] ?: return@forEachIndexed
             updatedPreferences[key] = current.copy(order = index)
         }
         preferences = updatedPreferences
+        if (!updateAddonOrder) return
 
         val addonIdByKey = definitions
             .filterNot { ServerCatalog.isServerKey(it.key) }
@@ -952,6 +1011,7 @@ object HomeCatalogSettingsRepository {
         showCatalogType = payload.showCatalogType
         hideUnreleasedContent = payload.hideUnreleasedContent
         val remotePolicy = HomeAddonRowOrderPolicy.fromStorage(payload.addonRowOrderPolicy)
+        hasPendingRowOrderChanges = false
         addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS
         upcomingRowKeys = emptySet()
         preservedOrderRowKeys = payload.preservedOrderRowKeys.toSet().ifEmpty {
