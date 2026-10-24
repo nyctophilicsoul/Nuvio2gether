@@ -478,23 +478,40 @@ class HomeCatalogSettingsRepositoryTest {
     }
 
     @Test
-    fun collectionCanMoveAbovePinnedCatalogWithoutChangingCatalogPin() {
+    fun collectionCannotMoveAcrossPinnedCatalogWithoutExplicitPinChange() {
         val managedAddon = addon(listOf("popular", "latest"))
-        val favorites = collection()
         HomeCatalogSettingsRepository.syncCatalogs(listOf(managedAddon))
-        HomeCatalogSettingsRepository.syncCollections(listOf(favorites))
-        HomeCatalogSettingsRepository.setRowPlacement("test:movie:popular", HomeCatalogRowPlacement.PINNED_TOP)
+        HomeCatalogSettingsRepository.syncCollections(listOf(collection()))
+        HomeCatalogSettingsRepository.setRowPlacement(
+            "test:movie:popular",
+            HomeCatalogRowPlacement.PINNED_TOP,
+        )
+        val before = HomeCatalogSettingsRepository.uiState.value.items.map { it.key }
 
+        assertFalse(
+            HomeCatalogSettingsRepository.canMoveByKeys(
+                "collection_favorites",
+                "test:movie:popular",
+            ),
+        )
         HomeCatalogSettingsRepository.moveByKeys(
             fromKey = "collection_favorites",
             toKey = "test:movie:popular",
         )
 
-        val items = HomeCatalogSettingsRepository.uiState.value.items
-        assertEquals("collection_favorites", items.first().key)
-        assertEquals(HomeCatalogRowPlacement.PINNED_TOP, items.single { it.key == "test:movie:popular" }.rowPlacement)
-        assertEquals(HomeCatalogRowPlacement.PINNED_TOP, items.single { it.key == "collection_favorites" }.rowPlacement)
-        assertEquals(false, items.single { it.key == "collection_favorites" }.isPinnedToTop)
+        assertEquals(before, HomeCatalogSettingsRepository.uiState.value.items.map { it.key })
+        assertEquals(
+            HomeCatalogRowPlacement.NORMAL,
+            HomeCatalogSettingsRepository.uiState.value.items.single {
+                it.key == "collection_favorites"
+            }.rowPlacement,
+        )
+        assertEquals(
+            HomeCatalogRowPlacement.PINNED_TOP,
+            HomeCatalogSettingsRepository.uiState.value.items.single {
+                it.key == "test:movie:popular"
+            }.rowPlacement,
+        )
     }
 
     @Test
@@ -557,43 +574,6 @@ class HomeCatalogSettingsRepositoryTest {
         assertEquals(
             listOf("a", "b"),
             HomeCatalogSettingsRepository.uiState.value.addonGroups.map { it.addonId },
-        )
-    }
-
-    @Test
-    fun collectionCannotBeDraggedAcrossPinnedSectionOrLoseItsPin() {
-        val managedAddon = addon(listOf("popular", "latest"))
-        HomeCatalogSettingsRepository.syncCatalogs(listOf(managedAddon))
-        HomeCatalogSettingsRepository.syncCollections(listOf(collection()))
-        HomeCatalogSettingsRepository.setRowPlacement(
-            "test:movie:popular",
-            HomeCatalogRowPlacement.PINNED_TOP,
-        )
-        val before = HomeCatalogSettingsRepository.uiState.value.items.map { it.key }
-
-        assertFalse(
-            HomeCatalogSettingsRepository.canMoveByKeys(
-                "collection_favorites",
-                "test:movie:popular",
-            ),
-        )
-        HomeCatalogSettingsRepository.moveByKeys(
-            fromKey = "collection_favorites",
-            toKey = "test:movie:popular",
-        )
-
-        assertEquals(before, HomeCatalogSettingsRepository.uiState.value.items.map { it.key })
-        assertEquals(
-            HomeCatalogRowPlacement.NORMAL,
-            HomeCatalogSettingsRepository.uiState.value.items.single {
-                it.key == "collection_favorites"
-            }.rowPlacement,
-        )
-        assertEquals(
-            HomeCatalogRowPlacement.PINNED_TOP,
-            HomeCatalogSettingsRepository.uiState.value.items.single {
-                it.key == "test:movie:popular"
-            }.rowPlacement,
         )
     }
 
