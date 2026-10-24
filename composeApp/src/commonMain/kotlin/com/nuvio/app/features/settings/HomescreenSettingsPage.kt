@@ -508,7 +508,7 @@ private fun AddonRowOrderSection(
                         onClick = {
                             editing = false
                             draftAddonIds = emptyList()
-                            draftPolicy = savedPolicy
+                            draftPolicy = HomeAddonRowOrderPolicy.UPCOMING_ROWS_ONLY
                         },
                     ) {
                         Text(stringResource(Res.string.settings_homescreen_addon_order_cancel))
