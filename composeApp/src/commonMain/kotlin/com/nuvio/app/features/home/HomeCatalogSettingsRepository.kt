@@ -565,6 +565,48 @@ object HomeCatalogSettingsRepository {
         moveByKeys(items[fromIndex].key, items[toIndex].key)
     }
 
+    /**
+     * Shared validation for drag previews and persisted moves. A drag must stay inside the
+     * same pin section and may not cross a position-pinned row. Pin changes are explicit
+     * settings actions; dragging a collection must never silently unpin or repin it.
+     */
+    fun canMoveByKeys(fromKey: String, toKey: String): Boolean {
+        ensureLoaded()
+        val items = _uiState.value.items
+        val fromItem = items.firstOrNull { it.key == fromKey } ?: return false
+        val toItem = items.firstOrNull { it.key == toKey } ?: return false
+        if (fromKey == toKey || fromItem.isVisible != toItem.isVisible) return false
+
+        val cohort = items.filter { it.isVisible == fromItem.isVisible }
+        val fromIndex = cohort.indexOfFirst { it.key == fromKey }
+        val toIndex = cohort.indexOfFirst { it.key == toKey }
+        return isMoveAllowedWithinPinSection(cohort, fromIndex, toIndex)
+    }
+
+    private fun isMoveAllowedWithinPinSection(
+        cohort: List<HomeCatalogSettingsItem>,
+        fromIndex: Int,
+        toIndex: Int,
+    ): Boolean {
+        if (fromIndex !in cohort.indices || toIndex !in cohort.indices || fromIndex == toIndex) return false
+
+        fun pinSection(item: HomeCatalogSettingsItem): HomeCatalogRowPlacement = when {
+            item.rowPlacement == HomeCatalogRowPlacement.PINNED_TOP ||
+                (item.isCollection && item.isPinnedToTop) -> HomeCatalogRowPlacement.PINNED_TOP
+            item.rowPlacement == HomeCatalogRowPlacement.PINNED_BOTTOM -> HomeCatalogRowPlacement.PINNED_BOTTOM
+            else -> HomeCatalogRowPlacement.NORMAL
+        }
+
+        val fromSection = pinSection(cohort[fromIndex])
+        if (pinSection(cohort[toIndex]) != fromSection) return false
+        val start = minOf(fromIndex, toIndex)
+        val end = maxOf(fromIndex, toIndex)
+        return cohort.subList(start, end + 1).none { item ->
+            item.rowPlacement == HomeCatalogRowPlacement.PINNED_POSITION ||
+                pinSection(item) != fromSection
+        }
+    }
+
     /** Reorder by stable keys because visible and hidden rows are rendered in separate lists. */
     fun moveByKeys(fromKey: String, toKey: String) {
         ensureLoaded()
@@ -584,38 +626,14 @@ object HomeCatalogSettingsRepository {
         val localTo = cohort.indexOfFirst { it.key == toKey }
         if (localFrom < 0 || localTo < 0 || localFrom == localTo) return
 
-        fun pinSection(item: HomeCatalogSettingsItem): HomeCatalogRowPlacement = when {
-            item.rowPlacement == HomeCatalogRowPlacement.PINNED_TOP ||
-                (item.isCollection && item.isPinnedToTop) -> HomeCatalogRowPlacement.PINNED_TOP
-            item.rowPlacement == HomeCatalogRowPlacement.PINNED_BOTTOM -> HomeCatalogRowPlacement.PINNED_BOTTOM
-            else -> HomeCatalogRowPlacement.NORMAL
-        }
-        val fromPinSection = pinSection(cohort[localFrom])
-        val toPinSection = pinSection(cohort[localTo])
+        if (!isMoveAllowedWithinPinSection(cohort, localFrom, localTo)) return
         val movingCollection = fromItem.isCollection
-        if (fromPinSection != toPinSection && !movingCollection) return
-        val start = minOf(localFrom, localTo)
-        val end = maxOf(localFrom, localTo)
-        val crossedProtectedAnchor = cohort.subList(start, end + 1).any { item ->
-            item.rowPlacement == HomeCatalogRowPlacement.PINNED_POSITION ||
-                (!movingCollection && pinSection(item) != fromPinSection)
-        }
-        if (crossedProtectedAnchor) return
 
         val reorderedCohortKeys = cohort.map { it.key }.toMutableList().apply {
             add(localTo, removeAt(localFrom))
         }
         val orderedKeys = items.map { it.key }.toMutableList()
         cohortIndices.forEachIndexed { index, globalIndex -> orderedKeys[globalIndex] = reorderedCohortKeys[index] }
-        if (movingCollection && fromPinSection != toPinSection) {
-            val current = preferences[fromKey] ?: defaultPreferenceForMissingKey(fromKey) ?: return
-            val newPlacement = when (toPinSection) {
-                HomeCatalogRowPlacement.PINNED_TOP -> HomeCatalogRowPlacement.PINNED_TOP
-                HomeCatalogRowPlacement.PINNED_BOTTOM -> HomeCatalogRowPlacement.PINNED_BOTTOM
-                else -> HomeCatalogRowPlacement.NORMAL
-            }
-            preferences = preferences + (fromKey to current.copy(rowPlacement = newPlacement.storageValue))
-        }
         // A manual cross-add-on row move changes row order, not the separate add-on
         // order. Keep those two preferences independent.
         val preserveManualCatalogOrder = !movingCollection && fromItem.addonId != toItem.addonId

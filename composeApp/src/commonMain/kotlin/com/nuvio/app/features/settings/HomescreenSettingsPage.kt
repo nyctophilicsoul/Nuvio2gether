@@ -720,36 +720,14 @@ private fun HomescreenCatalogList(
     ) { from, to ->
         val fromItem = items.getOrNull(from.index)
         val toItem = items.getOrNull(to.index)
-        fun pinSection(item: HomeCatalogSettingsItem?): HomeCatalogRowPlacement? = when {
-            item == null -> null
-            item.rowPlacement == HomeCatalogRowPlacement.PINNED_TOP ||
-                (item.isCollection && item.isPinnedToTop) -> HomeCatalogRowPlacement.PINNED_TOP
-            item.rowPlacement == HomeCatalogRowPlacement.PINNED_BOTTOM -> HomeCatalogRowPlacement.PINNED_BOTTOM
-            item.rowPlacement == HomeCatalogRowPlacement.NORMAL && !item.isPinnedToTop -> HomeCatalogRowPlacement.NORMAL
-            else -> item.rowPlacement
-        }
-        val fromSection = pinSection(fromItem)
-        val toSection = pinSection(toItem)
-        if (fromSection != toSection && fromItem?.isCollection != true) {
+        if (from.index == to.index) return@rememberReorderableLazyListState
+        if (fromItem == null || toItem == null) return@rememberReorderableLazyListState
+        if (!HomeCatalogSettingsRepository.canMoveByKeys(fromItem.key, toItem.key)) {
             onPinnedDragAttempt()
             return@rememberReorderableLazyListState
         }
         val rangeStart = minOf(from.index, to.index).coerceAtLeast(0)
         val rangeEnd = maxOf(from.index, to.index).coerceAtMost(items.lastIndex)
-        val crossesPinnedSection = rangeStart <= rangeEnd && items
-            .subList(rangeStart, rangeEnd + 1)
-            .any { pinSection(it) != fromSection }
-        if (crossesPinnedSection && fromItem?.isCollection != true) {
-            onPinnedDragAttempt()
-            return@rememberReorderableLazyListState
-        }
-        val crossesPositionPinnedAnchor = rangeStart <= rangeEnd && items
-            .subList(rangeStart, rangeEnd + 1)
-            .any { it.rowPlacement == HomeCatalogRowPlacement.PINNED_POSITION }
-        if (crossesPositionPinnedAnchor) {
-            onPinnedDragAttempt()
-            return@rememberReorderableLazyListState
-        }
         val crossesManagedGroup = rangeStart <= rangeEnd && items
             .subList(rangeStart, rangeEnd + 1)
             .any { it.addonId != null && it.addonLayoutMode != HomeAddonLayoutMode.NORMAL }
