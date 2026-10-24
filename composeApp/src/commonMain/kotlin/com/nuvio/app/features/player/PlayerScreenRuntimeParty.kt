@@ -397,6 +397,16 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
                 if (!party.canControl) showGestureMessage(getString(Res.string.party_caught_up))
             }
             val expected = PartySync.expectedPositionMs(playback, PartyRepository.nowMs(), snapshot.durationMs)
+            // A media-item re-prepare (including external subtitle attachment) can leave the
+            // player loading while party state advances. Like the settle guard in the legacy
+            // WatchParty implementation, wait until the player is ready before consuming a
+            // playback sequence or issuing a seek. Otherwise the command can be marked handled
+            // while the seek is ignored by the player.
+            if (snapshot.isLoading || isScrubbingTimeline) {
+                mismatchSince = null
+                continue
+            }
+
             val identity = playback.seq to playback.memberId
             if (identity != lastSeq) {
                 val forced = lastSeq == null
@@ -415,7 +425,7 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
                 continue
             }
 
-            if (snapshot.isLoading || isScrubbingTimeline || snapshot.isEnded) {
+            if (snapshot.isEnded) {
                 mismatchSince = null
                 continue
             }
@@ -648,12 +658,3 @@ private fun PartyStatusPill(
 }
 
 private val partyLog = Logger.withTag("Party")
-private val PARTY_TICK = 250.milliseconds
-private val NOTICE_DURATION = 3_000.milliseconds
-private val BUFFERING_REPORT_DELAY = 1_000.milliseconds
-private val OUTSIDE_TOGGLE_DELAY = 1_200.milliseconds
-private val SEEK_SETTLE = 2_500.milliseconds
-private val CORRECTION_INTERVAL = 500.milliseconds
-private const val MAX_SEEK_LEAD_MS = 3_000L
-private const val BEHIND_DISPLAY_STEP_MS = 1_000L
-private const val DESCRIPTION_LIMIT = 600
