@@ -123,7 +123,6 @@ internal fun LazyListScope.homescreenSettingsContent(
     hideUnreleasedContent: Boolean,
     items: List<HomeCatalogSettingsItem>,
     addonGroups: List<HomeAddonLayoutItem>,
-    addonRowOrderPolicy: HomeAddonRowOrderPolicy,
     isCatalogLoading: Boolean,
     catalogErrorMessage: String?,
 ) {
@@ -192,7 +191,6 @@ internal fun LazyListScope.homescreenSettingsContent(
             AddonRowOrderSection(
                 isTablet = isTablet,
                 addonGroups = addonGroups,
-                savedPolicy = addonRowOrderPolicy,
             )
         }
     }
@@ -306,7 +304,6 @@ internal fun LazyListScope.homescreenSettingsContent(
 private fun AddonRowOrderSection(
     isTablet: Boolean,
     addonGroups: List<HomeAddonLayoutItem>,
-    savedPolicy: HomeAddonRowOrderPolicy,
 ) {
     var editing by remember { mutableStateOf(false) }
     var draftAddonIds by remember { mutableStateOf(emptyList<String>()) }
