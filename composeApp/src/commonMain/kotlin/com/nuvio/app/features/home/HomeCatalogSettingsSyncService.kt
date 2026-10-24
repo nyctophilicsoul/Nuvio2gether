@@ -45,6 +45,7 @@ data class SyncAddonLayoutPreference(
     val order: Int = 0,
     @SerialName("anchor_order") val anchorOrder: Int = 0,
     @SerialName("anchor_key") val anchorKey: String? = null,
+    @SerialName("catalogs_enabled") val catalogsEnabled: Boolean = true,
 )
 
 @Serializable
@@ -55,6 +56,7 @@ data class SyncHomeCatalogPayload(
     @SerialName("addon_layouts") val addonLayouts: List<SyncAddonLayoutPreference>? = null,
     @SerialName("addon_row_order_policy") val addonRowOrderPolicy: String = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS.storageValue,
     @SerialName("upcoming_row_keys") val upcomingRowKeys: List<String> = emptyList(),
+    @SerialName("preserved_order_row_keys") val preservedOrderRowKeys: List<String> = emptyList(),
 )
 
 @Serializable
@@ -93,6 +95,7 @@ object HomeCatalogSettingsSyncService {
     private const val SHOW_CATALOG_TYPE_KEY = "show_catalog_type"
     private const val ADDON_ROW_ORDER_POLICY_KEY = "addon_row_order_policy"
     private const val UPCOMING_ROW_KEYS_KEY = "upcoming_row_keys"
+    private const val PRESERVED_ORDER_ROW_KEYS_KEY = "preserved_order_row_keys"
 
     @Volatile
     var isSyncingFromRemote: Boolean = false
@@ -243,6 +246,11 @@ object HomeCatalogSettingsSyncService {
                 decoded.upcomingRowKeys
             } else {
                 localPayload.upcomingRowKeys
+            },
+            preservedOrderRowKeys = if (settingsJson.containsKey(PRESERVED_ORDER_ROW_KEYS_KEY)) {
+                decoded.preservedOrderRowKeys
+            } else {
+                localPayload.preservedOrderRowKeys
             },
         )
     }.getOrNull()
