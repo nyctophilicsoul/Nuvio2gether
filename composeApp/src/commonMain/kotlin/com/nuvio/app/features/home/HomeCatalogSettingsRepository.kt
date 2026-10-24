@@ -634,13 +634,16 @@ object HomeCatalogSettingsRepository {
         }
         val orderedKeys = items.map { it.key }.toMutableList()
         cohortIndices.forEachIndexed { index, globalIndex -> orderedKeys[globalIndex] = reorderedCohortKeys[index] }
-        // A manual cross-add-on row move changes row order, not the separate add-on
-        // order. Keep those two preferences independent.
-        val preserveManualCatalogOrder = !movingCollection && fromItem.addonId != toItem.addonId
+        // Moving a collection changes the collection's position, not the add-on order.
+        // Cross-add-on catalog moves likewise change row order only. In both cases, avoid
+        // rewriting the independent add-on-order preference and preserve the existing
+        // catalog sequence so publish() cannot regroup rows across the manually placed row.
+        val preserveManualCatalogOrder = movingCollection ||
+            fromItem.addonId != toItem.addonId
         persistVisibleOrder(orderedKeys, updateAddonOrder = !preserveManualCatalogOrder)
-        // Default grouping must not undo a manual move across add-ons. Preserve the
-        // current order of existing catalog rows; newly discovered rows can still use
-        // the saved add-on order.
+        // Default grouping must not undo a manual collection placement or a cross-add-on
+        // move. Preserve the current order of existing catalog rows; newly discovered rows
+        // can still use the saved add-on order.
         if (preserveManualCatalogOrder) {
             preservedOrderRowKeys = definitions
                 .filterNot { ServerCatalog.isServerKey(it.key) }
