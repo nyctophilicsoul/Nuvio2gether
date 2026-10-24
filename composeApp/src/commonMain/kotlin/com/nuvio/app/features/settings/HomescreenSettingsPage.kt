@@ -746,7 +746,11 @@ private fun HomescreenCatalogList(
             return@rememberReorderableLazyListState
         }
         if (fromItem != null && toItem != null) {
-            HomeCatalogSettingsRepository.moveByKeys(fromItem.key, toItem.key)
+            HomeCatalogSettingsRepository.moveByKeys(
+                fromKey = fromItem.key,
+                toKey = toItem.key,
+                commitImmediately = false,
+            )
         }
         hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
     }
@@ -785,6 +789,7 @@ private fun HomescreenCatalogList(
                                 onRowPlacementChange = { HomeCatalogSettingsRepository.setRowPlacement(item.key, it) },
                                 dragHandleScope = this@ReorderableItem,
                                 onPinnedDragAttempt = onPinnedDragAttempt,
+                                onReorderFinished = { HomeCatalogSettingsRepository.commitPendingRowOrder() },
                             )
                         }
                     }
