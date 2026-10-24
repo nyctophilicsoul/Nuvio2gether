@@ -205,6 +205,7 @@ object HomeCatalogSettingsRepository {
     private var addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS
     private var upcomingRowKeys: Set<String> = emptySet()
     private var preservedOrderRowKeys: Set<String> = emptySet()
+    private var hasPendingRowOrderChanges = false
 
     fun onProfileChanged() = clearLocalState()
 
@@ -222,6 +223,7 @@ object HomeCatalogSettingsRepository {
         addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS
         upcomingRowKeys = emptySet()
         preservedOrderRowKeys = emptySet()
+        hasPendingRowOrderChanges = false
         _uiState.value = HomeCatalogSettingsUiState()
     }
 
@@ -628,7 +630,11 @@ object HomeCatalogSettingsRepository {
     }
 
     /** Reorder by stable keys because visible and hidden rows are rendered in separate lists. */
-    fun moveByKeys(fromKey: String, toKey: String) {
+    fun moveByKeys(
+        fromKey: String,
+        toKey: String,
+        commitImmediately: Boolean = true,
+    ) {
         ensureLoaded()
         val items = _uiState.value.items
         val fromIndex = items.indexOfFirst { it.key == fromKey }
@@ -660,7 +666,9 @@ object HomeCatalogSettingsRepository {
         // catalog sequence so publish() cannot regroup rows across the manually placed row.
         val preserveManualCatalogOrder = movingCollection ||
             fromItem.addonId != toItem.addonId
-        persistVisibleOrder(orderedKeys, updateAddonOrder = !preserveManualCatalogOrder)
+        // Row arrangement and add-on priority are independent settings. A manual row drag
+        // must never rewrite the add-on priority used for future catalog discovery.
+        persistVisibleOrder(orderedKeys, updateAddonOrder = false)
         // Default grouping must not undo a manual collection placement or a cross-add-on
         // move. Preserve the current order of existing catalog rows; newly discovered rows
         // can still use the saved add-on order.
@@ -670,6 +678,21 @@ object HomeCatalogSettingsRepository {
                 .mapTo(mutableSetOf()) { it.key }
         }
         publish()
+        if (commitImmediately) {
+            persistPendingRowOrderChanges()
+        } else {
+            hasPendingRowOrderChanges = true
+        }
+    }
+
+    /** Persist one completed drag, not every intermediate pointer movement. */
+    fun commitPendingRowOrder() {
+        if (!hasPendingRowOrderChanges) return
+        persistPendingRowOrderChanges()
+    }
+
+    private fun persistPendingRowOrderChanges() {
+        hasPendingRowOrderChanges = false
         persist()
         HomeRepository.applyCurrentSettings()
         HomeCatalogSettingsSyncService.triggerPush()
