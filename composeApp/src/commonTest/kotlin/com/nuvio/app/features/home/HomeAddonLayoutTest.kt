@@ -21,6 +21,54 @@ class HomeAddonLayoutTest {
     }
 
     @Test
+    fun `manual row order can interleave catalogs from different add-ons`() {
+        val definitions = listOf(
+            definition("A", "one"),
+            definition("C", "one"),
+            definition("B", "one"),
+            definition("C", "two"),
+            definition("D", "one"),
+        )
+        val state = snapshot(definitions).copy(
+            preservedOrderRowKeys = definitions.mapTo(mutableSetOf()) { it.key },
+        )
+
+        assertEquals(
+            listOf("A:one", "C:one", "B:one", "C:two", "D:one"),
+            orderHomeCatalogDefinitions(definitions, state).map(::label),
+        )
+    }
+
+    @Test
+    fun `manual row order remains interleaved in home settings after repeated cross-addon moves`() {
+        val items = listOf(
+            settingItem("A", "one", 0),
+            settingItem("C", "one", 1),
+            settingItem("B", "one", 2),
+            settingItem("C", "two", 3),
+            settingItem("D", "one", 4),
+        )
+        val addonIds = items.associate { it.key to it.addonId.orEmpty() }
+        val preservedKeys = items.mapTo(mutableSetOf()) { it.key }
+        val layouts = mapOf(
+            "A" to HomeAddonLayoutPreference(HomeAddonLayoutMode.NORMAL, order = 0, anchorOrder = 0),
+            "B" to HomeAddonLayoutPreference(HomeAddonLayoutMode.NORMAL, order = 2, anchorOrder = 2),
+            "C" to HomeAddonLayoutPreference(HomeAddonLayoutMode.NORMAL, order = 1, anchorOrder = 1),
+            "D" to HomeAddonLayoutPreference(HomeAddonLayoutMode.NORMAL, order = 4, anchorOrder = 4),
+        )
+
+        assertEquals(
+            listOf("A:one", "C:one", "B:one", "C:two", "D:one"),
+            orderHomeCatalogSettingsItems(
+                items = items,
+                addonIdByCatalogKey = addonIds,
+                addonLayouts = layouts,
+                preservedOrderRowKeys = preservedKeys,
+            ).map(::settingLabel),
+        )
+    }
+
+    @Test
     fun `saved add-on order groups its unpinned rows together`() {
         val definitions = listOf(
             definition("A", "one"),

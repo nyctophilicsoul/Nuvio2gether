@@ -478,12 +478,14 @@ class HomeCatalogSettingsRepositoryTest {
     }
 
     @Test
-    fun collectionCanMoveAbovePinnedCatalogWithoutChangingCatalogPin() {
+    fun collectionCannotMoveAcrossPinSectionsWithoutExplicitUnpin() {
         val managedAddon = addon(listOf("popular", "latest"))
-        val favorites = collection()
         HomeCatalogSettingsRepository.syncCatalogs(listOf(managedAddon))
-        HomeCatalogSettingsRepository.syncCollections(listOf(favorites))
+        HomeCatalogSettingsRepository.syncCollections(listOf(collection()))
         HomeCatalogSettingsRepository.setRowPlacement("test:movie:popular", HomeCatalogRowPlacement.PINNED_TOP)
+
+        val before = HomeCatalogSettingsRepository.uiState.value.items.map { it.key }
+        assertFalse(HomeCatalogSettingsRepository.canMoveByKeys("collection_favorites", "test:movie:popular"))
 
         HomeCatalogSettingsRepository.moveByKeys(
             fromKey = "collection_favorites",
@@ -491,10 +493,110 @@ class HomeCatalogSettingsRepositoryTest {
         )
 
         val items = HomeCatalogSettingsRepository.uiState.value.items
-        assertEquals("collection_favorites", items.first().key)
+        assertEquals(before, items.map { it.key })
         assertEquals(HomeCatalogRowPlacement.PINNED_TOP, items.single { it.key == "test:movie:popular" }.rowPlacement)
-        assertEquals(HomeCatalogRowPlacement.PINNED_TOP, items.single { it.key == "collection_favorites" }.rowPlacement)
-        assertEquals(false, items.single { it.key == "collection_favorites" }.isPinnedToTop)
+        assertEquals(HomeCatalogRowPlacement.NORMAL, items.single { it.key == "collection_favorites" }.rowPlacement)
+        assertFalse(items.single { it.key == "collection_favorites" }.isPinnedToTop)
+    }
+
+    @Test
+    fun homePinnedCollectionCannotBeDraggedIntoNormalSectionAndRemainsPinnedAfterReload() {
+        val managedAddon = addon(listOf("popular", "latest"))
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(managedAddon))
+        HomeCatalogSettingsRepository.syncCollections(listOf(collection()))
+        HomeCatalogSettingsRepository.setRowPlacement("collection_favorites", HomeCatalogRowPlacement.PINNED_TOP)
+
+        val before = HomeCatalogSettingsRepository.uiState.value.items.map { it.key }
+        assertFalse(HomeCatalogSettingsRepository.canMoveByKeys("collection_favorites", "test:movie:latest"))
+        HomeCatalogSettingsRepository.moveByKeys(
+            fromKey = "collection_favorites",
+            toKey = "test:movie:latest",
+        )
+
+        assertEquals(before, HomeCatalogSettingsRepository.uiState.value.items.map { it.key })
+        assertEquals(
+            HomeCatalogRowPlacement.PINNED_TOP,
+            HomeCatalogSettingsRepository.uiState.value.items.single { it.key == "collection_favorites" }.rowPlacement,
+        )
+
+        HomeCatalogSettingsRepository.clearLocalState()
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(managedAddon))
+        HomeCatalogSettingsRepository.syncCollections(listOf(collection()))
+        val reloaded = HomeCatalogSettingsRepository.uiState.value.items.single { it.key == "collection_favorites" }
+        assertEquals(HomeCatalogRowPlacement.PINNED_TOP, reloaded.rowPlacement)
+        assertEquals("collection_favorites", HomeCatalogSettingsRepository.uiState.value.items.first().key)
+    }
+
+    @Test
+    fun pinnedCollectionCanReorderWithinPinnedTopSectionWithoutLosingPin() {
+        val managedAddon = addon(listOf("popular", "latest"))
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(managedAddon))
+        HomeCatalogSettingsRepository.syncCollections(listOf(collection()))
+        HomeCatalogSettingsRepository.setRowPlacement("test:movie:popular", HomeCatalogRowPlacement.PINNED_TOP)
+        HomeCatalogSettingsRepository.setRowPlacement("collection_favorites", HomeCatalogRowPlacement.PINNED_TOP)
+
+        assertTrue(HomeCatalogSettingsRepository.canMoveByKeys("collection_favorites", "test:movie:popular"))
+        HomeCatalogSettingsRepository.moveByKeys(
+            fromKey = "collection_favorites",
+            toKey = "test:movie:popular",
+        )
+
+        val items = HomeCatalogSettingsRepository.uiState.value.items
+        assertEquals("collection_favorites", items.first().key)
+        assertEquals(
+            HomeCatalogRowPlacement.PINNED_TOP,
+            items.single { it.key == "collection_favorites" }.rowPlacement,
+        )
+        assertEquals(
+            HomeCatalogRowPlacement.PINNED_TOP,
+            items.single { it.key == "test:movie:popular" }.rowPlacement,
+        )
+    }
+
+    @Test
+    fun explicitlyUnpinnedCollectionBecomesEligibleForNormalRowReordering() {
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(addon(listOf("popular", "latest"))))
+        HomeCatalogSettingsRepository.syncCollections(listOf(collection()))
+        HomeCatalogSettingsRepository.setRowPlacement("collection_favorites", HomeCatalogRowPlacement.PINNED_TOP)
+        HomeCatalogSettingsRepository.setRowPlacement("collection_favorites", HomeCatalogRowPlacement.NORMAL)
+
+        assertTrue(HomeCatalogSettingsRepository.canMoveByKeys("collection_favorites", "test:movie:latest"))
+        HomeCatalogSettingsRepository.moveByKeys(
+            fromKey = "collection_favorites",
+            toKey = "test:movie:latest",
+        )
+        assertEquals(
+            HomeCatalogRowPlacement.NORMAL,
+            HomeCatalogSettingsRepository.uiState.value.items.single { it.key == "collection_favorites" }.rowPlacement,
+        )
+    }
+
+    @Test
+    fun collectionLevelPinSurvivesRejectedDragAndLocalReload() {
+        val managedAddon = addon(listOf("popular", "latest"))
+        val pinnedCollection = collection().copy(pinToTop = true)
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(managedAddon))
+        HomeCatalogSettingsRepository.syncCollections(listOf(pinnedCollection))
+
+        val before = HomeCatalogSettingsRepository.uiState.value.items.map { it.key }
+        assertFalse(HomeCatalogSettingsRepository.canMoveByKeys("collection_favorites", "test:movie:latest"))
+        HomeCatalogSettingsRepository.moveByKeys(
+            fromKey = "collection_favorites",
+            toKey = "test:movie:latest",
+        )
+
+        assertEquals(before, HomeCatalogSettingsRepository.uiState.value.items.map { it.key })
+        var item = HomeCatalogSettingsRepository.uiState.value.items.single { it.key == "collection_favorites" }
+        assertTrue(item.isPinnedToTop)
+        assertEquals(HomeCatalogRowPlacement.NORMAL, item.rowPlacement)
+
+        HomeCatalogSettingsRepository.clearLocalState()
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(managedAddon))
+        HomeCatalogSettingsRepository.syncCollections(listOf(pinnedCollection))
+        item = HomeCatalogSettingsRepository.uiState.value.items.single { it.key == "collection_favorites" }
+        assertTrue(item.isPinnedToTop)
+        assertEquals(HomeCatalogRowPlacement.NORMAL, item.rowPlacement)
+        assertEquals("collection_favorites", HomeCatalogSettingsRepository.uiState.value.items.first().key)
     }
 
     @Test

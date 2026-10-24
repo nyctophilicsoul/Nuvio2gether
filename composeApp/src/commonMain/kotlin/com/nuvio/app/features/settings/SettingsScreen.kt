@@ -68,7 +68,6 @@ import com.nuvio.app.features.addons.isWaitingForFirstEnabledManifest
 import com.nuvio.app.features.debrid.DebridSettings
 import com.nuvio.app.features.debrid.DebridSettingsRepository
 import com.nuvio.app.features.home.HomeAddonLayoutItem
-import com.nuvio.app.features.home.HomeAddonRowOrderPolicy
 import com.nuvio.app.features.home.HomeCatalogSettingsItem
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.buildAddonCatalogRefreshSignature
@@ -414,6 +413,7 @@ fun SettingsScreen(
                         tunnelingEnabled = playerSettingsUiState.tunnelingEnabled,
                         useLibass = playerSettingsUiState.useLibass,
                         libassRenderType = playerSettingsUiState.libassRenderType,
+                        libassRenderScale = playerSettingsUiState.libassRenderScale,
                         rememberLastProfileEnabled = profileSettingsState.rememberLastProfileEnabled,
                         selectedTheme = selectedTheme,
                         onThemeSelected = ThemeSettingsRepository::setTheme,
@@ -443,7 +443,6 @@ fun SettingsScreen(
                         homescreenHideUnreleasedContent = homescreenSettingsUiState.hideUnreleasedContent,
                         homescreenItems = homescreenSettingsUiState.items,
                         homescreenAddonGroups = homescreenSettingsUiState.addonGroups,
-                        homescreenAddonRowOrderPolicy = homescreenSettingsUiState.addonRowOrderPolicy,
                         homescreenCatalogLoading = addonManifestsLoading,
                         homescreenCatalogErrorMessage = addonManifestErrorMessage,
                         metaScreenSettingsUiState = metaScreenSettingsUiState,
@@ -483,6 +482,7 @@ fun SettingsScreen(
                         tunnelingEnabled = playerSettingsUiState.tunnelingEnabled,
                         useLibass = playerSettingsUiState.useLibass,
                         libassRenderType = playerSettingsUiState.libassRenderType,
+                        libassRenderScale = playerSettingsUiState.libassRenderScale,
                         rememberLastProfileEnabled = profileSettingsState.rememberLastProfileEnabled,
                         selectedTheme = selectedTheme,
                         onThemeSelected = ThemeSettingsRepository::setTheme,
@@ -512,7 +512,6 @@ fun SettingsScreen(
                         homescreenHideUnreleasedContent = homescreenSettingsUiState.hideUnreleasedContent,
                         homescreenItems = homescreenSettingsUiState.items,
                         homescreenAddonGroups = homescreenSettingsUiState.addonGroups,
-                        homescreenAddonRowOrderPolicy = homescreenSettingsUiState.addonRowOrderPolicy,
                         homescreenCatalogLoading = addonManifestsLoading,
                         homescreenCatalogErrorMessage = addonManifestErrorMessage,
                         metaScreenSettingsUiState = metaScreenSettingsUiState,
@@ -564,6 +563,7 @@ private fun MobileSettingsScreen(
     tunnelingEnabled: Boolean,
     useLibass: Boolean,
     libassRenderType: String,
+    libassRenderScale: String,
     rememberLastProfileEnabled: Boolean,
     selectedTheme: AppTheme,
     onThemeSelected: (AppTheme) -> Unit,
@@ -593,7 +593,6 @@ private fun MobileSettingsScreen(
     homescreenHideUnreleasedContent: Boolean,
     homescreenItems: List<HomeCatalogSettingsItem>,
     homescreenAddonGroups: List<HomeAddonLayoutItem>,
-    homescreenAddonRowOrderPolicy: HomeAddonRowOrderPolicy,
     homescreenCatalogLoading: Boolean,
     homescreenCatalogErrorMessage: String?,
     metaScreenSettingsUiState: MetaScreenSettingsUiState,
@@ -769,6 +768,7 @@ private fun MobileSettingsScreen(
                     tunnelingEnabled = tunnelingEnabled,
                     useLibass = useLibass,
                     libassRenderType = libassRenderType,
+                    libassRenderScale = libassRenderScale,
                 )
                 SettingsPage.Streams -> streamsSettingsContent(
                     isTablet = false,
@@ -843,7 +843,6 @@ private fun MobileSettingsScreen(
                     hideUnreleasedContent = homescreenHideUnreleasedContent,
                     items = homescreenItems,
                     addonGroups = homescreenAddonGroups,
-                    addonRowOrderPolicy = homescreenAddonRowOrderPolicy,
                     isCatalogLoading = homescreenCatalogLoading,
                     catalogErrorMessage = homescreenCatalogErrorMessage,
                 )
@@ -951,6 +950,7 @@ private fun TabletSettingsScreen(
     tunnelingEnabled: Boolean,
     useLibass: Boolean,
     libassRenderType: String,
+    libassRenderScale: String,
     rememberLastProfileEnabled: Boolean,
     selectedTheme: AppTheme,
     onThemeSelected: (AppTheme) -> Unit,
@@ -980,7 +980,6 @@ private fun TabletSettingsScreen(
     homescreenHideUnreleasedContent: Boolean,
     homescreenItems: List<HomeCatalogSettingsItem>,
     homescreenAddonGroups: List<HomeAddonLayoutItem>,
-    homescreenAddonRowOrderPolicy: HomeAddonRowOrderPolicy,
     homescreenCatalogLoading: Boolean,
     homescreenCatalogErrorMessage: String?,
     metaScreenSettingsUiState: MetaScreenSettingsUiState,
@@ -1212,6 +1211,7 @@ private fun TabletSettingsScreen(
                         tunnelingEnabled = tunnelingEnabled,
                         useLibass = useLibass,
                         libassRenderType = libassRenderType,
+                    libassRenderScale = libassRenderScale,
                     )
                     SettingsPage.Streams -> streamsSettingsContent(
                         isTablet = true,
@@ -1286,7 +1286,6 @@ private fun TabletSettingsScreen(
                         hideUnreleasedContent = homescreenHideUnreleasedContent,
                         items = homescreenItems,
                         addonGroups = homescreenAddonGroups,
-                    addonRowOrderPolicy = homescreenAddonRowOrderPolicy,
                         isCatalogLoading = homescreenCatalogLoading,
                         catalogErrorMessage = homescreenCatalogErrorMessage,
                     )

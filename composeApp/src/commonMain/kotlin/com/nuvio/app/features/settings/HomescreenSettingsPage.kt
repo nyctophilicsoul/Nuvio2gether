@@ -123,7 +123,6 @@ internal fun LazyListScope.homescreenSettingsContent(
     hideUnreleasedContent: Boolean,
     items: List<HomeCatalogSettingsItem>,
     addonGroups: List<HomeAddonLayoutItem>,
-    addonRowOrderPolicy: HomeAddonRowOrderPolicy,
     isCatalogLoading: Boolean,
     catalogErrorMessage: String?,
 ) {
@@ -192,7 +191,6 @@ internal fun LazyListScope.homescreenSettingsContent(
             AddonRowOrderSection(
                 isTablet = isTablet,
                 addonGroups = addonGroups,
-                savedPolicy = addonRowOrderPolicy,
             )
         }
     }
@@ -306,11 +304,11 @@ internal fun LazyListScope.homescreenSettingsContent(
 private fun AddonRowOrderSection(
     isTablet: Boolean,
     addonGroups: List<HomeAddonLayoutItem>,
-    savedPolicy: HomeAddonRowOrderPolicy,
 ) {
     var editing by remember { mutableStateOf(false) }
     var draftAddonIds by remember { mutableStateOf(emptyList<String>()) }
-    var draftPolicy by remember(savedPolicy) { mutableStateOf(savedPolicy) }
+    // The selected scope is a one-time operation, not a persistent layout mode.
+    var draftPolicy by remember { mutableStateOf(HomeAddonRowOrderPolicy.UPCOMING_ROWS_ONLY) }
     var showResetConfirmation by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
     val groupById = addonGroups.associateBy { it.addonId }
@@ -359,10 +357,10 @@ private fun AddonRowOrderSection(
                     if (editing) {
                         editing = false
                         draftAddonIds = emptyList()
-                        draftPolicy = savedPolicy
+                        draftPolicy = HomeAddonRowOrderPolicy.UPCOMING_ROWS_ONLY
                     } else {
                         draftAddonIds = addonGroups.map { it.addonId }
-                        draftPolicy = savedPolicy
+                        draftPolicy = HomeAddonRowOrderPolicy.UPCOMING_ROWS_ONLY
                         editing = true
                     }
                 },
@@ -507,7 +505,7 @@ private fun AddonRowOrderSection(
                         onClick = {
                             editing = false
                             draftAddonIds = emptyList()
-                            draftPolicy = savedPolicy
+                            draftPolicy = HomeAddonRowOrderPolicy.UPCOMING_ROWS_ONLY
                         },
                     ) {
                         Text(stringResource(Res.string.settings_homescreen_addon_order_cancel))
@@ -715,48 +713,30 @@ private fun HomescreenCatalogList(
     var expandedKey by remember { mutableStateOf<String?>(null) }
     val hapticFeedback = LocalHapticFeedback.current
     val lazyListState = rememberLazyListState()
+    // The reorderable state can retain its callback across recompositions. Always resolve
+    // drag indices against the same latest list that Compose is currently rendering.
+    val latestItems by rememberUpdatedState(items)
     val reorderableLazyListState = rememberReorderableLazyListState(
         lazyListState = lazyListState,
     ) { from, to ->
-        val fromItem = items.getOrNull(from.index)
-        val toItem = items.getOrNull(to.index)
-        fun pinSection(item: HomeCatalogSettingsItem?): HomeCatalogRowPlacement? = when {
-            item == null -> null
-            item.rowPlacement == HomeCatalogRowPlacement.PINNED_TOP ||
-                (item.isCollection && item.isPinnedToTop) -> HomeCatalogRowPlacement.PINNED_TOP
-            item.rowPlacement == HomeCatalogRowPlacement.PINNED_BOTTOM -> HomeCatalogRowPlacement.PINNED_BOTTOM
-            item.rowPlacement == HomeCatalogRowPlacement.NORMAL && !item.isPinnedToTop -> HomeCatalogRowPlacement.NORMAL
-            else -> item.rowPlacement
-        }
-        val fromSection = pinSection(fromItem)
-        val toSection = pinSection(toItem)
-        if (fromSection != toSection && fromItem?.isCollection != true) {
+        val currentItems = latestItems
+        val fromItem = currentItems.getOrNull(from.index)
+        val toItem = currentItems.getOrNull(to.index)
+        if (from.index == to.index) return@rememberReorderableLazyListState
+        if (fromItem == null || toItem == null) return@rememberReorderableLazyListState
+        if (!HomeCatalogSettingsRepository.canMoveByKeys(fromItem.key, toItem.key)) {
             onPinnedDragAttempt()
             return@rememberReorderableLazyListState
         }
         val rangeStart = minOf(from.index, to.index).coerceAtLeast(0)
-        val rangeEnd = maxOf(from.index, to.index).coerceAtMost(items.lastIndex)
-        val crossesPinnedSection = rangeStart <= rangeEnd && items
-            .subList(rangeStart, rangeEnd + 1)
-            .any { pinSection(it) != fromSection }
-        if (crossesPinnedSection && fromItem?.isCollection != true) {
-            onPinnedDragAttempt()
-            return@rememberReorderableLazyListState
-        }
-        val crossesPositionPinnedAnchor = rangeStart <= rangeEnd && items
-            .subList(rangeStart, rangeEnd + 1)
-            .any { it.rowPlacement == HomeCatalogRowPlacement.PINNED_POSITION }
-        if (crossesPositionPinnedAnchor) {
-            onPinnedDragAttempt()
-            return@rememberReorderableLazyListState
-        }
-        val crossesManagedGroup = rangeStart <= rangeEnd && items
+        val rangeEnd = maxOf(from.index, to.index).coerceAtMost(currentItems.lastIndex)
+        val crossesManagedGroup = rangeStart <= rangeEnd && currentItems
             .subList(rangeStart, rangeEnd + 1)
             .any { it.addonId != null && it.addonLayoutMode != HomeAddonLayoutMode.NORMAL }
-        val staysInsideSameManagedGroup = fromItem?.addonId != null &&
-            fromItem.addonId == toItem?.addonId &&
+        val staysInsideSameManagedGroup = fromItem.addonId != null &&
+            fromItem.addonId == toItem.addonId &&
             fromItem.addonLayoutMode != HomeAddonLayoutMode.NORMAL &&
-            rangeStart <= rangeEnd && items.subList(rangeStart, rangeEnd + 1).all {
+            rangeStart <= rangeEnd && currentItems.subList(rangeStart, rangeEnd + 1).all {
                 it.addonId == fromItem.addonId && it.addonLayoutMode != HomeAddonLayoutMode.NORMAL
             }
         // A managed dynamic group can be reordered internally, but cannot be dragged out
@@ -766,7 +746,11 @@ private fun HomescreenCatalogList(
             return@rememberReorderableLazyListState
         }
         if (fromItem != null && toItem != null) {
-            HomeCatalogSettingsRepository.moveByKeys(fromItem.key, toItem.key)
+            HomeCatalogSettingsRepository.moveByKeys(
+                fromKey = fromItem.key,
+                toKey = toItem.key,
+                commitImmediately = false,
+            )
         }
         hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
     }
@@ -805,6 +789,7 @@ private fun HomescreenCatalogList(
                                 onRowPlacementChange = { HomeCatalogSettingsRepository.setRowPlacement(item.key, it) },
                                 dragHandleScope = this@ReorderableItem,
                                 onPinnedDragAttempt = onPinnedDragAttempt,
+                                onReorderFinished = { HomeCatalogSettingsRepository.commitPendingRowOrder() },
                             )
                         }
                     }
