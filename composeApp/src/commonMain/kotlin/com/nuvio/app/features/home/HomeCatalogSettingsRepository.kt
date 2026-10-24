@@ -473,16 +473,26 @@ object HomeCatalogSettingsRepository {
         saveAddonRowOrder(reordered, HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS)
     }
 
-    /** Apply the selected scope once; the saved add-on order remains the default for new rows. */
+    /**
+     * Apply the selected scope once. The resulting order is stored on current rows;
+     * newly discovered rows alone are grouped by the saved add-on order afterward.
+     */
     fun saveAddonRowOrder(addonIds: List<String>, policy: HomeAddonRowOrderPolicy) {
         ensureLoaded()
         val groups = _uiState.value.addonGroups
         if (groups.isEmpty()) return
+
         val knownIds = groups.mapTo(linkedSetOf()) { it.addonId }
         val requestedOrder = addonIds.filter { it in knownIds }.distinct()
         val completeOrder = requestedOrder + groups.map { it.addonId }.filterNot { it in requestedOrder }
+        val currentCatalogKeys = definitions
+            .filterNot { ServerCatalog.isServerKey(it.key) }
+            .mapTo(mutableSetOf()) { it.key }
+
         when (policy) {
             HomeAddonRowOrderPolicy.MOVE_ALL_ROWS -> {
+                // This is the explicit reset-style operation: clear individual catalog
+                // pins once, then materialize the selected add-on grouping into row order.
                 val affectedKeys = definitions.asSequence()
                     .filter { it.addonGroupId() in completeOrder }
                     .map { it.key }
@@ -496,25 +506,16 @@ object HomeCatalogSettingsRepository {
                         preference
                     }
                 }
-                preservedOrderRowKeys = emptySet()
             }
             HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS -> {
-                // Clear any previous preserve-existing-order boundary before reordering
-                // all unpinned rows. Individual pins are deliberately left unchanged.
-                preservedOrderRowKeys = emptySet()
+                // Pinned rows keep their placement during this one-time grouping pass.
             }
             HomeAddonRowOrderPolicy.UPCOMING_ROWS_ONLY -> {
-                // Materialize today's visible order. Only current catalog rows are frozen;
-                // future catalog rows use the saved add-on group order.
-                persistVisibleOrder(_uiState.value.items.map { it.key })
-                preservedOrderRowKeys = definitions
-                    .filterNot { ServerCatalog.isServerKey(it.key) }
-                    .mapTo(mutableSetOf()) { it.key }
+                // Freeze existing catalog positions before applying the new add-on order.
+                // Only rows discovered in the future should be affected by that order.
             }
         }
-        // The choice controls this save only; it is never persisted as an active policy.
-        addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS
-        upcomingRowKeys = emptySet()
+
         val nextLayouts = addonLayouts.toMutableMap()
         completeOrder.forEachIndexed { index, addonId ->
             nextLayouts[addonId] = StoredHomeAddonLayoutPreference(
@@ -527,6 +528,25 @@ object HomeCatalogSettingsRepository {
             )
         }
         addonLayouts = nextLayouts
+        upcomingRowKeys = emptySet()
+        addonRowOrderPolicy = policy
+
+        // Options 1 and 2 need one grouping pass. Option 3 preserves the existing
+        // order during that pass. Do not persist this selected policy as an ongoing mode.
+        preservedOrderRowKeys = if (policy == HomeAddonRowOrderPolicy.UPCOMING_ROWS_ONLY) {
+            currentCatalogKeys
+        } else {
+            emptySet()
+        }
+        publish()
+
+        // Materialize the result in per-row order values. This is the important boundary:
+        // after this point existing rows are no longer regrouped on every publication.
+        // Keep add-on order independent from row order.
+        persistVisibleOrder(_uiState.value.items.map { it.key }, updateAddonOrder = false)
+        preservedOrderRowKeys = currentCatalogKeys
+        addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS
+        upcomingRowKeys = emptySet()
         publish()
         persist()
         HomeRepository.applyCurrentSettings()
