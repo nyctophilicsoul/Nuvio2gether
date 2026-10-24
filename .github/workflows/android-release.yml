@@ -66,13 +66,17 @@ jobs:
             exit 1
           fi
 
-          if git rev-parse --verify --quiet "refs/tags/${RELEASE_TAG}"; then
-            echo "Tag ${RELEASE_TAG} already exists." >&2
-            exit 1
-          fi
-          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
-            echo "A GitHub release for ${RELEASE_TAG} already exists." >&2
-            exit 1
+          # Re-running a release for the same version is allowed. The release job
+          # will update the existing release assets instead of trying to create a duplicate.
+          existing_release_json="${RUNNER_TEMP}/existing-release.json"
+          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" > "${existing_release_json}" 2>/dev/null; then
+            existing_draft="$(jq -r '.draft' "${existing_release_json}")"
+            echo "Release ${RELEASE_TAG} already exists (draft=${existing_draft}); will reuse it and replace its APK assets."
+          else
+            if git rev-parse --verify --quiet "refs/tags/${RELEASE_TAG}"; then
+              echo "Tag ${RELEASE_TAG} exists without a matching GitHub release. Refusing to overwrite an orphan tag." >&2
+              exit 1
+            fi
           fi
 
           unexpected_changes="$(
@@ -315,17 +319,29 @@ jobs:
             exit 1
           fi
 
-          release_args=(
-            "${RELEASE_TAG}"
-            --repo "${GITHUB_REPOSITORY}"
-            --target "${RELEASE_BRANCH}"
-            --title "${RELEASE_VERSION}"
-            --notes-file release-assets/release-notes.md
-          )
-          if [[ "${RELEASE_MODE}" == "draft" ]]; then
-            release_args+=(--draft)
+          release_json="${RUNNER_TEMP}/existing-release.json"
+          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" > "${release_json}" 2>/dev/null; then
+            existing_draft="$(jq -r '.draft' "${release_json}")"
+            if [[ "${RELEASE_MODE}" == "draft" && "${existing_draft}" != "true" ]]; then
+              echo "Release ${RELEASE_TAG} is already published; refusing to turn a published release back into a draft." >&2
+              exit 1
+            fi
+            gh release upload "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --clobber "${release_files[@]}"
+            gh release edit "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --title "${RELEASE_VERSION}" --notes-file release-assets/release-notes.md
+            echo "Updated existing release ${RELEASE_TAG} assets and notes."
+          else
+            release_args=(
+              "${RELEASE_TAG}"
+              --repo "${GITHUB_REPOSITORY}"
+              --target "${RELEASE_BRANCH}"
+              --title "${RELEASE_VERSION}"
+              --notes-file release-assets/release-notes.md
+            )
+            if [[ "${RELEASE_MODE}" == "draft" ]]; then
+              release_args+=(--draft)
+            fi
+            gh release create "${release_args[@]}" "${release_files[@]}"
           fi
-          gh release create "${release_args[@]}" "${release_files[@]}"
 
   store:
     name: Update sideload source
