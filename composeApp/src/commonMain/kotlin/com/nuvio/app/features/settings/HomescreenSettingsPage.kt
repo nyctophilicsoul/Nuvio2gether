@@ -310,7 +310,8 @@ private fun AddonRowOrderSection(
 ) {
     var editing by remember { mutableStateOf(false) }
     var draftAddonIds by remember { mutableStateOf(emptyList<String>()) }
-    var draftPolicy by remember(savedPolicy) { mutableStateOf(savedPolicy) }
+    // The selected scope is a one-time operation, not a persistent layout mode.
+    var draftPolicy by remember { mutableStateOf(HomeAddonRowOrderPolicy.UPCOMING_ROWS_ONLY) }
     var showResetConfirmation by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
     val groupById = addonGroups.associateBy { it.addonId }
@@ -359,10 +360,10 @@ private fun AddonRowOrderSection(
                     if (editing) {
                         editing = false
                         draftAddonIds = emptyList()
-                        draftPolicy = savedPolicy
+                        draftPolicy = HomeAddonRowOrderPolicy.UPCOMING_ROWS_ONLY
                     } else {
                         draftAddonIds = addonGroups.map { it.addonId }
-                        draftPolicy = savedPolicy
+                        draftPolicy = HomeAddonRowOrderPolicy.UPCOMING_ROWS_ONLY
                         editing = true
                     }
                 },
