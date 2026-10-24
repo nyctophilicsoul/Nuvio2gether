@@ -551,6 +551,7 @@ object HomeCatalogSettingsRepository {
         upcomingRowKeys = emptySet()
         publish()
         persist()
+        hasPendingRowOrderChanges = false
         HomeRepository.applyCurrentSettings()
         HomeCatalogSettingsSyncService.triggerPush()
     }
@@ -565,6 +566,7 @@ object HomeCatalogSettingsRepository {
         addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS
         upcomingRowKeys = emptySet()
         preservedOrderRowKeys = emptySet()
+        hasPendingRowOrderChanges = false
         normalizePreferences()
         publish()
         persist()
@@ -660,18 +662,14 @@ object HomeCatalogSettingsRepository {
         }
         val orderedKeys = items.map { it.key }.toMutableList()
         cohortIndices.forEachIndexed { index, globalIndex -> orderedKeys[globalIndex] = reorderedCohortKeys[index] }
-        // Moving a collection changes the collection's position, not the add-on order.
-        // Cross-add-on catalog moves likewise change row order only. In both cases, avoid
-        // rewriting the independent add-on-order preference and preserve the existing
-        // catalog sequence so publish() cannot regroup rows across the manually placed row.
+        // Manual row placement and add-on priority are independent. Never derive saved
+        // add-on priority from a row drag: the Add-ons Row Order section owns that setting.
         val preserveManualCatalogOrder = movingCollection ||
             fromItem.addonId != toItem.addonId
-        // Row arrangement and add-on priority are independent settings. A manual row drag
-        // must never rewrite the add-on priority used for future catalog discovery.
         persistVisibleOrder(orderedKeys, updateAddonOrder = false)
-        // Default grouping must not undo a manual collection placement or a cross-add-on
-        // move. Preserve the current order of existing catalog rows; newly discovered rows
-        // can still use the saved add-on order.
+        // Collections and cross-add-on moves can split catalog groups. Freeze the current
+        // catalog sequence so future publishes do not undo that intentional row placement;
+        // newly discovered rows are not in this set and still follow saved add-on priority.
         if (preserveManualCatalogOrder) {
             preservedOrderRowKeys = definitions
                 .filterNot { ServerCatalog.isServerKey(it.key) }
@@ -1031,6 +1029,7 @@ object HomeCatalogSettingsRepository {
         showCatalogType = payload.showCatalogType
         hideUnreleasedContent = payload.hideUnreleasedContent
         val remotePolicy = HomeAddonRowOrderPolicy.fromStorage(payload.addonRowOrderPolicy)
+        hasPendingRowOrderChanges = false
         addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS
         upcomingRowKeys = emptySet()
         preservedOrderRowKeys = payload.preservedOrderRowKeys.toSet().ifEmpty {
