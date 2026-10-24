@@ -16,8 +16,15 @@ internal fun PartySource.matches(stream: StreamItem): Boolean {
         if (sourceIndex != null && streamIndex != null) {
             return sourceIndex == streamIndex
         }
-        // Same torrent hash alone is not enough to identify an episode in a
-        // multi-file torrent. Try filename/label matching if the index is absent.
+
+        // A matching torrent hash without both file indexes is ambiguous for
+        // multi-file torrents. Only accept it when the filenames independently match.
+        val file = filename?.trim()?.takeIf { it.isNotEmpty() } ?: return false
+        val streamFile = (stream.behaviorHints.filename ?: stream.clientResolve?.filename)
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?: return false
+        return normalizePartyFilename(file) == normalizePartyFilename(streamFile)
     }
 
     val file = filename?.trim()?.takeIf { it.isNotEmpty() }
