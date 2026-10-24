@@ -715,11 +715,15 @@ private fun HomescreenCatalogList(
     var expandedKey by remember { mutableStateOf<String?>(null) }
     val hapticFeedback = LocalHapticFeedback.current
     val lazyListState = rememberLazyListState()
+    // The reorderable state can retain its callback across recompositions. Always resolve
+    // drag indices against the same latest list that Compose is currently rendering.
+    val latestItems by rememberUpdatedState(items)
     val reorderableLazyListState = rememberReorderableLazyListState(
         lazyListState = lazyListState,
     ) { from, to ->
-        val fromItem = items.getOrNull(from.index)
-        val toItem = items.getOrNull(to.index)
+        val currentItems = latestItems
+        val fromItem = currentItems.getOrNull(from.index)
+        val toItem = currentItems.getOrNull(to.index)
         if (from.index == to.index) return@rememberReorderableLazyListState
         if (fromItem == null || toItem == null) return@rememberReorderableLazyListState
         if (!HomeCatalogSettingsRepository.canMoveByKeys(fromItem.key, toItem.key)) {
@@ -727,14 +731,14 @@ private fun HomescreenCatalogList(
             return@rememberReorderableLazyListState
         }
         val rangeStart = minOf(from.index, to.index).coerceAtLeast(0)
-        val rangeEnd = maxOf(from.index, to.index).coerceAtMost(items.lastIndex)
-        val crossesManagedGroup = rangeStart <= rangeEnd && items
+        val rangeEnd = maxOf(from.index, to.index).coerceAtMost(currentItems.lastIndex)
+        val crossesManagedGroup = rangeStart <= rangeEnd && currentItems
             .subList(rangeStart, rangeEnd + 1)
             .any { it.addonId != null && it.addonLayoutMode != HomeAddonLayoutMode.NORMAL }
-        val staysInsideSameManagedGroup = fromItem?.addonId != null &&
-            fromItem.addonId == toItem?.addonId &&
+        val staysInsideSameManagedGroup = fromItem.addonId != null &&
+            fromItem.addonId == toItem.addonId &&
             fromItem.addonLayoutMode != HomeAddonLayoutMode.NORMAL &&
-            rangeStart <= rangeEnd && items.subList(rangeStart, rangeEnd + 1).all {
+            rangeStart <= rangeEnd && currentItems.subList(rangeStart, rangeEnd + 1).all {
                 it.addonId == fromItem.addonId && it.addonLayoutMode != HomeAddonLayoutMode.NORMAL
             }
         // A managed dynamic group can be reordered internally, but cannot be dragged out
