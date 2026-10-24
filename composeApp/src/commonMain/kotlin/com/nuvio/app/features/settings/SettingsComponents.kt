@@ -434,6 +434,7 @@ internal fun HomescreenCatalogRow(
     onRowPlacementChange: (HomeCatalogRowPlacement) -> Unit,
     dragHandleScope: ReorderableCollectionItemScope,
     onPinnedDragAttempt: () -> Unit = {},
+    onReorderFinished: () -> Unit = {},
 ) {
     val tokens = MaterialTheme.nuvio
     val horizontalPadding = if (isTablet) 20.dp else 16.dp
@@ -554,6 +555,7 @@ internal fun HomescreenCatalogRow(
                                 },
                                 onDragStopped = {
                                     hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onReorderFinished()
                                 },
                             )
                         },
