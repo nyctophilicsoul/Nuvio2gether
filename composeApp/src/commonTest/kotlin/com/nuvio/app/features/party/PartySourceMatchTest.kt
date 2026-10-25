@@ -24,29 +24,7 @@ class PartySourceMatchTest {
     )
 
     @Test
-    fun httpStreamDoesNotMatchByAddonAndLabelWhenFilenamesDiffer() {
-        val source = PartySource(
-            filename = "Movie.2024.1080p.WEB-DL.mkv",
-            addonId = "addon.example",
-            name = "1080p WEB-DL",
-        )
-        assertFalse(source.matches(stream(filename = "Movie.2024.WEB-DL.1080p.mkv")))
-    }
-
-    @Test
-    fun httpStreamDoesNotMatchByAddonAndLabelWhenFilenameIsMissing() {
-        val source = PartySource(addonId = "addon.example", name = "1080p WEB-DL")
-        assertFalse(source.matches(stream()))
-    }
-
-    @Test
-    fun equalNormalizedFilenameMatchesAcrossAddons() {
-        val source = PartySource(filename = "/cache/Movie.2024.mkv", addonId = "other", name = "Other")
-        assertTrue(source.matches(stream(addonId = "addon.example", filename = "movie.2024.MKV")))
-    }
-
-    @Test
-    fun httpStreamMatchesByVideoHashAcrossAddons() {
+    fun httpStreamMatchesByVideoHashAcrossAddonsAndLabels() {
         val source = PartySource(
             filename = "Old.Name.mkv",
             videoHash = "ABC123",
@@ -66,38 +44,51 @@ class PartySourceMatchTest {
     }
 
     @Test
-    fun differingVideoHashesOverrideMatchingFilename() {
+    fun differingVideoHashesRejectEvenWhenFilenamesMatch() {
         val source = PartySource(filename = "Movie.mkv", videoHash = "aaa111")
         assertFalse(source.matches(stream(filename = "Movie.mkv", videoHash = "bbb222")))
     }
 
     @Test
-    fun videoHashPresentOnOnlyOneSideDoesNotFallBackToFilename() {
-        val source = PartySource(filename = "Movie.mkv", videoHash = "aaa111")
+    fun missingVideoHashDoesNotFallBackToFilenameOrLabel() {
+        val source = PartySource(filename = "Movie.mkv", addonId = "addon.example", name = "1080p WEB-DL")
         assertFalse(source.matches(stream(filename = "Movie.mkv")))
+        assertFalse(source.matches(stream()))
+    }
+
+    @Test
+    fun filenameMatchAloneIsNotTreatedAsSourceIdentity() {
+        val source = PartySource(filename = "Movie.mkv")
+        assertFalse(source.matches(stream(filename = "movie.MKV")))
+    }
+
+    @Test
+    fun torrentHashAndFileIndexMatch() {
+        val source = PartySource(infoHash = "AAAAAAAA", fileIdx = 2)
+        assertTrue(source.matches(stream(infoHash = "aaaaaaaa", fileIdx = 2)))
     }
 
     @Test
     fun torrentHashMismatchNeverFallsBackToMatchingLabel() {
-        val source = PartySource(infoHash = "aaaaaaaa", filename = "Movie.mkv", addonId = "addon.example", name = "1080p WEB-DL")
-        assertFalse(source.matches(stream(filename = "Movie.mkv", infoHash = "bbbbbbbb")))
+        val source = PartySource(infoHash = "aaaaaaaa", fileIdx = 1, addonId = "addon.example", name = "1080p WEB-DL")
+        assertFalse(source.matches(stream(filename = "Movie.mkv", infoHash = "bbbbbbbb", fileIdx = 1)))
     }
 
     @Test
     fun torrentIdentityPresentOnOnlyOneSideDoesNotFallBackToFilename() {
-        val source = PartySource(infoHash = "aaaaaaaa", filename = "Movie.mkv")
+        val source = PartySource(infoHash = "aaaaaaaa", fileIdx = 1, filename = "Movie.mkv")
         assertFalse(source.matches(stream(filename = "Movie.mkv")))
     }
 
     @Test
     fun torrentFileIndexMismatchDoesNotMatch() {
-        val source = PartySource(infoHash = "aaaaaaaa", fileIdx = 1, addonId = "addon.example", name = "1080p WEB-DL")
+        val source = PartySource(infoHash = "aaaaaaaa", fileIdx = 1)
         assertFalse(source.matches(stream(infoHash = "aaaaaaaa", fileIdx = 2)))
     }
 
     @Test
-    fun sameTorrentHashWithoutIndexesRequiresFilenameMatch() {
+    fun torrentWithMissingFileIndexDoesNotClaimExactMatch() {
         val source = PartySource(infoHash = "aaaaaaaa", filename = "Episode.01.mkv")
-        assertFalse(source.matches(stream(infoHash = "aaaaaaaa", filename = "Episode.02.mkv")))
+        assertFalse(source.matches(stream(infoHash = "aaaaaaaa", filename = "Episode.01.mkv")))
     }
 }
