@@ -2493,4 +2493,26 @@
     <string name="settings_homescreen_group_mode_locked">Lock group here</string>
     <string name="settings_homescreen_group_mode_top">Pin all rows to top</string>
     <string name="settings_homescreen_group_mode_bottom">Pin all rows to bottom</string>
+    <string name="settings_merged_rows_title">Merged Rows</string>
+    <string name="settings_merged_rows_description">Combine catalogs from multiple add-ons into one home row. Source catalogs stay available and keep their own layout settings.</string>
+    <string name="settings_merged_rows_manage">Manage merged rows</string>
+    <string name="settings_merged_rows_add">Create merged row</string>
+    <string name="settings_merged_rows_empty">No merged rows yet. Create one to combine at least two add-on catalogs.</string>
+    <string name="settings_merged_rows_create_title">Create merged row</string>
+    <string name="settings_merged_rows_edit_title">Edit merged row</string>
+    <string name="settings_merged_rows_name">Row name</string>
+    <string name="settings_merged_rows_select_sources">Choose add-on catalogs</string>
+    <string name="settings_merged_rows_source_limit">Select 2–8 catalogs. The same catalog can be used in more than one merged row.</string>
+    <string name="settings_merged_rows_display_mode">Display mode</string>
+    <string name="settings_merged_rows_mode_unified">Unified carousel</string>
+    <string name="settings_merged_rows_mode_tabs">Source tabs</string>
+    <string name="settings_merged_rows_deduplicate">Remove duplicate media by type and ID</string>
+    <string name="settings_merged_rows_edit">Edit</string>
+    <string name="settings_merged_rows_delete">Delete</string>
+    <string name="settings_merged_rows_delete_title">Delete merged row?</string>
+    <string name="settings_merged_rows_delete_message">This removes the merged row configuration, but does not delete or change any source catalogs.</string>
+    <string name="settings_merged_rows_save">Save</string>
+    <string name="settings_merged_rows_cancel">Cancel</string>
+    <string name="settings_merged_rows_unavailable_source">Some saved sources are currently unavailable. Remove them or choose available catalogs below.</string>
+    <string name="settings_merged_rows_duplicate">Duplicate</string>
 </resources>

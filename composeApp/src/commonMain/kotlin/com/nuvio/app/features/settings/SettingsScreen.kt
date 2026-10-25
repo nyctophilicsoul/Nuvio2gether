@@ -846,6 +846,11 @@ private fun MobileSettingsScreen(
                     addonRowOrderPolicy = homescreenAddonRowOrderPolicy,
                     isCatalogLoading = homescreenCatalogLoading,
                     catalogErrorMessage = homescreenCatalogErrorMessage,
+                    onMergedRowsClick = { onPageChange(SettingsPage.MergedRows) },
+                )
+                SettingsPage.MergedRows -> mergedHomeRowsSettingsContent(
+                    isTablet = false,
+                    uiState = homescreenSettingsUiState,
                 )
                 SettingsPage.MetaScreen -> metaScreenSettingsContent(
                     isTablet = false,
@@ -1286,9 +1291,14 @@ private fun TabletSettingsScreen(
                         hideUnreleasedContent = homescreenHideUnreleasedContent,
                         items = homescreenItems,
                         addonGroups = homescreenAddonGroups,
-                    addonRowOrderPolicy = homescreenAddonRowOrderPolicy,
+                        addonRowOrderPolicy = homescreenAddonRowOrderPolicy,
                         isCatalogLoading = homescreenCatalogLoading,
                         catalogErrorMessage = homescreenCatalogErrorMessage,
+                        onMergedRowsClick = { onPageChange(SettingsPage.MergedRows) },
+                    )
+                    SettingsPage.MergedRows -> mergedHomeRowsSettingsContent(
+                        isTablet = true,
+                        uiState = homescreenSettingsUiState,
                     )
                     SettingsPage.MetaScreen -> metaScreenSettingsContent(
                         isTablet = true,
