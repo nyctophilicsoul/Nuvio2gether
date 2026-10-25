@@ -773,12 +773,14 @@ private fun ExoPlayerSurface(
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             playerViewRef?.let { playerView ->
-                // Detach the view before releasing the player so its surface/listeners
-                // cannot keep the old player alive across navigation or source changes.
-                playerView.releaseLibassOverlay()
-                if (playerView.player === exoPlayer) {
-                    playerView.keepScreenOn = false
-                    playerView.player = null
+                // A reused AndroidView may already be bound to the next player's instance
+                // when this effect is disposed. Never tear down the new player's overlay.
+                if (playerView.player == null || playerView.player === exoPlayer) {
+                    playerView.releaseLibassOverlay()
+                    if (playerView.player === exoPlayer) {
+                        playerView.keepScreenOn = false
+                        playerView.player = null
+                    }
                 }
             }
             exoPlayer.releaseWithAssSupportCompat()
