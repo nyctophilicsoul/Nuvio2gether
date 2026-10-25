@@ -62,8 +62,12 @@ internal object PartySync {
                 val rampRange = (SEEK_THRESHOLD_MS - threshold).coerceAtLeast(1L)
                 val progress = ((distance - threshold).toFloat() / rampRange).coerceIn(0f, 1f)
                 val factor = MIN_NUDGE_FACTOR + (MAX_NUDGE_FACTOR - MIN_NUDGE_FACTOR) * progress
-                val adjustedRate = playback.rate * if (drift > 0L) (1f - factor) else (1f + factor)
-                PartyCorrection.Nudge(adjustedRate.coerceIn(MIN_PLAYBACK_RATE, MAX_PLAYBACK_RATE))
+                val adjustedRate = (playback.rate * if (drift > 0L) (1f - factor) else (1f + factor))
+                    .coerceIn(MIN_PLAYBACK_RATE, MAX_PLAYBACK_RATE)
+                // At a player speed limit, an impossible nudge should not be marked active:
+                // that would suppress later corrections while the actual rate cannot change.
+                val canCorrect = if (drift > 0L) adjustedRate < playback.rate else adjustedRate > playback.rate
+                if (canCorrect) PartyCorrection.Nudge(adjustedRate) else PartyCorrection.InSync
             }
             else -> PartyCorrection.InSync
         }
