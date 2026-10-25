@@ -304,7 +304,23 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
         activeSourceUrl,
     ) {
         val party = PartyRepository.state.value.party ?: return@LaunchedEffect
-        if (party.isHost || party.media.key != key) return@LaunchedEffect
+        if (party.isHost) {
+            // Host ownership can change when the previous host leaves. Do not carry the
+            // guest-only unavailable-source pause into the new host role.
+            if (waitingForSharedSource) {
+                waitingForSharedSource = false
+                unavailableSourceNoticeShown = false
+                val playback = PartyRepository.playback.value?.takeIf { it.mediaKey == key }
+                if (playback != null) {
+                    val target = PartySync.expectedPositionMs(playback, PartyRepository.nowMs(), playbackSnapshot.durationMs)
+                    if (!playback.paused) playerController?.seekTo(target)
+                    applyPartyPaused(playback.paused, force = true)
+                }
+            }
+            lastFollowedSharedStream = null
+            return@LaunchedEffect
+        }
+        if (party.media.key != key) return@LaunchedEffect
 
         val incoming = remoteSharedStream
         if (!hostSharingEnabled) {
