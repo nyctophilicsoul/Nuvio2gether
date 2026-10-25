@@ -307,6 +307,7 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
                 localMediaKey = key,
                 sharedStream = incoming,
                 activeSourceUrl = activeSourceUrl,
+                activeSourceHeaders = activeSourceHeaders,
             )
         ) return@LaunchedEffect
 
