@@ -236,7 +236,7 @@ object SimklAuthRepository : TrackingAuthProvider {
                 SimklApi.client.execute(
                     SimklApiRequest(
                         method = SimklHttpMethod.POST,
-                        path = "/oauth/token",
+                        path = "/oauth2/token",
                         body = json.encodeToString(request),
                         requiresAuthentication = false,
                         retryPolicy = SimklRetryPolicy.NEVER,
@@ -399,6 +399,7 @@ private data class SimklTokenRequest(
     @SerialName("client_id") val clientId: String,
     @SerialName("code_verifier") val codeVerifier: String,
     @SerialName("redirect_uri") val redirectUri: String,
+    val scope: String = "media:read media:write",
     @SerialName("grant_type") val grantType: String = "authorization_code",
 )
 
