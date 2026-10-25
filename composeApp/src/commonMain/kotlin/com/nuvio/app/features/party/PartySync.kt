@@ -15,11 +15,14 @@ internal sealed interface OwnSeek {
 }
 
 internal object PartySync {
-    const val NUDGE_START_MS = 250L
+    const val NUDGE_START_MS = 200L
     const val NUDGE_STOP_MS = 80L
-    const val SEEK_THRESHOLD_MS = 1_500L
+    const val SEEK_THRESHOLD_MS = 2_000L
     const val PAUSED_TOLERANCE_MS = 500L
-    const val NUDGE_FACTOR = 0.05f
+    const val MIN_NUDGE_FACTOR = 0.01f
+    const val MAX_NUDGE_FACTOR = 0.05f
+    const val MIN_PLAYBACK_RATE = 0.25f
+    const val MAX_PLAYBACK_RATE = 4f
     const val SEEK_NOTICE_MS = 2_000L
     const val REJOIN_GAP_MS = 2_000L
     const val BEHIND_STEP_MS = 5_000L
@@ -56,8 +59,15 @@ internal object PartySync {
         return when {
             distance > SEEK_THRESHOLD_MS -> PartyCorrection.Seek(expectedPositionMs)
             distance > threshold -> {
-                val factor = if (drift > 0L) 1f - NUDGE_FACTOR else 1f + NUDGE_FACTOR
-                PartyCorrection.Nudge(playback.rate * factor)
+                val rampRange = (SEEK_THRESHOLD_MS - threshold).coerceAtLeast(1L)
+                val progress = ((distance - threshold).toFloat() / rampRange).coerceIn(0f, 1f)
+                val factor = MIN_NUDGE_FACTOR + (MAX_NUDGE_FACTOR - MIN_NUDGE_FACTOR) * progress
+                val adjustedRate = (playback.rate * if (drift > 0L) (1f - factor) else (1f + factor))
+                    .coerceIn(MIN_PLAYBACK_RATE, MAX_PLAYBACK_RATE)
+                // At a player speed limit, an impossible nudge should not be marked active:
+                // that would suppress later corrections while the actual rate cannot change.
+                val canCorrect = if (drift > 0L) adjustedRate < playback.rate else adjustedRate > playback.rate
+                if (canCorrect) PartyCorrection.Nudge(adjustedRate) else PartyCorrection.InSync
             }
             else -> PartyCorrection.InSync
         }
