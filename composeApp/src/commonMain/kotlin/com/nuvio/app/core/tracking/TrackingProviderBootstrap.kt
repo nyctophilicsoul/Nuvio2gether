@@ -24,8 +24,6 @@ fun ensureTrackingProvidersRegistered() {
     MdbListTracker.register()
     AniListTracker.register()
     WeTrakrTracker.register()
-    AniListTracker.register()
-    WeTrakrTracker.register()
     TraktAuthRepository.descriptor
     TraktScrobbleRepository.ensureRegistered()
     SimklAuthRepository.descriptor
