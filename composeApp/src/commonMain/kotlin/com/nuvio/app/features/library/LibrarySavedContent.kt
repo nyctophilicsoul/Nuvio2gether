@@ -15,7 +15,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.i18n.localizedMediaTypeLabel
 import com.nuvio.app.core.poster.withCustomPosterUrl
-import com.nuvio.app.core.ui.Chip
 import com.nuvio.app.core.ui.NuvioDropdownChip
 import com.nuvio.app.core.ui.NuvioDropdownOption
 import com.nuvio.app.features.home.MetaPreview
@@ -54,14 +53,18 @@ internal fun LibrarySavedControls(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (layoutMode == LibraryLayoutMode.VERTICAL && sourceMode.isRemoteTrackingSource) {
-            verticalProjection.availableSections.forEach { section ->
-                Chip(
-                    label = localizedLibrarySectionTitle(section.type, section.displayTitle),
-                    selected = section.type == verticalProjection.selectedSectionKey,
-                    enabled = verticalProjection.availableSections.size > 1,
-                    onClick = { onSectionSelected(section.type) },
-                )
-            }
+            val selectedSection = verticalProjection.availableSections
+                .firstOrNull { section -> section.type == verticalProjection.selectedSectionKey }
+            NuvioDropdownChip(
+                title = stringResource(Res.string.library_filter_list),
+                label = selectedSection?.let { section -> localizedLibrarySectionTitle(section.type, section.displayTitle) }.orEmpty(),
+                selectedKey = verticalProjection.selectedSectionKey,
+                options = verticalProjection.availableSections.map { section ->
+                    NuvioDropdownOption(key = section.type, label = localizedLibrarySectionTitle(section.type, section.displayTitle))
+                },
+                enabled = verticalProjection.availableSections.size > 1,
+                onSelected = { option -> onSectionSelected(option.key) },
+            )
         }
 
         if (layoutMode == LibraryLayoutMode.VERTICAL) {
