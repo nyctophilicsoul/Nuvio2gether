@@ -1,5 +1,6 @@
 package com.nuvio.app.features.mdblist
 
+import co.touchlab.kermit.Logger
 import kotlinx.serialization.json.Json
 
 class MdbListApiClient(
@@ -8,6 +9,7 @@ class MdbListApiClient(
     private val store: MdbListAuthStore
 ) {
     private val json = Json { ignoreUnknownKeys = true }
+    private val log = Logger.withTag("MDBListApi")
 
     suspend fun get(
         path: String,
@@ -70,18 +72,33 @@ class MdbListApiClient(
             )
             if (response.status == 401) {
                 if (attempt == 1) {
+                    log.w {
+                        "MDBList API request remained unauthorized after token refresh: " +
+                            "method=$method endpoint=${safeDiagnosticEndpoint(path)} status=${response.status}"
+                    }
                     store.clearAuth(scope, MdbListAuthError.AUTHORIZATION_REVOKED, authorization.tokens.accessToken)
                     throw MdbListAuthException(MdbListAuthError.AUTHORIZATION_REVOKED)
                 }
                 authorization = auth.authorization(scope, authorization.tokens.accessToken)
             } else {
                 if (response.status !in 200..299 && response.status !in acceptedStatuses) {
-                    throw MdbListApiException(response.status, response.errorCode())
+                    val code = response.errorCode()
+                    log.w {
+                        "MDBList API request failed: method=$method endpoint=${safeDiagnosticEndpoint(path)} " +
+                            "status=${response.status} code=${code ?: "unavailable"}"
+                    }
+                    throw MdbListApiException(response.status, code)
                 }
                 return response
             }
         }
         throw MdbListAuthException(MdbListAuthError.AUTHORIZATION_REVOKED)
+    }
+
+    private fun safeDiagnosticEndpoint(path: String): String = when {
+        path == "/user" -> path
+        path.startsWith("/sync/") -> path
+        else -> "<redacted>"
     }
 
     private fun limitKey(scope: MdbListAuthScope): String = store.state.value.user?.id?.let { "user:$it" }
