@@ -85,12 +85,13 @@ internal fun isShareableStreamUrl(url: String): Boolean = SHAREABLE_URL.contains
  */
 internal fun shouldFollowSharedPartyStream(
     isHost: Boolean,
+    sharingEnabled: Boolean,
     partyMediaKey: String?,
     localMediaKey: String,
     sharedStream: PartyStream?,
     activeSourceUrl: String,
 ): Boolean {
-    if (isHost || partyMediaKey != localMediaKey) return false
+    if (isHost || !sharingEnabled || partyMediaKey != localMediaKey) return false
     val stream = sharedStream ?: return false
     return stream.mediaKey == localMediaKey &&
         isShareableStreamUrl(stream.url) &&

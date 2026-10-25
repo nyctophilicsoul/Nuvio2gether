@@ -762,6 +762,7 @@ internal fun StreamDestination(
 
     val partyState by PartyRepository.state.collectAsStateWithLifecycle()
     val partyStream by PartyRepository.sharedStream.collectAsStateWithLifecycle()
+    val hostSharingEnabled by PartyRepository.hostSharingEnabled.collectAsStateWithLifecycle()
     val party = partyState.party
     val contentKey = partyMediaKey(
         metaType = launch.parentMetaType ?: launch.type,
@@ -776,9 +777,9 @@ internal fun StreamDestination(
     }
     val sharedLabel = stringResource(Res.string.party_shared_by, party?.member(party.hostMemberId)?.displayName.orEmpty())
     val isHost = party?.isHost == true
-    val sharedPartyStream = remember(partyStream, party, isHost, contentKey) {
+    val sharedPartyStream = remember(partyStream, party, isHost, contentKey, hostSharingEnabled) {
         partyStream?.takeIf {
-            !isHost && party?.media?.key == contentKey && it.mediaKey == contentKey
+            hostSharingEnabled && !isHost && party?.media?.key == contentKey && it.mediaKey == contentKey
         }
     }
     val sharedStream = remember(sharedPartyStream, sharedLabel) {
@@ -791,6 +792,7 @@ internal fun StreamDestination(
     LaunchedEffect(
         route.launchId,
         sharedPartyStream,
+        hostSharingEnabled,
         contentKey,
         party?.id,
         autoPlayNavigationStarted,
@@ -800,8 +802,12 @@ internal fun StreamDestination(
         resolvingYouTubeStream,
     ) {
         val currentParty = party ?: return@LaunchedEffect
-        val shared = sharedPartyStream ?: return@LaunchedEffect
-        if (currentParty.isHost || currentParty.media.key != contentKey) return@LaunchedEffect
+        val shared = sharedPartyStream
+        if (shared == null) {
+            sharedStreamAutoOpenedUrl = null
+            return@LaunchedEffect
+        }
+        if (!hostSharingEnabled || currentParty.isHost || currentParty.media.key != contentKey) return@LaunchedEffect
         if (sharedStreamAutoOpenedUrl == shared.url) return@LaunchedEffect
         if (autoPlayNavigationStarted || reuseNavigated || preparingServerStream ||
             resolvingDebridStream || resolvingYouTubeStream

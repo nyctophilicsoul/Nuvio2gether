@@ -61,10 +61,25 @@ class PartyStreamTest {
     }
 
     @Test
+    fun disabledSharingNeverForcesTheGuestToFollowAStaleAnnouncement() {
+        assertFalse(
+            shouldFollowSharedPartyStream(
+                isHost = false,
+                sharingEnabled = false,
+                partyMediaKey = stream.mediaKey,
+                localMediaKey = stream.mediaKey,
+                sharedStream = stream,
+                activeSourceUrl = "https://cdn.example.com/other.mkv",
+            ),
+        )
+    }
+
+    @Test
     fun guestFollowsSharedUrlOnlyForTheMatchingPartyMedia() {
         assertTrue(
             shouldFollowSharedPartyStream(
                 isHost = false,
+                sharingEnabled = true,
                 partyMediaKey = stream.mediaKey,
                 localMediaKey = stream.mediaKey,
                 sharedStream = stream,
@@ -74,6 +89,7 @@ class PartyStreamTest {
         assertFalse(
             shouldFollowSharedPartyStream(
                 isHost = true,
+                sharingEnabled = true,
                 partyMediaKey = stream.mediaKey,
                 localMediaKey = stream.mediaKey,
                 sharedStream = stream,
@@ -83,6 +99,7 @@ class PartyStreamTest {
         assertFalse(
             shouldFollowSharedPartyStream(
                 isHost = false,
+                sharingEnabled = true,
                 partyMediaKey = "movie|different||",
                 localMediaKey = stream.mediaKey,
                 sharedStream = stream,
@@ -92,6 +109,7 @@ class PartyStreamTest {
         assertFalse(
             shouldFollowSharedPartyStream(
                 isHost = false,
+                sharingEnabled = true,
                 partyMediaKey = stream.mediaKey,
                 localMediaKey = stream.mediaKey,
                 sharedStream = stream.copy(mediaKey = "movie|different||"),
@@ -101,6 +119,7 @@ class PartyStreamTest {
         assertFalse(
             shouldFollowSharedPartyStream(
                 isHost = false,
+                sharingEnabled = true,
                 partyMediaKey = stream.mediaKey,
                 localMediaKey = stream.mediaKey,
                 sharedStream = stream,
@@ -110,6 +129,7 @@ class PartyStreamTest {
         assertFalse(
             shouldFollowSharedPartyStream(
                 isHost = false,
+                sharingEnabled = true,
                 partyMediaKey = stream.mediaKey,
                 localMediaKey = stream.mediaKey,
                 sharedStream = stream.copy(url = "http://localhost:8096/video"),
