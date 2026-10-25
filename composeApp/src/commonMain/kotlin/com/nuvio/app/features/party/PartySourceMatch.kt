@@ -6,9 +6,8 @@ internal fun PartySource.matches(stream: StreamItem): Boolean {
     val hash = infoHash?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
     val streamHash = stream.p2pInfoHash?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
 
+    // Torrent identity is authoritative when both sides expose it.
     if (hash != null && streamHash != null) {
-        // A known hash mismatch is definitive: don't fall back to a coincidentally
-        // identical filename or display label from another source.
         if (hash != streamHash) return false
 
         val sourceIndex = fileIdx
@@ -17,8 +16,8 @@ internal fun PartySource.matches(stream: StreamItem): Boolean {
             return sourceIndex == streamIndex
         }
 
-        // A matching torrent hash without both file indexes is ambiguous for
-        // multi-file torrents. Only accept it when the filenames independently match.
+        // For multi-file torrents, a shared hash alone is not enough.
+        // If either index is missing, require the filenames to independently match.
         val file = filename?.trim()?.takeIf { it.isNotEmpty() } ?: return false
         val streamFile = (stream.behaviorHints.filename ?: stream.clientResolve?.filename)
             ?.trim()
@@ -31,13 +30,20 @@ internal fun PartySource.matches(stream: StreamItem): Boolean {
     val streamFile = (stream.behaviorHints.filename ?: stream.clientResolve?.filename)
         ?.trim()
         ?.takeIf { it.isNotEmpty() }
-    if (file != null && streamFile != null) {
-        return normalizePartyFilename(file) == normalizePartyFilename(streamFile)
+
+    // HTTP streams often lack torrent identity. Matching filenames is a strong
+    // signal, but filename values can vary between addons or after URL resolution.
+    if (file != null && streamFile != null &&
+        normalizePartyFilename(file) == normalizePartyFilename(streamFile)
+    ) {
+        return true
     }
 
+    // Don't return false just because both filenames exist but differ. For ordinary
+    // HTTP streams, prefer the stable provider + stream label as a fallback identity.
     val sourceAddonId = addonId?.trim()?.takeIf { it.isNotEmpty() } ?: return false
     val label = name?.trim()?.takeIf { it.isNotEmpty() } ?: return false
-    return stream.addonId == sourceAddonId &&
+    return stream.addonId.trim() == sourceAddonId &&
         stream.streamLabel.trim().equals(label, ignoreCase = true)
 }
 
