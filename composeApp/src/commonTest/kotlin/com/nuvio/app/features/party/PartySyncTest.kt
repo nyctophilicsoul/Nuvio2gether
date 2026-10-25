@@ -94,6 +94,42 @@ class PartySyncTest {
     }
 
     @Test
+    fun largerDriftGetsStrongerCorrectionThanSmallDrift() {
+        val small = assertIs<PartyCorrection.Nudge>(
+            PartySync.correction(10_300, 10_000, playback(), nudging = false),
+        )
+        val large = assertIs<PartyCorrection.Nudge>(
+            PartySync.correction(11_800, 10_000, playback(), nudging = false),
+        )
+        assertTrue(small.rate > 1f)
+        assertTrue(large.rate > small.rate)
+    }
+
+    @Test
+    fun correctionRateStaysWithinSupportedPlaybackRange() {
+        val fastBase = assertIs<PartyCorrection.Nudge>(
+            PartySync.correction(10_500, 10_000, playback(rate = 4f), nudging = false),
+        )
+        val slowBase = assertIs<PartyCorrection.Nudge>(
+            PartySync.correction(9_500, 10_000, playback(rate = 0.25f), nudging = false),
+        )
+        assertTrue(fastBase.rate in PartySync.MIN_PLAYBACK_RATE..PartySync.MAX_PLAYBACK_RATE)
+        assertTrue(slowBase.rate in PartySync.MIN_PLAYBACK_RATE..PartySync.MAX_PLAYBACK_RATE)
+    }
+
+    @Test
+    fun speedLimitDoesNotPretendAnImpossibleNudgeIsActive() {
+        assertEquals(
+            PartyCorrection.InSync,
+            PartySync.correction(9_000, 10_000, playback(rate = 4f), nudging = false),
+        )
+        assertEquals(
+            PartyCorrection.InSync,
+            PartySync.correction(11_000, 10_000, playback(rate = 0.25f), nudging = false),
+        )
+    }
+
+    @Test
     fun largeDriftSeeks() {
         val result = PartySync.correction(4_000, 10_000, playback(), nudging = false)
         assertEquals(PartyCorrection.Seek(10_000), result)
