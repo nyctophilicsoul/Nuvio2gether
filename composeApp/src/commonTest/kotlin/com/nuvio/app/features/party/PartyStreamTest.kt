@@ -105,17 +105,6 @@ class PartyStreamTest {
                 localMediaKey = stream.mediaKey,
                 sharedStream = stream,
                 activeSourceUrl = stream.url,
-                activeSourceHeaders = stream.headers,
-            ),
-        )
-        assertTrue(
-            shouldFollowSharedPartyStream(
-                isHost = false,
-                partyMediaKey = stream.mediaKey,
-                localMediaKey = stream.mediaKey,
-                sharedStream = stream,
-                activeSourceUrl = stream.url,
-                activeSourceHeaders = emptyMap(),
             ),
         )
         assertFalse(
