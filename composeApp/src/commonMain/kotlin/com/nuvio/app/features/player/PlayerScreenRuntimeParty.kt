@@ -250,6 +250,7 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
     val partyState by PartyRepository.state.collectAsState()
     val remoteSharedStream by PartyRepository.sharedStream.collectAsState()
     val partyId = partyState.party?.id
+    var lastFollowedSharedStream by remember(partyId) { mutableStateOf<PartyStream?>(null) }
     val key = partyKey
     val sharing = partyState.party?.let { it.isHost && it.sharing } == true
     val sharedStream = if (sharing) currentPartyStream() else null
@@ -300,7 +301,15 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
         activeSourceUrl,
     ) {
         val party = PartyRepository.state.value.party ?: return@LaunchedEffect
-        val incoming = remoteSharedStream ?: return@LaunchedEffect
+        val incoming = remoteSharedStream
+        if (incoming == null) {
+            lastFollowedSharedStream = null
+            return@LaunchedEffect
+        }
+        // Do not continually reopen the same failing host URL if local dead-link
+        // fallback changes the guest source. Re-follow only after a new shared source
+        // arrives (or sharing is reset), which mirrors the old engine's media updates.
+        if (lastFollowedSharedStream == incoming) return@LaunchedEffect
         if (!shouldFollowSharedPartyStream(
                 isHost = party.isHost,
                 partyMediaKey = party.media.key,
@@ -310,6 +319,7 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
             )
         ) return@LaunchedEffect
 
+        lastFollowedSharedStream = incoming
         val targetPositionMs = PartyRepository.playback.value
             ?.takeIf { it.mediaKey == key }
             ?.let { PartySync.expectedPositionMs(it, PartyRepository.nowMs()) }
