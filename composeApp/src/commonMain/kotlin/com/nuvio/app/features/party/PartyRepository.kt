@@ -91,6 +91,7 @@ object PartyRepository {
     private var resumedAt: TimeMark? = null
     private val ignoredWaiting = mutableSetOf<String>()
     private var rejoining = false
+    private var hostShareAnnouncementSent = false
 
     init {
         scope.launch {
@@ -181,15 +182,21 @@ object PartyRepository {
             if (!party.isHost || party.sharing == enabled) return@launch
             updateParty { it.copy(sharing = enabled) }
             _hostSharingEnabled.value = enabled
-            // Send the toggle even when the host's current source is unavailable.
-            sendStream(null, sharingEnabled = enabled)
+            if (enabled) {
+                // Let the player publish its current stream first. If it has no shareable
+                // source, shareStream(null) will still send the enabled/unavailable state.
+                hostShareAnnouncementSent = false
+            } else {
+                sendStream(null, sharingEnabled = false)
+            }
         }
     }
 
     fun shareStream(stream: PartyStream?) {
         scope.launch {
             val party = _state.value.party ?: return@launch
-            if (!party.isHost || !party.sharing || stream == _sharedStream.value) return@launch
+            if (!party.isHost || !party.sharing) return@launch
+            if (stream == _sharedStream.value && hostShareAnnouncementSent) return@launch
             sendStream(stream, sharingEnabled = true)
         }
     }
@@ -272,6 +279,7 @@ object PartyRepository {
         sessionJob = job
         sessionScope = session
         channel = partyChannel
+        hostShareAnnouncementSent = false
         _hostSharingEnabled.value = party.isHost && party.sharing
         localPresence = null
         ignoredWaiting.clear()
@@ -308,6 +316,7 @@ object PartyRepository {
         _playback.value = null
         _sharedStream.value = null
         _hostSharingEnabled.value = false
+        hostShareAnnouncementSent = false
         _state.value = PartyUiState()
         PartyChat.stop()
     }
@@ -678,6 +687,7 @@ object PartyRepository {
         val party = _state.value.party ?: return
         _sharedStream.value = stream
         _hostSharingEnabled.value = sharingEnabled
+        hostShareAnnouncementSent = true
         val payload = buildJsonObject {
             put("member_id", party.memberId)
             put("sharing", sharingEnabled)
