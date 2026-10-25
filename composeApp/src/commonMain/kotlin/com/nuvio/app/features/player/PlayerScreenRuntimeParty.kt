@@ -254,7 +254,6 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
     var lastFollowedSharedStream by remember(partyId) { mutableStateOf<PartyStream?>(null) }
     val key = partyKey
     var waitingForSharedSource by remember(partyId, key) { mutableStateOf(false) }
-    var unavailableSourceNoticeShown by remember(partyId, key) { mutableStateOf(false) }
     val sharing = partyState.party?.let { it.isHost && it.sharing } == true
     val sharedStream = if (sharing) currentPartyStream() else null
 
@@ -309,7 +308,6 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
             // guest-only unavailable-source pause into the new host role.
             if (waitingForSharedSource) {
                 waitingForSharedSource = false
-                unavailableSourceNoticeShown = false
                 val playback = PartyRepository.playback.value?.takeIf { it.mediaKey == key }
                 if (playback != null) {
                     val target = PartySync.expectedPositionMs(playback, PartyRepository.nowMs(), playbackSnapshot.durationMs)
@@ -327,7 +325,6 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
             lastFollowedSharedStream = null
             if (waitingForSharedSource) {
                 waitingForSharedSource = false
-                unavailableSourceNoticeShown = false
                 val playback = PartyRepository.playback.value?.takeIf { it.mediaKey == key }
                 if (playback != null) {
                     val target = PartySync.expectedPositionMs(playback, PartyRepository.nowMs(), playbackSnapshot.durationMs)
@@ -348,16 +345,11 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
                 playerController?.pause()
                 shouldPlay = false
             }
-            if (!unavailableSourceNoticeShown) {
-                unavailableSourceNoticeShown = true
-                NuvioToastController.show(getString(Res.string.party_share_unavailable))
-            }
             return@LaunchedEffect
         }
 
         val wasWaitingForSource = waitingForSharedSource
         waitingForSharedSource = false
-        unavailableSourceNoticeShown = false
         if (lastFollowedSharedStream == incoming) return@LaunchedEffect
 
         // If the host returns to the same URL after a temporary unavailable state, resume
