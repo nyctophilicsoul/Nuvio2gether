@@ -64,6 +64,7 @@ import com.nuvio.app.features.party.PartySync
 import com.nuvio.app.features.party.UnreadBadge
 import com.nuvio.app.features.party.messageRes
 import com.nuvio.app.features.party.partyMediaKey
+import com.nuvio.app.features.party.shouldFollowSharedPartyStream
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.isActive
@@ -247,6 +248,7 @@ private fun PlayerScreenRuntime.handlePartyMediaChange(media: PartyMedia) {
 internal fun PlayerScreenRuntime.BindPartyEffects() {
     // This binding belongs to the player session, including background PiP.
     val partyState by PartyRepository.state.collectAsState()
+    val remoteSharedStream by PartyRepository.sharedStream.collectAsState()
     val partyId = partyState.party?.id
     val key = partyKey
     val sharing = partyState.party?.let { it.isHost && it.sharing } == true
@@ -284,6 +286,43 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
 
     LaunchedEffect(sharing, sharedStream) {
         if (sharing) PartyRepository.shareStream(sharedStream)
+    }
+
+    // The previous WatchParty engine sent the host URL + request headers and made guests
+    // use that exact stream. Keep guests on that authoritative source when it changes,
+    // instead of only updating the stream-picker card.
+    LaunchedEffect(
+        partyId,
+        key,
+        partyState.party?.isHost,
+        partyState.party?.media?.key,
+        remoteSharedStream,
+        activeSourceUrl,
+    ) {
+        val party = PartyRepository.state.value.party ?: return@LaunchedEffect
+        val incoming = remoteSharedStream ?: return@LaunchedEffect
+        if (!shouldFollowSharedPartyStream(
+                isHost = party.isHost,
+                partyMediaKey = party.media.key,
+                localMediaKey = key,
+                sharedStream = incoming,
+                activeSourceUrl = activeSourceUrl,
+            )
+        ) return@LaunchedEffect
+
+        val targetPositionMs = PartyRepository.playback.value
+            ?.takeIf { it.mediaKey == key }
+            ?.let { PartySync.expectedPositionMs(it, PartyRepository.nowMs(), playbackSnapshot.durationMs) }
+            ?: playbackSnapshot.positionMs.coerceAtLeast(0L)
+
+        // Keep the guest's already loaded subtitle choices where possible; the shared URL
+        // represents the video source, not the guest's selected subtitle track.
+        switchToSource(
+            stream = incoming.toStreamItem().copy(externalSubtitles = externalSubtitles),
+            saveForReuse = false,
+        )
+        activeInitialPositionMs = targetPositionMs
+        activeInitialProgressFraction = null
     }
 
     LaunchedEffect(key) {
