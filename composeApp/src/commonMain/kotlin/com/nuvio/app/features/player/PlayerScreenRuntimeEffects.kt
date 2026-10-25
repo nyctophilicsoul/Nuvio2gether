@@ -46,12 +46,23 @@ import org.jetbrains.compose.resources.getString
 
 @Composable
 internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
+    val partyState by PartyRepository.state.collectAsStateWithLifecycle()
+    val hostSharingEnabled by PartyRepository.hostSharingEnabled.collectAsStateWithLifecycle()
     val deadLinkScope = rememberCoroutineScope()
     val deadLinkMonitor = remember(deadLinkScope) {
         DeadLinkStartupMonitor(
             scope = deadLinkScope,
             timeoutSeconds = { PlayerSettingsRepository.uiState.value.deadLinkTimeoutSeconds },
-            timeoutEnabled = { PlayerSettingsRepository.uiState.value.deadLinkTimeoutEnabled },
+            timeoutEnabled = {
+                val party = PartyRepository.state.value.party
+                val guestFollowingHostSource =
+                    party != null &&
+                        !party.isHost &&
+                        party.media.key == partyKey &&
+                        PartyRepository.hostSharingEnabled.value
+                PlayerSettingsRepository.uiState.value.deadLinkTimeoutEnabled &&
+                    !guestFollowingHostSource
+            },
             candidateStreams = {
                 val videoId = activeVideoId
                 if (videoId == null) {
@@ -108,7 +119,17 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
     }
 
     val deadLinkSettings by PlayerSettingsRepository.uiState.collectAsStateWithLifecycle()
-    LaunchedEffect(deadLinkSettings.deadLinkTimeoutEnabled, deadLinkSettings.deadLinkTimeoutSeconds) {
+    LaunchedEffect(
+        deadLinkSettings.deadLinkTimeoutEnabled,
+        deadLinkSettings.deadLinkTimeoutSeconds,
+        partyState.party?.id,
+        partyState.party?.memberId,
+        partyState.party?.isHost,
+        partyState.party?.media?.key,
+        hostSharingEnabled,
+    ) {
+        // A guest following the host must not independently select a competing fallback.
+        // Re-evaluate the watchdog whenever party role or sharing state changes.
         deadLinkMonitor.settingsChanged()
     }
 
