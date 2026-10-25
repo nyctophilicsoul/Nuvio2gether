@@ -118,6 +118,18 @@ class PartySyncTest {
     }
 
     @Test
+    fun speedLimitDoesNotPretendAnImpossibleNudgeIsActive() {
+        assertEquals(
+            PartyCorrection.InSync,
+            PartySync.correction(9_000, 10_000, playback(rate = 4f), nudging = false),
+        )
+        assertEquals(
+            PartyCorrection.InSync,
+            PartySync.correction(11_000, 10_000, playback(rate = 0.25f), nudging = false),
+        )
+    }
+
+    @Test
     fun largeDriftSeeks() {
         val result = PartySync.correction(4_000, 10_000, playback(), nudging = false)
         assertEquals(PartyCorrection.Seek(10_000), result)
