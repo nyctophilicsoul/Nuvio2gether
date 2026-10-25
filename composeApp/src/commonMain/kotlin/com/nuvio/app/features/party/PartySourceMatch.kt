@@ -2,13 +2,21 @@ package com.nuvio.app.features.party
 
 import com.nuvio.app.features.streams.StreamItem
 
+/**
+ * Best-effort metadata match for the picker label only.
+ *
+ * An add-on ID plus a display label is not source identity: one add-on can return
+ * multiple encodes under the same label. Exact host-source playback is handled by
+ * PartyStream sharing, not by guessing from labels.
+ */
 internal fun PartySource.matches(stream: StreamItem): Boolean {
     val hash = infoHash?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
     val streamHash = stream.p2pInfoHash?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
 
-    // Torrent identity is authoritative when both sides expose it.
-    if (hash != null && streamHash != null) {
-        if (hash != streamHash) return false
+    // If either side claims torrent identity, require matching torrent identity.
+    // Never fall through to filenames or labels when the hash is missing or differs.
+    if (hash != null || streamHash != null) {
+        if (hash == null || streamHash == null || hash != streamHash) return false
 
         val sourceIndex = fileIdx
         val streamIndex = stream.p2pFileIdx
@@ -28,29 +36,17 @@ internal fun PartySource.matches(stream: StreamItem): Boolean {
 
     val sourceVideoHash = videoHash?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
     val streamVideoHash = stream.behaviorHints.videoHash?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
-    if (sourceVideoHash != null && streamVideoHash != null) {
-        return sourceVideoHash == streamVideoHash
+    if (sourceVideoHash != null || streamVideoHash != null) {
+        return sourceVideoHash != null && streamVideoHash != null && sourceVideoHash == streamVideoHash
     }
 
-    val file = filename?.trim()?.takeIf { it.isNotEmpty() }
+    val file = filename?.trim()?.takeIf { it.isNotEmpty() } ?: return false
     val streamFile = (stream.behaviorHints.filename ?: stream.clientResolve?.filename)
         ?.trim()
         ?.takeIf { it.isNotEmpty() }
+        ?: return false
 
-    // HTTP streams often lack torrent identity. Matching filenames is a strong
-    // signal, but filename values can vary between addons or after URL resolution.
-    if (file != null && streamFile != null &&
-        normalizePartyFilename(file) == normalizePartyFilename(streamFile)
-    ) {
-        return true
-    }
-
-    // Don't return false just because both filenames exist but differ. For ordinary
-    // HTTP streams, prefer the stable provider + stream label as a fallback identity.
-    val sourceAddonId = addonId?.trim()?.takeIf { it.isNotEmpty() } ?: return false
-    val label = name?.trim()?.takeIf { it.isNotEmpty() } ?: return false
-    return stream.addonId.trim() == sourceAddonId &&
-        stream.streamLabel.trim().equals(label, ignoreCase = true)
+    return normalizePartyFilename(file) == normalizePartyFilename(streamFile)
 }
 
 private fun normalizePartyFilename(value: String): String =
