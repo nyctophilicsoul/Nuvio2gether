@@ -105,6 +105,26 @@ class PartyStreamTest {
                 localMediaKey = stream.mediaKey,
                 sharedStream = stream,
                 activeSourceUrl = stream.url,
+                activeSourceHeaders = stream.headers,
+            ),
+        )
+        assertTrue(
+            shouldFollowSharedPartyStream(
+                isHost = false,
+                partyMediaKey = stream.mediaKey,
+                localMediaKey = stream.mediaKey,
+                sharedStream = stream,
+                activeSourceUrl = stream.url,
+                activeSourceHeaders = emptyMap(),
+            ),
+        )
+        assertFalse(
+            shouldFollowSharedPartyStream(
+                isHost = false,
+                partyMediaKey = stream.mediaKey,
+                localMediaKey = stream.mediaKey,
+                sharedStream = stream.copy(url = "http://localhost:8096/video"),
+                activeSourceUrl = "https://cdn.example.com/other.mkv",
             ),
         )
     }
