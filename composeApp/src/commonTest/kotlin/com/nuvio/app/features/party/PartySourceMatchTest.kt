@@ -13,13 +13,14 @@ class PartySourceMatchTest {
         filename: String? = null,
         infoHash: String? = null,
         fileIdx: Int? = null,
+        videoHash: String? = null,
     ) = StreamItem(
         name = name,
         addonName = "Example",
         addonId = addonId,
         infoHash = infoHash,
         fileIdx = fileIdx,
-        behaviorHints = StreamBehaviorHints(filename = filename),
+        behaviorHints = StreamBehaviorHints(filename = filename, videoHash = videoHash),
     )
 
     @Test
@@ -42,6 +43,26 @@ class PartySourceMatchTest {
     fun equalNormalizedFilenameMatchesAcrossAddons() {
         val source = PartySource(filename = "/cache/Movie.2024.mkv", addonId = "other", name = "Other")
         assertTrue(source.matches(stream(addonId = "addon.example", filename = "movie.2024.MKV")))
+    }
+
+    @Test
+    fun httpStreamMatchesByVideoHashAcrossAddons() {
+        val source = PartySource(
+            filename = "Old.Name.mkv",
+            videoHash = "ABC123",
+            addonId = "addon.one",
+            name = "Release A",
+        )
+        assertTrue(
+            source.matches(
+                stream(
+                    name = "Release B",
+                    addonId = "addon.two",
+                    filename = "Different.Name.mkv",
+                    videoHash = "abc123",
+                ),
+            ),
+        )
     }
 
     @Test
