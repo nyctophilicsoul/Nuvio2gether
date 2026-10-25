@@ -52,6 +52,7 @@ import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.resources.getString
 import androidx.compose.runtime.CompositionLocalProvider
 import com.nuvio.app.features.party.PartyRepository
+import com.nuvio.app.features.party.PartySync
 import com.nuvio.app.features.party.matches
 import com.nuvio.app.features.party.partyMediaKey
 import com.nuvio.app.features.streams.LocalSharedStream
@@ -93,6 +94,7 @@ internal fun StreamDestination(
     var resolvingYouTubeStream by rememberSaveable(route.launchId) { mutableStateOf(false) }
     var preparingServerStream by remember(route.launchId) { mutableStateOf(false) }
     var pendingP2pStreamOpen by remember { mutableStateOf<PendingP2pStreamOpen?>(null) }
+    var sharedStreamAutoOpenedUrl by remember(route.launchId) { mutableStateOf<String?>(null) }
     val shouldResolveEpisodeVideoId =
         launch.parentMetaId != null &&
             launch.seasonNumber != null &&
@@ -760,6 +762,7 @@ internal fun StreamDestination(
 
     val partyState by PartyRepository.state.collectAsStateWithLifecycle()
     val partyStream by PartyRepository.sharedStream.collectAsStateWithLifecycle()
+    val hostSharingEnabled by PartyRepository.hostSharingEnabled.collectAsStateWithLifecycle()
     val party = partyState.party
     val contentKey = partyMediaKey(
         metaType = launch.parentMetaType ?: launch.type,
@@ -774,10 +777,57 @@ internal fun StreamDestination(
     }
     val sharedLabel = stringResource(Res.string.party_shared_by, party?.member(party.hostMemberId)?.displayName.orEmpty())
     val isHost = party?.isHost == true
-    val sharedStream = remember(partyStream, sharedLabel, isHost, contentKey) {
-        partyStream
-            ?.takeIf { !isHost && it.mediaKey == contentKey }
-            ?.let { SharedStream(label = sharedLabel, stream = it.toStreamItem()) }
+    val sharedPartyStream = remember(partyStream, party, isHost, contentKey, hostSharingEnabled) {
+        partyStream?.takeIf {
+            hostSharingEnabled && !isHost && party?.media?.key == contentKey && it.mediaKey == contentKey
+        }
+    }
+    val sharedStream = remember(sharedPartyStream, sharedLabel) {
+        sharedPartyStream?.let { SharedStream(label = sharedLabel, stream = it.toStreamItem()) }
+    }
+
+    // The old WatchParty engine opened the host's exact URL + headers for guests.
+    // Preserve that behaviour when an opted-in shared source arrives for this media,
+    // rather than making the guest guess between independently fetched add-on links.
+    LaunchedEffect(
+        route.launchId,
+        sharedPartyStream,
+        hostSharingEnabled,
+        contentKey,
+        party?.id,
+        autoPlayNavigationStarted,
+        reuseNavigated,
+        preparingServerStream,
+        resolvingDebridStream,
+        resolvingYouTubeStream,
+    ) {
+        val currentParty = party ?: return@LaunchedEffect
+        val shared = sharedPartyStream
+        if (shared == null) {
+            sharedStreamAutoOpenedUrl = null
+            return@LaunchedEffect
+        }
+        if (!hostSharingEnabled || currentParty.isHost || currentParty.media.key != contentKey) return@LaunchedEffect
+        if (sharedStreamAutoOpenedUrl == shared.url) return@LaunchedEffect
+        if (autoPlayNavigationStarted || reuseNavigated || preparingServerStream ||
+            resolvingDebridStream || resolvingYouTubeStream
+        ) return@LaunchedEffect
+
+        val resumePositionMs = PartyRepository.playback.value
+            ?.takeIf { it.mediaKey == contentKey }
+            ?.let { PartySync.expectedPositionMs(it, PartyRepository.nowMs()) }
+            ?: launch.resumePositionMs
+
+        // Mark the URL before navigation; recomposition must not open it twice.
+        sharedStreamAutoOpenedUrl = shared.url
+        openSelectedStream(
+            stream = shared.toStreamItem(),
+            resolvedResumePositionMs = resumePositionMs,
+            resolvedResumeProgressFraction = null,
+            forceExternal = false,
+            forceInternal = true,
+            saveForReuse = false,
+        )
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
