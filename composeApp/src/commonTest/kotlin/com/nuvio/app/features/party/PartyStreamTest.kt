@@ -59,4 +59,53 @@ class PartyStreamTest {
         val encoded = PartyApi.json.encodeToString(PartyStream.serializer(), stream)
         assertEquals(stream, PartyApi.json.decodeFromString(PartyStream.serializer(), encoded))
     }
+
+    @Test
+    fun guestFollowsSharedUrlOnlyForTheMatchingPartyMedia() {
+        assertTrue(
+            shouldFollowSharedPartyStream(
+                isHost = false,
+                partyMediaKey = stream.mediaKey,
+                localMediaKey = stream.mediaKey,
+                sharedStream = stream,
+                activeSourceUrl = "https://cdn.example.com/other.mkv",
+            ),
+        )
+        assertFalse(
+            shouldFollowSharedPartyStream(
+                isHost = true,
+                partyMediaKey = stream.mediaKey,
+                localMediaKey = stream.mediaKey,
+                sharedStream = stream,
+                activeSourceUrl = "https://cdn.example.com/other.mkv",
+            ),
+        )
+        assertFalse(
+            shouldFollowSharedPartyStream(
+                isHost = false,
+                partyMediaKey = "movie|different||",
+                localMediaKey = stream.mediaKey,
+                sharedStream = stream,
+                activeSourceUrl = "https://cdn.example.com/other.mkv",
+            ),
+        )
+        assertFalse(
+            shouldFollowSharedPartyStream(
+                isHost = false,
+                partyMediaKey = stream.mediaKey,
+                localMediaKey = stream.mediaKey,
+                sharedStream = stream.copy(mediaKey = "movie|different||"),
+                activeSourceUrl = "https://cdn.example.com/other.mkv",
+            ),
+        )
+        assertFalse(
+            shouldFollowSharedPartyStream(
+                isHost = false,
+                partyMediaKey = stream.mediaKey,
+                localMediaKey = stream.mediaKey,
+                sharedStream = stream,
+                activeSourceUrl = stream.url,
+            ),
+        )
+    }
 }
