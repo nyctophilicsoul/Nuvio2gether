@@ -69,6 +69,7 @@ data class PartyStream(
             bingeGroup = bingeGroup,
             videoSize = videoSize,
             filename = filename,
+            videoHash = videoHash,
             proxyHeaders = StreamProxyHeaders(request = headers, response = responseHeaders),
         ),
         badges = badges,
