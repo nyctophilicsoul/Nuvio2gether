@@ -24,6 +24,7 @@ class TraktAuthRepositoryTest {
         assertEquals("nuvio://auth/trakt", url.parameters["redirect_uri"])
         assertEquals(state, url.parameters["state"])
         assertEquals(challenge, url.parameters["code_challenge"])
+        assertEquals("auth.trakt.tv", url.host)
         assertEquals("S256", url.parameters["code_challenge_method"])
     }
 
