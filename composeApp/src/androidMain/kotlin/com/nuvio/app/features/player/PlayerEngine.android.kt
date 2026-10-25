@@ -772,17 +772,7 @@ private fun ExoPlayerSurface(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            playerViewRef?.let { playerView ->
-                // A reused AndroidView may already be bound to the next player's instance
-                // when this effect is disposed. Never tear down the new player's overlay.
-                if (playerView.player == null || playerView.player === exoPlayer) {
-                    playerView.releaseLibassOverlay()
-                    if (playerView.player === exoPlayer) {
-                        playerView.keepScreenOn = false
-                        playerView.player = null
-                    }
-                }
-            }
+            playerViewRef?.releaseLibassOverlay()
             exoPlayer.releaseWithAssSupportCompat()
             if (VodCache.playheadBytesProvider != null) {
                 VodCache.playheadBytesProvider = null
@@ -2096,13 +2086,6 @@ private fun PlayerView.syncLibassOverlay(
     val boundPlayer = getTag(R.id.libass_overlay_bound_player) as? ExoPlayer
     val hasOverlayChild = overlayContainer.hasAssOverlayChild()
 
-    // The old player's ASS handler callback captures the overlay view. Clear it
-    // before rebinding the PlayerView to a different ExoPlayer instance.
-    if (boundPlayer != null && boundPlayer !== player) {
-        boundPlayer.getAssHandlerCompat()?.videoFrameCallback = null
-        setTag(R.id.libass_overlay_bound_player, null)
-    }
-
     if (!needsOverlay) {
         if (hasOverlayChild) {
             overlayContainer.removeAssOverlayChildren()
@@ -2154,10 +2137,6 @@ private fun android.widget.FrameLayout.removeAssOverlayChildren() {
 }
 
 private fun PlayerView.releaseLibassOverlay() {
-    // Remove the callback before removing the view: it captures the subtitle
-    // surface and otherwise can retain it after the player screen is closed.
-    val boundPlayer = getTag(R.id.libass_overlay_bound_player) as? ExoPlayer
-    boundPlayer?.getAssHandlerCompat()?.videoFrameCallback = null
     findViewById<android.widget.FrameLayout>(R.id.libass_overlay_container)
         ?.removeAssOverlayChildren()
     findViewById<android.widget.FrameLayout>(R.id.libass_overlay_container_gl)
