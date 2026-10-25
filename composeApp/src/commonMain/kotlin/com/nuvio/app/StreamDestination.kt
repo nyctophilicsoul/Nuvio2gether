@@ -94,7 +94,7 @@ internal fun StreamDestination(
     var resolvingYouTubeStream by rememberSaveable(route.launchId) { mutableStateOf(false) }
     var preparingServerStream by remember(route.launchId) { mutableStateOf(false) }
     var pendingP2pStreamOpen by remember { mutableStateOf<PendingP2pStreamOpen?>(null) }
-    var sharedStreamAutoOpenedUrl by rememberSaveable(route.launchId) { mutableStateOf<String?>(null) }
+    var sharedStreamAutoOpenedUrl by remember(route.launchId) { mutableStateOf<String?>(null) }
     val shouldResolveEpisodeVideoId =
         launch.parentMetaId != null &&
             launch.seasonNumber != null &&
