@@ -26,6 +26,12 @@ internal fun PartySource.matches(stream: StreamItem): Boolean {
         return normalizePartyFilename(file) == normalizePartyFilename(streamFile)
     }
 
+    val sourceVideoHash = videoHash?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
+    val streamVideoHash = stream.behaviorHints.videoHash?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
+    if (sourceVideoHash != null && streamVideoHash != null) {
+        return sourceVideoHash == streamVideoHash
+    }
+
     val file = filename?.trim()?.takeIf { it.isNotEmpty() }
     val streamFile = (stream.behaviorHints.filename ?: stream.clientResolve?.filename)
         ?.trim()
