@@ -54,7 +54,8 @@ object MdbListTracker : TrackingAuthProvider {
     }
 
     fun register() {
-        if (TrackingProviderRegistry.authProvider(providerId) === this) return
+        // Register each capability independently. The auth provider may already be
+        // present while one of the sync/rating adapters is still missing.
         TrackingProviderRegistry.register(this)
         TrackingProviderRegistry.registerHistoryWriter(writes)
         TrackingProviderRegistry.registerScrobbler(writes)
