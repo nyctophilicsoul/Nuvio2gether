@@ -149,6 +149,7 @@ jobs:
       RELEASE_KEY_ALIAS: ${{ secrets.NUVIO_RELEASE_KEY_ALIAS }}
       RELEASE_KEY_PASSWORD: ${{ secrets.NUVIO_RELEASE_KEY_PASSWORD }}
       TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+      TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
       SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
       MDBLIST_CLIENT_ID: ${{ secrets.MDBLIST_CLIENT_ID }}
 
@@ -182,7 +183,7 @@ jobs:
             "${keystore_path}" "${RELEASE_STORE_PASSWORD}" "${RELEASE_KEY_ALIAS}" "${RELEASE_KEY_PASSWORD}" >> local.properties
 
           # Override tracking client IDs from dedicated Actions secrets when configured.
-          for property_name in TRAKT_CLIENT_ID SIMKL_CLIENT_ID MDBLIST_CLIENT_ID; do
+          for property_name in TRAKT_CLIENT_ID TRAKT_CLIENT_SECRET SIMKL_CLIENT_ID MDBLIST_CLIENT_ID; do
             value="${!property_name:-}"
             if [[ -n "${value}" ]]; then
               sed -i "/^[[:space:]]*${property_name}[[:space:]]*=/d" local.properties
@@ -195,6 +196,7 @@ jobs:
             NUVIO_RELEASE_KEY_ALIAS
             NUVIO_RELEASE_KEY_PASSWORD
             TRAKT_CLIENT_ID
+            TRAKT_CLIENT_SECRET
           )
           for property_name in "${required_properties[@]}"; do
             if ! grep -Eq "^${property_name}=.+" local.properties; then
