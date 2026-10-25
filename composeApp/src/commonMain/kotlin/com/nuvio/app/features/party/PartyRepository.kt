@@ -343,7 +343,12 @@ object PartyRepository {
         runCatching { channel?.track(presence) }
         runCatching { channel?.send("status", presence) }
         _playback.value?.let { current -> runCatching { channel?.send("state", encodePlayback(current)) } }
-        if (party.isHost && party.sharing) sendStream(_sharedStream.value, sharingEnabled = true)
+        if (party.isHost) {
+            sendStream(
+                stream = _sharedStream.value.takeIf { party.sharing },
+                sharingEnabled = party.sharing,
+            )
+        }
         requestState(party)
         PartyChat.refresh()
     }
@@ -355,7 +360,12 @@ object PartyRepository {
             "state_request" -> {
                 if (payload.string("member_id") == party.memberId) return
                 runCatching { channel?.send("status", encodePresence(ownPresence(party))) }
-                if (party.isHost && party.sharing) sendStream(_sharedStream.value, sharingEnabled = true)
+                if (party.isHost) {
+                    sendStream(
+                        stream = _sharedStream.value.takeIf { party.sharing },
+                        sharingEnabled = party.sharing,
+                    )
+                }
                 val current = _playback.value ?: return
                 runCatching { channel?.send("state", encodePlayback(current)) }
             }
