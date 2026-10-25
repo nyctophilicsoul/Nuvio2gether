@@ -118,8 +118,8 @@ jobs:
             > release-notes.md
 
           if [[ ! -s release-notes.md ]]; then
-            echo "No release-note commits were found." >&2
-            exit 1
+            echo "No user-facing release-note commits were found; using a maintenance-release note."
+            printf '%s\n' '- Maintenance release; no user-facing changes were detected by the release-notes filter.' > release-notes.md
           fi
 
           {
