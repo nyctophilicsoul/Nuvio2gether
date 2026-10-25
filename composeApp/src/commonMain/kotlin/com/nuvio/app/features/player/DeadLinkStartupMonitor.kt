@@ -130,13 +130,18 @@ internal class DeadLinkStartupMonitor(
         // media is still buffering. Loading must take precedence or the dead-link
         // watchdog gets cancelled for precisely the streams it needs to recover.
         if (isLoading) {
-            if (!buffering && timeoutEnabled()) {
+            if (!buffering) {
+                // Track the loading transition even when the watchdog is temporarily disabled
+                // (for example, a guest following the host's shared source). If fallback is
+                // later re-enabled, settingsChanged() must know playback was still buffering.
                 buffering = true
                 playbackStarted = false
                 generation++
-                timer?.cancel()
-                armTimeout(key, generation)
-                log.w { "Playback is still loading; dead-link deadline armed for $key (isPlaying=$isPlaying)" }
+                cancelTimer()
+                if (timeoutEnabled()) {
+                    armTimeout(key, generation)
+                    log.w { "Playback is still loading; dead-link deadline armed for $key (isPlaying=$isPlaying)" }
+                }
             }
             return
         }
