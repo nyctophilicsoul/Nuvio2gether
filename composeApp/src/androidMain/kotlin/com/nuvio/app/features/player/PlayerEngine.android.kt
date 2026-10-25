@@ -772,7 +772,15 @@ private fun ExoPlayerSurface(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            playerViewRef?.releaseLibassOverlay()
+            playerViewRef?.let { playerView ->
+                // Detach the view before releasing the player so its surface/listeners
+                // cannot keep the old player alive across navigation or source changes.
+                playerView.releaseLibassOverlay()
+                if (playerView.player === exoPlayer) {
+                    playerView.keepScreenOn = false
+                    playerView.player = null
+                }
+            }
             exoPlayer.releaseWithAssSupportCompat()
             if (VodCache.playheadBytesProvider != null) {
                 VodCache.playheadBytesProvider = null
@@ -2086,6 +2094,13 @@ private fun PlayerView.syncLibassOverlay(
     val boundPlayer = getTag(R.id.libass_overlay_bound_player) as? ExoPlayer
     val hasOverlayChild = overlayContainer.hasAssOverlayChild()
 
+    // The old player's ASS handler callback captures the overlay view. Clear it
+    // before rebinding the PlayerView to a different ExoPlayer instance.
+    if (boundPlayer != null && boundPlayer !== player) {
+        boundPlayer.getAssHandlerCompat()?.videoFrameCallback = null
+        setTag(R.id.libass_overlay_bound_player, null)
+    }
+
     if (!needsOverlay) {
         if (hasOverlayChild) {
             overlayContainer.removeAssOverlayChildren()
@@ -2137,6 +2152,10 @@ private fun android.widget.FrameLayout.removeAssOverlayChildren() {
 }
 
 private fun PlayerView.releaseLibassOverlay() {
+    // Remove the callback before removing the view: it captures the subtitle
+    // surface and otherwise can retain it after the player screen is closed.
+    val boundPlayer = getTag(R.id.libass_overlay_bound_player) as? ExoPlayer
+    boundPlayer?.getAssHandlerCompat()?.videoFrameCallback = null
     findViewById<android.widget.FrameLayout>(R.id.libass_overlay_container)
         ?.removeAssOverlayChildren()
     findViewById<android.widget.FrameLayout>(R.id.libass_overlay_container_gl)
