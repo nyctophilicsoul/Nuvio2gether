@@ -89,12 +89,13 @@ internal fun shouldFollowSharedPartyStream(
     localMediaKey: String,
     sharedStream: PartyStream?,
     activeSourceUrl: String,
+    activeSourceHeaders: Map<String, String> = emptyMap(),
 ): Boolean {
     if (isHost || partyMediaKey != localMediaKey) return false
     val stream = sharedStream ?: return false
-    return stream.mediaKey == localMediaKey &&
-        isShareableStreamUrl(stream.url) &&
-        stream.url != activeSourceUrl
+    if (stream.mediaKey != localMediaKey || !isShareableStreamUrl(stream.url)) return false
+    // URL equality alone is not enough when request headers affect authorization or routing.
+    return stream.url != activeSourceUrl || stream.headers != activeSourceHeaders
 }
 
 private val SHAREABLE_URL = Regex("^https?://(?!localhost|127\\.|0\\.0\\.0\\.0|\\[::1])[^\\s/]+", RegexOption.IGNORE_CASE)
