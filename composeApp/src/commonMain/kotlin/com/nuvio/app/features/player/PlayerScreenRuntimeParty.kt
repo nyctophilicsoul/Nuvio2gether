@@ -312,7 +312,7 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
 
         val targetPositionMs = PartyRepository.playback.value
             ?.takeIf { it.mediaKey == key }
-            ?.let { PartySync.expectedPositionMs(it, PartyRepository.nowMs(), playbackSnapshot.durationMs) }
+            ?.let { PartySync.expectedPositionMs(it, PartyRepository.nowMs()) }
             ?: playbackSnapshot.positionMs.coerceAtLeast(0L)
 
         // Keep the guest's already loaded subtitle choices where possible; the shared URL
