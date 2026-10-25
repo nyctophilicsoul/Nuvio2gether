@@ -51,6 +51,7 @@ data class PartyStream(
     @SerialName("addon_id") val addonId: String = "",
     @SerialName("addon_logo") val addonLogo: String? = null,
     val filename: String? = null,
+    @SerialName("video_hash") val videoHash: String? = null,
     @SerialName("video_size") val videoSize: Long? = null,
     @SerialName("binge_group") val bingeGroup: String? = null,
     @SerialName("stream_type") val streamType: String? = null,
