@@ -58,7 +58,10 @@ internal fun MdbListProviderCard(modifier: Modifier = Modifier) {
             else -> null
         },
         errorMessage = if (status?.revokeFailed == true) stringResource(Res.string.settings_mdblist_revoke_failed)
-            else mdbListAccountError(auth.error ?: status?.authError, status?.error ?: syncStatus?.error),
+            else mdbListAccountError(
+                auth.error ?: status?.authError,
+                status?.error ?: syncStatus?.error.takeIf { auth.isAuthenticated },
+            ),
         websiteLabel = stringResource(Res.string.settings_mdblist_visit),
         websiteUrl = "https://mdblist.com",
         onConnectRequested = { MdbListTracker.account.connect(auth.scope) },
