@@ -12,6 +12,7 @@ data class PartySource(
     @SerialName("info_hash") val infoHash: String? = null,
     @SerialName("file_idx") val fileIdx: Int? = null,
     val filename: String? = null,
+    @SerialName("video_hash") val videoHash: String? = null,
     @SerialName("video_size") val videoSize: Long? = null,
     @SerialName("binge_group") val bingeGroup: String? = null,
     @SerialName("addon_id") val addonId: String? = null,
