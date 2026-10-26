@@ -161,7 +161,11 @@ object TraktAuthRepository : TrackingAuthProvider {
 
     fun onConnectRequested(profileId: Int = ProfileRepository.activeProfileId): String? {
         ensureLoaded(profileId)
-        if (!hasRequiredCredentials()) {
+        val credentialsAvailable = when (authenticationMethod) {
+            TraktAuthenticationMethod.BROWSER_REDIRECT -> TraktConfig.CLIENT_ID.isNotBlank()
+            TraktAuthenticationMethod.DEVICE_CODE -> hasRequiredCredentials()
+        }
+        if (!credentialsAvailable) {
             publish(errorMessage = localizedString(Res.string.trakt_missing_credentials))
             return null
         }
@@ -588,7 +592,7 @@ object TraktAuthRepository : TrackingAuthProvider {
     }
 
     private suspend fun refreshTokenIfNeeded(force: Boolean, profileId: Int = currentProfileId): Boolean = refreshMutex.withLock {
-        if (!hasRequiredCredentials()) return@withLock false
+        if (TraktConfig.CLIENT_ID.isBlank()) return@withLock false
         val refreshToken = authState.refreshToken?.takeIf { it.isNotBlank() }
             ?: return@withLock false
 
@@ -600,7 +604,6 @@ object TraktAuthRepository : TrackingAuthProvider {
             TraktRefreshTokenRequest(
                 refreshToken = refreshToken,
                 clientId = TraktConfig.CLIENT_ID,
-                clientSecret = TraktConfig.CLIENT_SECRET,
                 redirectUri = TraktConfig.REDIRECT_URI,
             ),
         )
@@ -912,7 +915,6 @@ private data class TraktAuthorizationCodeRequest(
 private data class TraktRefreshTokenRequest(
     @SerialName("refresh_token") val refreshToken: String,
     @SerialName("client_id") val clientId: String,
-    @SerialName("client_secret") val clientSecret: String,
     @SerialName("redirect_uri") val redirectUri: String,
     @SerialName("grant_type") val grantType: String = "refresh_token",
 )
