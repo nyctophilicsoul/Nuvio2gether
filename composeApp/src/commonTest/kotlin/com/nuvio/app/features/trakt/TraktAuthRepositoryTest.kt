@@ -6,9 +6,27 @@ import kotlin.test.assertEquals
 class TraktAuthRepositoryTest {
 
     @Test
-    fun `missing or unknown authentication method defaults to device code`() {
-        assertEquals(TraktAuthenticationMethod.DEVICE_CODE, TraktAuthenticationMethod.fromStorageValue(null))
-        assertEquals(TraktAuthenticationMethod.DEVICE_CODE, TraktAuthenticationMethod.fromStorageValue("legacy-or-unknown"))
+    fun `missing or legacy authentication method defaults to browser PKCE`() {
+        assertEquals(TraktAuthenticationMethod.BROWSER_REDIRECT, TraktAuthenticationMethod.fromStorageValue(null))
+        assertEquals(TraktAuthenticationMethod.BROWSER_REDIRECT, TraktAuthenticationMethod.fromStorageValue("device_code"))
+        assertEquals(TraktAuthenticationMethod.BROWSER_REDIRECT, TraktAuthenticationMethod.fromStorageValue("legacy-or-unknown"))
+    }
+
+    @Test
+    fun `PKCE challenge matches RFC 7636 S256 example`() {
+        val verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+        assertEquals(
+            "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+            TraktPkce.challengeForVerifier(verifier),
+        )
+    }
+
+    @Test
+    fun `Trakt redirect URI must use HTTPS`() {
+        assertEquals(true, isValidTraktRedirectUri("https://auth.example.com/trakt/callback"))
+        assertEquals(false, isValidTraktRedirectUri("nuvio://auth/trakt"))
+        assertEquals(false, isValidTraktRedirectUri("http://auth.example.com/trakt/callback"))
+        assertEquals(false, isValidTraktRedirectUri("not a URI"))
     }
 
     @Test
