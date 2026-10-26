@@ -2512,4 +2512,8 @@
     <string name="tracking_rating_completion_very_bad">Very bad</string>
     <string name="tracking_rating_completion_outstanding">Outstanding</string>
     <string name="tracking_rating_completion_failed">Couldn&apos;t submit your rating. Please try again.</string>
+    <string name="trakt_device_request_code">Requesting a device code…</string>
+    <string name="trakt_device_start_failed">Could not start Trakt device authorization. Please try again.</string>
+    <string name="trakt_device_code_expired">The Trakt device code has expired. Please start connecting again.</string>
+    <string name="trakt_device_activation_instruction">Enter this code on the Trakt activation page to connect your account.</string>
 </resources>
