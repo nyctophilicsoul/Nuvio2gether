@@ -249,6 +249,7 @@ private fun TraktProviderCard(
         statusMessage = uiState.statusMessage.takeUnless {
             uiState.mode == TraktConnectionMode.CONNECTED
         },
+        authorizationCode = TraktAuthRepository.pendingDeviceUserCode(),
         errorMessage = uiState.errorMessage,
         onConnectRequested = TraktAuthRepository::onConnectRequested,
         onResumeAuthorization = {
