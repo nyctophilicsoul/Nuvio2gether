@@ -350,8 +350,7 @@ internal fun TrackingProviderCard(
         label = "trackingCardChevron",
     )
     val toggleLabel = stringResource(if (expanded) Res.string.action_collapse else Res.string.action_expand)
-    val headerError = errorMessage?.takeIf(String::isNotBlank)
-        ?: failedOpenBrowserMessage.takeIf { browserError }
+    val headerError = if (browserError) failedOpenBrowserMessage else null
     val connectionLabel = when (mode) {
         TrackingConnectionCardMode.CONNECTED -> connectedLabel
         TrackingConnectionCardMode.AWAITING_APPROVAL -> finishSignInLabel
