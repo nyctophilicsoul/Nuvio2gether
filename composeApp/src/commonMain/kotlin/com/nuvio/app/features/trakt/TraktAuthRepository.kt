@@ -842,7 +842,7 @@ internal enum class TraktAuthenticationMethod(
 
     companion object {
         fun fromStorageValue(value: String?): TraktAuthenticationMethod =
-            entries.firstOrNull { it.storageValue == value } ?: BROWSER_REDIRECT
+            entries.firstOrNull { it.storageValue == value } ?: DEVICE_CODE
     }
 }
 
