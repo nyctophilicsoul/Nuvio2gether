@@ -90,7 +90,7 @@ object TraktAuthRepository : TrackingAuthProvider {
     private var currentProfileId: Int = 1
     private var profileGeneration: Long = 0L
     private var authState = TraktAuthState()
-    private var authenticationMethod = TraktAuthenticationMethod.DEVICE_CODE
+    private var authenticationMethod = TraktAuthenticationMethod.BROWSER_REDIRECT
     private var devicePollingJob: Job? = null
 
     override fun ensureLoaded() {
@@ -118,7 +118,7 @@ object TraktAuthRepository : TrackingAuthProvider {
         currentProfileId = 1
         profileGeneration += 1L
         authState = TraktAuthState()
-        authenticationMethod = TraktAuthenticationMethod.DEVICE_CODE
+        authenticationMethod = TraktAuthenticationMethod.BROWSER_REDIRECT
         publish()
     }
 
@@ -167,6 +167,10 @@ object TraktAuthRepository : TrackingAuthProvider {
 
         devicePollingJob?.cancel()
         clearPendingAuthorization()
+
+        // Temporary browser-OAuth experiment matching the tested Nuvio Enhanced flow.
+        authenticationMethod = TraktAuthenticationMethod.BROWSER_REDIRECT
+        persist(profileId)
 
         return when (authenticationMethod) {
             TraktAuthenticationMethod.BROWSER_REDIRECT -> {
@@ -747,18 +751,14 @@ object TraktAuthRepository : TrackingAuthProvider {
     }
 
     private fun readAuthenticationMethod(payload: String): TraktAuthenticationMethod {
-        if (payload.isBlank()) return TraktAuthenticationMethod.DEVICE_CODE
+        if (payload.isBlank()) return TraktAuthenticationMethod.BROWSER_REDIRECT
         val value = runCatching {
             json.parseToJsonElement(payload)
                 .jsonObject[AUTH_METHOD_PAYLOAD_KEY]
                 ?.jsonPrimitive
                 ?.content
         }.getOrNull()
-        return if (value == TraktAuthenticationMethod.BROWSER_REDIRECT.storageValue) {
-            TraktAuthenticationMethod.DEVICE_CODE
-        } else {
-            TraktAuthenticationMethod.fromStorageValue(value)
-        }
+        return TraktAuthenticationMethod.fromStorageValue(value)
     }
 
     private fun pendingDeviceCode(): String? = pendingDeviceAuthorization()?.deviceCode
@@ -851,7 +851,7 @@ internal enum class TraktAuthenticationMethod(
 
     companion object {
         fun fromStorageValue(value: String?): TraktAuthenticationMethod =
-            entries.firstOrNull { it.storageValue == value } ?: DEVICE_CODE
+            entries.firstOrNull { it.storageValue == value } ?: BROWSER_REDIRECT
     }
 }
 
