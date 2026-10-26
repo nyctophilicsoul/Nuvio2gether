@@ -6,6 +6,12 @@ import kotlin.test.assertEquals
 class TraktAuthRepositoryTest {
 
     @Test
+    fun `missing or unknown authentication method defaults to device code`() {
+        assertEquals(TraktAuthenticationMethod.DEVICE_CODE, TraktAuthenticationMethod.fromStorageValue(null))
+        assertEquals(TraktAuthenticationMethod.DEVICE_CODE, TraktAuthenticationMethod.fromStorageValue("legacy-or-unknown"))
+    }
+
+    @Test
     fun `HTTP 400 permanently invalidates a rejected refresh token`() {
         assertEquals(
             TraktTokenRefreshResponseAction.INVALIDATE,
