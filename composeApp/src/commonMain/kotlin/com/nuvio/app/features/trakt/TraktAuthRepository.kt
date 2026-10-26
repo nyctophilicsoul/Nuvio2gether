@@ -670,6 +670,15 @@ object TraktAuthRepository : TrackingAuthProvider {
                     TraktAuthState()
                 }
         }
+        // A legacy browser OAuth state must not be resumed after switching this profile
+        // to device-code auth; pendingAuthorizationUrl() would otherwise reopen /oauth/authorize.
+        if (authenticationMethod == TraktAuthenticationMethod.DEVICE_CODE &&
+            !authState.pendingAuthorizationState.isNullOrBlank() &&
+            !authState.pendingAuthorizationState.orEmpty().startsWith(DEVICE_CODE_PREFIX)
+        ) {
+            clearPendingAuthorization()
+            persist(profileId)
+        }
         publish(statusMessage = null, errorMessage = null)
         pendingDeviceCode()?.let { deviceCode ->
             startDeviceTokenPolling(
