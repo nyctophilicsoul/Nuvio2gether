@@ -345,7 +345,7 @@ val generateRuntimeConfigs = tasks.register<GenerateRuntimeConfigsTask>("generat
     // Tracking credentials may be supplied either by local.properties or GitHub Actions env vars.
     traktClientId.set(runtimeConfigValue("TRAKT_CLIENT_ID"))
     traktClientSecret.set(runtimeConfigValue("TRAKT_CLIENT_SECRET"))
-    traktRedirectUri.set(runtimeConfigValue("TRAKT_REDIRECT_URI", ""))
+    traktRedirectUri.set(runtimeConfigValue("TRAKT_REDIRECT_URI", "nuvio://auth/trakt"))
     simklClientId.set(runtimeConfigValue("SIMKL_CLIENT_ID"))
     simklRedirectUri.set(runtimeConfigValue("SIMKL_REDIRECT_URI", "nuvio://auth/simkl"))
     simklAppName.set(runtimeConfigValue("SIMKL_APP_NAME", "nuvio"))
