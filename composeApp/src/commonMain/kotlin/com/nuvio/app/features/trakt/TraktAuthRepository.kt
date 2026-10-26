@@ -775,9 +775,13 @@ object TraktAuthRepository : TrackingAuthProvider {
     }
 
     private fun readAuthenticationMethod(payload: String): TraktAuthenticationMethod {
-        // The current Trakt login uses browser Authorization Code Flow with PKCE.
-        // Migrate old device-code preferences to the browser flow.
-        return TraktAuthenticationMethod.BROWSER_REDIRECT
+        val storedValue = if (payload.isBlank()) null else runCatching {
+            json.parseToJsonElement(payload)
+                .jsonObject[AUTH_METHOD_PAYLOAD_KEY]
+                ?.jsonPrimitive
+                ?.content
+        }.getOrNull()
+        return TraktAuthenticationMethod.fromStorageValue(storedValue)
     }
 
     private fun pendingDeviceCode(): String? = pendingDeviceAuthorization()?.deviceCode
@@ -870,8 +874,8 @@ internal enum class TraktAuthenticationMethod(
     DEVICE_CODE("device_code");
 
     companion object {
-        fun fromStorageValue(value: String?): TraktAuthenticationMethod =
-            if (value == BROWSER_REDIRECT.storageValue) BROWSER_REDIRECT else BROWSER_REDIRECT
+        fun fromStorageValue(@Suppress("UNUSED_PARAMETER") value: String?): TraktAuthenticationMethod =
+            BROWSER_REDIRECT
     }
 }
 
