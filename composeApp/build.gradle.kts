@@ -336,10 +336,8 @@ fun runtimeConfigBoolean(key: String, default: Boolean): Boolean =
         else -> default
     }
 
-val mdblistClientId = runtimeConfigValue("MDBLIST_CLIENT_ID")
-require(mdblistClientId.isNotBlank()) {
-    "MDBLIST_CLIENT_ID is required. Set it in local.properties or as an environment variable before building the app."
-}
+// MDBList is optional; keep an empty value when no client ID is configured.
+val mdblistClientIdValue = runtimeConfigValue("MDBLIST_CLIENT_ID")
 
 val generateRuntimeConfigs = tasks.register<GenerateRuntimeConfigsTask>("generateRuntimeConfigs") {
     outputDir.set(generatedRuntimeConfigDir)
@@ -351,7 +349,7 @@ val generateRuntimeConfigs = tasks.register<GenerateRuntimeConfigsTask>("generat
     simklClientId.set(runtimeConfigValue("SIMKL_CLIENT_ID"))
     simklRedirectUri.set(runtimeConfigValue("SIMKL_REDIRECT_URI", "nuvio://auth/simkl"))
     simklAppName.set(runtimeConfigValue("SIMKL_APP_NAME", "nuvio"))
-    mdblistClientId.set(mdblistClientId)
+    mdblistClientId.set(mdblistClientIdValue)
     appVersionName.set(releaseAppVersionName)
     appVersionCode.set(releaseAppVersionCode)
     supabaseUrl.set(
