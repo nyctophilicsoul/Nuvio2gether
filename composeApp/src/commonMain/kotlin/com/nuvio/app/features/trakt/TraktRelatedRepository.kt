@@ -2,7 +2,7 @@ package com.nuvio.app.features.trakt
 
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.httpRequestRaw
-import com.nuvio.app.features.details.MoreLikeThisPage
+import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.tmdb.TmdbService
@@ -23,26 +23,21 @@ object TraktRelatedRepository {
     private val json = Json { ignoreUnknownKeys = true }
     private val cacheMutex = Mutex()
     private val cache = mutableMapOf<String, TimedCache>()
-    private val resolvedTargets = mutableMapOf<String, ResolvedRelatedTarget>()
 
     suspend fun getRelated(
-        itemId: String,
-        itemType: String?,
+        meta: MetaDetails,
         fallbackItemId: String? = null,
         fallbackItemType: String? = null,
-        page: Int = 1,
         forceRefresh: Boolean = false,
-    ): MoreLikeThisPage {
-        val headers = TraktAuthRepository.authorizedHeaders() ?: return MoreLikeThisPage()
+    ): List<MetaPreview> {
+        val headers = TraktAuthRepository.authorizedHeaders() ?: return emptyList()
         val target = resolveRelatedTarget(
-            itemId = itemId,
-            itemType = itemType,
+            meta = meta,
             fallbackItemId = fallbackItemId,
             fallbackItemType = fallbackItemType,
             headers = headers,
-        ) ?: return MoreLikeThisPage()
-        val requestedPage = page.coerceAtLeast(1)
-        val cacheKey = "${target.type.apiValue}|${target.pathId}|$requestedPage"
+        ) ?: return emptyList()
+        val cacheKey = "${target.type.apiValue}|${target.pathId}"
 
         if (forceRefresh) {
             cacheMutex.withLock { cache.remove(cacheKey) }
@@ -52,94 +47,82 @@ object TraktRelatedRepository {
             cacheMutex.withLock {
                 cache[cacheKey]?.let { cached ->
                     if (TraktPlatformClock.nowEpochMs() - cached.updatedAtMs <= RELATED_CACHE_TTL_MS) {
-                        return cached.page
+                        return cached.items
                     }
                 }
             }
         }
 
-        val fetched = fetchRelated(target = target, headers = headers, page = requestedPage)
-        val result = MoreLikeThisPage(
-            items = fetched.items.distinctBy { it.stableRelatedKey() },
-            hasMore = requestedPage < fetched.pageCount,
-        )
+        val items = fetchRelated(target = target, headers = headers)
+            .distinctBy { it.stableRelatedKey() }
+            .take(RELATED_LIMIT)
 
         cacheMutex.withLock {
             cache[cacheKey] = TimedCache(
-                page = result,
+                items = items,
                 updatedAtMs = TraktPlatformClock.nowEpochMs(),
             )
         }
-        return result
+        return items
     }
 
     fun clearCache() {
         cache.clear()
-        resolvedTargets.clear()
     }
 
     private suspend fun fetchRelated(
         target: ResolvedRelatedTarget,
         headers: Map<String, String>,
-        page: Int,
-    ): FetchedRelatedPage {
+    ): List<MetaPreview> {
         val endpoint = when (target.type) {
             TraktRelatedType.MOVIE -> "movies"
             TraktRelatedType.SHOW -> "shows"
         }
         val response = httpRequestRaw(
             method = "GET",
-            url = buildTraktUrl(
-                endpoint = "$endpoint/${target.pathId}/related",
-                query = mapOf(
-                    "extended" to "full,images",
-                    "page" to page.toString(),
-                    "limit" to RELATED_LIMIT.toString(),
-                ),
-            ),
+            url = buildTraktUrl("$endpoint/${target.pathId}/related", mapOf("extended" to "full,images")),
             headers = jsonHeaders(headers),
             body = "",
         )
 
-        if (response.status == 404) return FetchedRelatedPage()
+        if (response.status == 404) return emptyList()
         if (response.status !in 200..299) {
             error("Failed to load Trakt related titles (${response.status})")
         }
 
-        val items = when (target.type) {
+        return when (target.type) {
             TraktRelatedType.MOVIE -> json.decodeFromString<List<TraktRelatedMovieDto>>(response.body)
                 .mapNotNull { it.toMetaPreview() }
             TraktRelatedType.SHOW -> json.decodeFromString<List<TraktRelatedShowDto>>(response.body)
                 .mapNotNull { it.toMetaPreview() }
         }
-        val pageCount = response.headers["X-Pagination-Page-Count"]?.toIntOrNull()
-            ?: response.headers["x-pagination-page-count"]?.toIntOrNull()
-            ?: page
-        return FetchedRelatedPage(items = items, pageCount = pageCount)
     }
 
     private suspend fun resolveRelatedTarget(
-        itemId: String,
-        itemType: String?,
+        meta: MetaDetails,
         fallbackItemId: String?,
         fallbackItemType: String?,
         headers: Map<String, String>,
     ): ResolvedRelatedTarget? {
-        val type = normalizeRelatedType(itemType) ?: normalizeRelatedType(fallbackItemType) ?: return null
-        resolveDirectPathId(itemId)?.let { return ResolvedRelatedTarget(type, it) }
+        val type = resolveRelatedType(meta = meta, fallbackItemType = fallbackItemType) ?: return null
+        resolveDirectPathId(meta.id)?.let { return ResolvedRelatedTarget(type, it) }
         resolveDirectPathId(fallbackItemId)?.let { return ResolvedRelatedTarget(type, it) }
 
-        val memoKey = "${type.apiValue}|$itemId|${fallbackItemId.orEmpty()}"
-        resolvedTargets[memoKey]?.let { return it }
-
-        val tmdbId = resolveTmdbCandidate(itemId)
+        val tmdbId = resolveTmdbCandidate(meta.id)
             ?: resolveTmdbCandidate(fallbackItemId)
-            ?: TmdbService.ensureTmdbId(itemId, itemType.orEmpty())?.toIntOrNull()
-            ?: fallbackItemId?.let { TmdbService.ensureTmdbId(it, fallbackItemType ?: itemType.orEmpty()) }?.toIntOrNull()
+            ?: TmdbService.ensureTmdbId(meta.id, meta.type)?.toIntOrNull()
+            ?: fallbackItemId?.let { TmdbService.ensureTmdbId(it, fallbackItemType ?: meta.type) }?.toIntOrNull()
             ?: return null
 
         return resolveViaTraktSearch(type = type, tmdbId = tmdbId, headers = headers)
-            ?.also { resolvedTargets[memoKey] = it }
+    }
+
+    private fun resolveRelatedType(meta: MetaDetails, fallbackItemType: String?): TraktRelatedType? {
+        return when (normalizeRelatedType(meta.type)) {
+            TraktRelatedType.MOVIE -> TraktRelatedType.MOVIE
+            TraktRelatedType.SHOW -> TraktRelatedType.SHOW
+            null -> normalizeRelatedType(fallbackItemType)
+        }
     }
 
     private fun normalizeRelatedType(value: String?): TraktRelatedType? =
@@ -199,7 +182,7 @@ object TraktRelatedRepository {
     }
 
     private fun buildTraktUrl(endpoint: String, query: Map<String, String> = emptyMap()): String {
-        val queryString = query
+        val queryString = (query + mapOf("page" to "1", "limit" to RELATED_LIMIT.toString()))
             .entries
             .filter { (_, value) -> value.isNotBlank() }
             .joinToString("&") { (key, value) ->
@@ -213,13 +196,8 @@ object TraktRelatedRepository {
 }
 
 private data class TimedCache(
-    val page: MoreLikeThisPage,
+    val items: List<MetaPreview>,
     val updatedAtMs: Long,
-)
-
-private data class FetchedRelatedPage(
-    val items: List<MetaPreview> = emptyList(),
-    val pageCount: Int = 1,
 )
 
 private enum class TraktRelatedType(val apiValue: String) {
