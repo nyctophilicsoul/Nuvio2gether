@@ -90,7 +90,7 @@ object TraktAuthRepository : TrackingAuthProvider {
     private var currentProfileId: Int = 1
     private var profileGeneration: Long = 0L
     private var authState = TraktAuthState()
-    private var authenticationMethod = TraktAuthenticationMethod.BROWSER_REDIRECT
+    private var authenticationMethod = TraktAuthenticationMethod.DEVICE_CODE
     private var devicePollingJob: Job? = null
 
     override fun ensureLoaded() {
@@ -118,7 +118,7 @@ object TraktAuthRepository : TrackingAuthProvider {
         currentProfileId = 1
         profileGeneration += 1L
         authState = TraktAuthState()
-        authenticationMethod = TraktAuthenticationMethod.BROWSER_REDIRECT
+        authenticationMethod = TraktAuthenticationMethod.DEVICE_CODE
         publish()
     }
 
@@ -738,14 +738,18 @@ object TraktAuthRepository : TrackingAuthProvider {
     }
 
     private fun readAuthenticationMethod(payload: String): TraktAuthenticationMethod {
-        if (payload.isBlank()) return TraktAuthenticationMethod.BROWSER_REDIRECT
+        if (payload.isBlank()) return TraktAuthenticationMethod.DEVICE_CODE
         val value = runCatching {
             json.parseToJsonElement(payload)
                 .jsonObject[AUTH_METHOD_PAYLOAD_KEY]
                 ?.jsonPrimitive
                 ?.content
         }.getOrNull()
-        return TraktAuthenticationMethod.fromStorageValue(value)
+        return if (value == TraktAuthenticationMethod.BROWSER_REDIRECT.storageValue) {
+            TraktAuthenticationMethod.DEVICE_CODE
+        } else {
+            TraktAuthenticationMethod.fromStorageValue(value)
+        }
     }
 
     private fun pendingDeviceCode(): String? = pendingDeviceAuthorization()?.deviceCode
