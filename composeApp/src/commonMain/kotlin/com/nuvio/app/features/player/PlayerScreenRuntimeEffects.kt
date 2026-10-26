@@ -769,6 +769,9 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
         profileId,
         activeSeasonNumber,
         activeEpisodeNumber,
+        activeVideoId,
+        playerMeta,
+        metaUiState.meta,
     ) {
         if (!playbackSnapshot.isEnded || playbackSnapshotKey != activePlaybackKey || !isSeries) {
             return@LaunchedEffect
@@ -780,17 +783,21 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
             return@LaunchedEffect
         }
 
+        // Ratings need provider-addressable IDs. Wait for async metadata resolution instead
+        // of consuming this episode's one prompt opportunity with a title-only target.
+        val media = currentTrackingMedia()
+        if (!media.hasResolvableIdentity || !media.ids.hasAny) return@LaunchedEffect
+
         val promptKey = buildString {
             append(profileId).append('|')
             append(parentMetaId).append('|')
             append(season).append('|')
             append(episode)
         }
-        if (lastCompletionRatingPromptKey == promptKey) return@LaunchedEffect
-
-        val media = currentTrackingMedia()
-        if (!media.hasResolvableIdentity) return@LaunchedEffect
-        lastCompletionRatingPromptKey = promptKey
+        if (lastCompletionRatingPromptKey == promptKey ||
+            pendingCompletionRatingPromptKey == promptKey
+        ) return@LaunchedEffect
+        pendingCompletionRatingPromptKey = promptKey
         completionRatingMedia = media.copy(
             episode = null,
             catalog = media.catalog?.copy(videoId = null),

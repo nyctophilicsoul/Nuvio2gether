@@ -294,15 +294,24 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
         RenderParty(runtime = runtime)
 
         val completedMedia = completionRatingMedia
-        if (showCompletionRatingPrompt && completedMedia != null) {
+        val completionPromptKey = pendingCompletionRatingPromptKey
+        if (showCompletionRatingPrompt && completedMedia != null && completionPromptKey != null) {
             CompletionRatingPrompt(
                 profileId = profileId,
                 seriesTitle = title,
                 media = completedMedia,
                 posterUrl = completedMedia.posterUrl ?: poster ?: playerMeta?.poster,
+                onOptionsReady = {
+                    if (pendingCompletionRatingPromptKey == completionPromptKey) {
+                        lastCompletionRatingPromptKey = completionPromptKey
+                    }
+                },
                 onDismiss = {
                     showCompletionRatingPrompt = false
                     completionRatingMedia = null
+                    if (pendingCompletionRatingPromptKey == completionPromptKey) {
+                        pendingCompletionRatingPromptKey = null
+                    }
                 },
             )
         }

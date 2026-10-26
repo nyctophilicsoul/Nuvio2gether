@@ -168,6 +168,7 @@ internal class PlayerScreenRuntime(
     var currentTrackingMedia by mutableStateOf<TrackingMediaReference?>(null)
     var showCompletionRatingPrompt by mutableStateOf(false)
     var completionRatingMedia by mutableStateOf<TrackingMediaReference?>(null)
+    var pendingCompletionRatingPromptKey by mutableStateOf<String?>(null)
     var lastCompletionRatingPromptKey: String? = null
 
     var showSourcesPanel by mutableStateOf(false)

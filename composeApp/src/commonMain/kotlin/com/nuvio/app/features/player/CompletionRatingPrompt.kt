@@ -66,6 +66,7 @@ internal fun CompletionRatingPrompt(
     seriesTitle: String,
     media: TrackingMediaReference,
     posterUrl: String?,
+    onOptionsReady: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     var options by remember(profileId, media) { mutableStateOf<List<CompletionRatingOption>>(emptyList()) }
@@ -112,6 +113,11 @@ internal fun CompletionRatingPrompt(
             options = available
             selectedProviderId = available.firstOrNull { it.providerId == TrackingProviderId.SIMKL }?.providerId
                 ?: available.firstOrNull()?.providerId
+            if (available.isEmpty()) {
+                onDismiss()
+            } else {
+                onOptionsReady()
+            }
         } catch (error: CancellationException) {
             throw error
         } catch (_: Exception) {
@@ -120,7 +126,6 @@ internal fun CompletionRatingPrompt(
         } finally {
             isLoading = false
         }
-        if (options.isEmpty()) onDismiss()
     }
 
     val selectedOption = options.firstOrNull { it.providerId == selectedProviderId }
