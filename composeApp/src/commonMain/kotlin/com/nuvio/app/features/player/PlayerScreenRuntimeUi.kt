@@ -292,6 +292,20 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
         )
         RenderPlayerModals(displayedPositionMs = displayedPositionMs)
         RenderParty(runtime = runtime)
+
+        val completedMedia = completionRatingMedia
+        if (showCompletionRatingPrompt && completedMedia != null) {
+            CompletionRatingPrompt(
+                profileId = profileId,
+                seriesTitle = title,
+                media = completedMedia,
+                posterUrl = completedMedia.posterUrl ?: poster ?: playerMeta?.poster,
+                onDismiss = {
+                    showCompletionRatingPrompt = false
+                    completionRatingMedia = null
+                },
+            )
+        }
     }
 }
 

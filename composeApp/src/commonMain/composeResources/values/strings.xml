@@ -2504,4 +2504,12 @@
     <string name="settings_homescreen_addon_order_reset_title">Reset row pin preferences?</string>
     <string name="settings_homescreen_addon_order_reset_message">Changing the add-on order using Move all rows together resets individual pin placements for existing catalog rows, including pinned positions and top or bottom pins. Collection pin preferences stay unchanged. Do you want to continue?</string>
     <string name="settings_homescreen_addon_order_reset_confirm">Reset and apply</string>
+    <string name="tracking_rating_completion_title">You&apos;ve finished this series.</string>
+    <string name="tracking_rating_completion_question">How would you rate it on %1$s?</string>
+    <string name="tracking_rating_completion_submit">Submit to %1$s</string>
+    <string name="tracking_rating_completion_not_now">Not now</string>
+    <string name="tracking_rating_completion_checking">Checking connected rating services…</string>
+    <string name="tracking_rating_completion_very_bad">Very bad</string>
+    <string name="tracking_rating_completion_outstanding">Outstanding</string>
+    <string name="tracking_rating_completion_failed">Couldn&apos;t submit your rating. Please try again.</string>
 </resources>

@@ -166,6 +166,9 @@ internal class PlayerScreenRuntime(
     var pendingSeekScrobbleRestart by mutableStateOf(false)
     var hasSentCompletionScrobbleForCurrentItem by mutableStateOf(false)
     var currentTrackingMedia by mutableStateOf<TrackingMediaReference?>(null)
+    var showCompletionRatingPrompt by mutableStateOf(false)
+    var completionRatingMedia by mutableStateOf<TrackingMediaReference?>(null)
+    var lastCompletionRatingPromptKey: String? = null
 
     var showSourcesPanel by mutableStateOf(false)
     var showEpisodesPanel by mutableStateOf(false)

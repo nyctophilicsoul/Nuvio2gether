@@ -757,6 +757,48 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
         } else null
     }
 
+    // Offer a whole-series rating only after a known final episode finishes.
+    // This effect also re-checks if episode metadata arrives after playback has ended.
+    LaunchedEffect(
+        playbackSnapshot.isEnded,
+        playbackSnapshotKey,
+        activePlaybackKey,
+        playerMetaVideos,
+        isSeries,
+        parentMetaId,
+        profileId,
+        activeSeasonNumber,
+        activeEpisodeNumber,
+    ) {
+        if (!playbackSnapshot.isEnded || playbackSnapshotKey != activePlaybackKey || !isSeries) {
+            return@LaunchedEffect
+        }
+        if (playerMetaVideos.isEmpty()) return@LaunchedEffect
+        val season = activeSeasonNumber ?: return@LaunchedEffect
+        val episode = activeEpisodeNumber ?: return@LaunchedEffect
+        if (!PlayerNextEpisodeRules.isFinalKnownEpisode(playerMetaVideos, season, episode)) {
+            return@LaunchedEffect
+        }
+
+        val promptKey = buildString {
+            append(profileId).append('|')
+            append(parentMetaId).append('|')
+            append(season).append('|')
+            append(episode)
+        }
+        if (lastCompletionRatingPromptKey == promptKey) return@LaunchedEffect
+
+        val media = currentTrackingMedia()
+        if (!media.hasResolvableIdentity) return@LaunchedEffect
+        lastCompletionRatingPromptKey = promptKey
+        completionRatingMedia = media.copy(
+            episode = null,
+            catalog = media.catalog?.copy(videoId = null),
+            posterUrl = poster ?: playerMeta?.poster ?: metaUiState.meta?.poster,
+        )
+        showCompletionRatingPrompt = true
+    }
+
     LaunchedEffect(playbackSnapshot.isEnded) {
         if (playbackSnapshot.isEnded && nextEpisodeCardDismissed &&
             playerSettingsUiState.streamAutoPlayNextEpisodeEnabled &&
