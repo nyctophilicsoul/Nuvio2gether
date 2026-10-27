@@ -1800,7 +1800,7 @@
     <string name="trakt_library_load_failed">Failed to load Trakt library</string>
     <string name="trakt_list_fallback_title">List %1$d</string>
     <string name="trakt_missing_auth_code">Trakt did not return an authorization code</string>
-    <string name="trakt_missing_credentials">Missing Trakt credentials</string>
+    <string name="trakt_missing_credentials">Missing TRAKT_CLIENT_ID / TRAKT_REDIRECT_URI in local.properties.</string>
     <string name="trakt_progress_load_failed">Failed to load Trakt progress</string>
     <string name="trakt_public_list">Trakt public list</string>
     <string name="trakt_public_list_enter_valid_id_or_url">Enter a valid Trakt list ID or URL</string>
