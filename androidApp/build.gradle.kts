@@ -1,4 +1,3 @@
-import java.net.URI
 import java.util.Properties
 
 fun readXcconfigValue(file: File, key: String): String? {
@@ -33,17 +32,6 @@ val releaseKeystore = releaseStoreFile?.let(rootProject::file)
 fun envOrLocalProperty(key: String): String? =
     providers.environmentVariable(key).orNull?.trim()?.takeIf { it.isNotBlank() }
         ?: localProps.getProperty(key)?.trim()?.takeIf { it.isNotBlank() }
-
-val traktRedirectUri = envOrLocalProperty("TRAKT_REDIRECT_URI").orEmpty()
-val parsedTraktRedirectUri = runCatching { URI(traktRedirectUri) }.getOrNull()
-val traktRedirectHost = parsedTraktRedirectUri
-    ?.takeIf { it.scheme.equals("https", ignoreCase = true) && !it.host.isNullOrBlank() }
-    ?.host
-    ?: "invalid.invalid"
-val traktRedirectPath = parsedTraktRedirectUri
-    ?.path
-    ?.takeIf { it.startsWith("/") && it.isNotBlank() }
-    ?: "/auth/trakt"
 
 val sentryAuthToken = envOrLocalProperty("SENTRY_AUTH_TOKEN")
 val sentryOrg = envOrLocalProperty("SENTRY_ORG")
@@ -84,8 +72,6 @@ android {
         versionCode = releaseAppVersionCode
         versionName = releaseAppVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        manifestPlaceholders["traktRedirectHost"] = traktRedirectHost
-        manifestPlaceholders["traktRedirectPath"] = traktRedirectPath
     }
 
     flavorDimensions += "distribution"
