@@ -1,0 +1,50 @@
+name: Media3 Alpha02 Runtime Smoke Test
+
+on:
+  push:
+    branches: [test-media-update]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: media3-alpha02-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runtime-smoke:
+    name: Build APK and verify Media3 runtime classes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Prepare runtime properties
+        env:
+          LOCAL_PROPERTIES_BASE64: ${{ secrets.NUVIO_LOCAL_PROPERTIES_BASE64 }}
+        run: |
+          if [ -n "$LOCAL_PROPERTIES_BASE64" ]; then
+            printf '%s' "$LOCAL_PROPERTIES_BASE64" | base64 --decode > local.properties
+            sed -i -E '/^[[:space:]]*(sdk\.dir|NUVIO_RELEASE_STORE_FILE)[[:space:]]*=/d' local.properties
+          else
+            touch local.properties
+          fi
+
+      - name: Build and run instrumented Media3 smoke test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: ./gradlew :androidApp:connectedFullDebugAndroidTest -Pnuvio.android.distribution=full -Pnuvio.ios.distribution=appstore --stacktrace
