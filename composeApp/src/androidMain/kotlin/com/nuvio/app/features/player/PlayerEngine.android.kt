@@ -284,6 +284,15 @@ private fun ExoPlayerSurface(
         useYoutubeChunkedPlayback,
         initialPositionRequestKey.orEmpty(),
     )
+    // Track restores/jobs belong to the stream, not to a one-off resume/seek request.
+    val playerTrackIdentityKey = listOf(
+        sourceUrl,
+        sourceAudioUrl.orEmpty(),
+        sanitizedSourceHeaders,
+        sanitizedSourceResponseHeaders,
+        normalizedStreamType.orEmpty(),
+        useYoutubeChunkedPlayback,
+    )
     val playbackDiagnostics = remember(playerSourceKey) { PlaybackDiagnostics() }
     var subtitleDelayMs by remember(playerSourceKey) { mutableStateOf(0) }
     var selectedExternalSubtitleMimeType by remember(playerSourceKey) { mutableStateOf<String?>(null) }
@@ -557,9 +566,20 @@ private fun ExoPlayerSurface(
         exoPlayer.prepare()
     }
 
-    val pendingSubtitleTrackIndex = remember { mutableListOf<Int>() }
-    val pendingAudioTrackSelection = remember { mutableListOf<TrackSelectionSnapshot>() }
+    val pendingSubtitleTrackIndex = remember(playerTrackIdentityKey) { mutableListOf<Int>() }
+    val pendingAudioTrackSelection = remember(playerTrackIdentityKey) { mutableListOf<TrackSelectionSnapshot>() }
     var subtitleSelectionJob by remember { mutableStateOf<Job?>(null) }
+
+    // The same ExoPlayer now survives URL changes to preserve AudioTrack, so cancel stale
+    // subtitle reloads and track-restoration state when a different stream takes over.
+    DisposableEffect(playerTrackIdentityKey) {
+        onDispose {
+            subtitleSelectionJob?.cancel()
+            subtitleSelectionJob = null
+            pendingSubtitleTrackIndex.clear()
+            pendingAudioTrackSelection.clear()
+        }
+    }
     val isInPip = rememberIsInPictureInPicture()
     // Player size outside PiP, so PiP subtitles keep the full-screen size relative to the video.
     var playerSizeOutsidePip by remember { mutableStateOf(IntSize.Zero) }
