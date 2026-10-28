@@ -52,6 +52,59 @@ class PartySyncTest {
     }
 
     @Test
+    fun localPositionEstimateAdvancesAtEffectivePlaybackRate() {
+        assertEquals(
+            10_525L,
+            PartySync.estimatedLocalPositionMs(
+                positionMs = 10_000L,
+                elapsedMs = 500L,
+                playbackRate = 1.05f,
+                isPlaying = true,
+                isLoading = false,
+            ),
+        )
+    }
+
+    @Test
+    fun localPositionEstimateDoesNotAdvanceWhilePausedOrLoading() {
+        assertEquals(
+            10_000L,
+            PartySync.estimatedLocalPositionMs(10_000L, 500L, 1.5f, isPlaying = false, isLoading = false),
+        )
+        assertEquals(
+            10_000L,
+            PartySync.estimatedLocalPositionMs(10_000L, 500L, 1.5f, isPlaying = true, isLoading = true),
+        )
+    }
+
+    @Test
+    fun localPositionEstimateBoundsExtrapolationAndDuration() {
+        assertEquals(
+            11_000L,
+            PartySync.estimatedLocalPositionMs(10_000L, 5_000L, 1f, isPlaying = true, isLoading = false),
+        )
+        assertEquals(
+            10_500L,
+            PartySync.estimatedLocalPositionMs(
+                positionMs = 10_000L,
+                elapsedMs = 1_000L,
+                playbackRate = 1f,
+                isPlaying = true,
+                isLoading = false,
+                durationMs = 10_500L,
+            ),
+        )
+    }
+
+    @Test
+    fun stalePositionSamplesAreNotUsedForRoutineCorrection() {
+        assertTrue(PartySync.isPositionSampleFresh(0L))
+        assertTrue(PartySync.isPositionSampleFresh(PartySync.MAX_LOCAL_POSITION_EXTRAPOLATION_MS))
+        assertFalse(PartySync.isPositionSampleFresh(PartySync.MAX_LOCAL_POSITION_EXTRAPOLATION_MS + 1L))
+        assertFalse(PartySync.isPositionSampleFresh(-1L))
+    }
+
+    @Test
     fun higherSequenceWins() {
         assertTrue(PartySync.isNewer(playback(seq = 3), playback(seq = 2)))
         assertFalse(PartySync.isNewer(playback(seq = 2), playback(seq = 3)))

@@ -15,6 +15,7 @@ internal sealed interface OwnSeek {
 }
 
 internal object PartySync {
+    const val MAX_LOCAL_POSITION_EXTRAPOLATION_MS = 1_000L
     const val NUDGE_START_MS = 300L
     const val NUDGE_STOP_MS = 120L
     const val SEEK_THRESHOLD_MS = 2_000L
@@ -40,6 +41,33 @@ internal object PartySync {
         val clamped = position.coerceAtLeast(0L)
         return if (durationMs > 0L) clamped.coerceAtMost(durationMs) else clamped
     }
+
+    /**
+     * Estimate the playhead between player snapshots without extrapolating indefinitely.
+     * Correction decisions use the effective local rate, including a temporary sync nudge,
+     * rather than the base rate exposed to the rest of the player UI.
+     */
+    fun estimatedLocalPositionMs(
+        positionMs: Long,
+        elapsedMs: Long,
+        playbackRate: Float,
+        isPlaying: Boolean,
+        isLoading: Boolean,
+        durationMs: Long = 0L,
+    ): Long {
+        val elapsed = if (isPlaying && !isLoading) {
+            elapsedMs.coerceIn(0L, MAX_LOCAL_POSITION_EXTRAPOLATION_MS)
+        } else {
+            0L
+        }
+        val advanceMs = (elapsed * playbackRate.coerceAtLeast(0f)).toLong()
+        val predicted = (positionMs.coerceAtLeast(0L) + advanceMs).coerceAtLeast(0L)
+        return if (durationMs > 0L) predicted.coerceAtMost(durationMs) else predicted
+    }
+
+    /** Don't run feedback correction from a stale moving-playhead sample. */
+    fun isPositionSampleFresh(sampleAgeMs: Long): Boolean =
+        sampleAgeMs in 0L..MAX_LOCAL_POSITION_EXTRAPOLATION_MS
 
     fun isNewer(candidate: PartyPlayback, current: PartyPlayback?): Boolean {
         if (current == null) return true
