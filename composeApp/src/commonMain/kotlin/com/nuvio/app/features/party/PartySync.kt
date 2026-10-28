@@ -21,7 +21,8 @@ internal object PartySync {
     const val PAUSED_TOLERANCE_MS = 500L
     const val MIN_NUDGE_FACTOR = 0.01f
     const val MAX_NUDGE_FACTOR = 0.05f
-    const val RATE_UPDATE_THRESHOLD = 0.001f
+    const val RATE_UPDATE_THRESHOLD = 0.005f
+    const val MAX_NUDGE_RATE_STEP = 0.01f
     const val MIN_PLAYBACK_RATE = 0.25f
     const val MAX_PLAYBACK_RATE = 4f
     const val SEEK_NOTICE_MS = 2_000L
@@ -82,7 +83,57 @@ internal object PartySync {
     fun shouldUpdateNudge(currentRate: Float?, targetRate: Float): Boolean =
         currentRate == null || abs(currentRate - targetRate) >= RATE_UPDATE_THRESHOLD
 
-    fun coordinatorId(party: ActiveParty): String? {
+    /**
+     * Distinguishes an authoritative timeline jump from pause/rate updates that naturally carry
+     * a newer sequence but do not represent a seek. Comparing against the previous state's
+     * predicted position avoids treating normal playback progression as a discontinuity.
+     */
+    fun isSeekTransition(previous: PartyPlayback?, next: PartyPlayback): Boolean {
+        if (previous == null || previous.waiting || next.waiting) return false
+        if (previous.mediaKey != next.mediaKey || next.at < previous.at) return false
+        return abs(next.positionMs - expectedPositionMs(previous, next.at)) > SEEK_NOTICE_MS
+    }
+
+    /** Coalesce a remote seek that arrives while the previous seek is still settling. */
+    fun shouldDeferSeek(previous: PartyPlayback?, next: PartyPlayback, seekInFlight: Boolean): Boolean =
+        seekInFlight && isSeekTransition(previous, next)
+
+    /**
+     * A local seek is already reflected in the local timeline; don't echo it back as a remote
+     * seek. Initial alignment, explicit remote timeline jumps, and inaccurate paused states still
+     * get an exact seek.
+     */
+    fun shouldSeekForPlaybackUpdate(
+        previous: PartyPlayback?,
+        next: PartyPlayback,
+        localPositionMs: Long,
+        expectedPositionMs: Long,
+        initialSync: Boolean,
+        ownUpdate: Boolean,
+    ): Boolean {
+        if (abs(localPositionMs - expectedPositionMs) <= PAUSED_TOLERANCE_MS) return false
+        if (initialSync) return true
+        if (ownUpdate) return false
+        if (next.paused) return true
+        return isSeekTransition(previous, next)
+    }
+
+    /**
+     * Bound how much the time-stretch rate changes in one correction tick. This prevents abrupt
+     * alternating adjustments when noisy drift samples move across zero.
+     */
+    fun smoothNudge(currentNudgeRate: Float?, baseRate: Float, targetRate: Float): Float {
+        val current = (currentNudgeRate ?: baseRate).coerceIn(MIN_PLAYBACK_RATE, MAX_PLAYBACK_RATE)
+        val target = targetRate.coerceIn(MIN_PLAYBACK_RATE, MAX_PLAYBACK_RATE)
+        val next = when {
+            target > current -> minOf(target, current + MAX_NUDGE_RATE_STEP)
+            target < current -> maxOf(target, current - MAX_NUDGE_RATE_STEP)
+            else -> target
+        }
+        return next.coerceIn(MIN_PLAYBACK_RATE, MAX_PLAYBACK_RATE)
+    }
+
+    fun coordinatorId(party: ActiveParty): String {
         val online = party.presence.keys + party.memberId
         val host = party.hostMemberId
         if (host != null && host in online) return host
@@ -96,7 +147,7 @@ internal object PartySync {
         return when {
             previous.paused != next.paused -> if (next.paused) PartyAction.Paused else PartyAction.Resumed
             abs(previous.rate - next.rate) > 0.01f -> PartyAction.Speed
-            abs(next.positionMs - expectedPositionMs(previous, next.at)) > SEEK_NOTICE_MS -> PartyAction.Seeked
+            isSeekTransition(previous, next) -> PartyAction.Seeked
             else -> null
         }
     }

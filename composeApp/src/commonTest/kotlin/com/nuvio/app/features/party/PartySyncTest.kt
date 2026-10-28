@@ -71,8 +71,80 @@ class PartySyncTest {
     fun rateNudgeDeadbandAvoidsTinyAudioSpeedUpdates() {
         assertTrue(PartySync.shouldUpdateNudge(currentRate = null, targetRate = 1.01f))
         assertFalse(PartySync.shouldUpdateNudge(currentRate = 1.01f, targetRate = 1.0105f))
-        assertTrue(PartySync.shouldUpdateNudge(currentRate = 1.01f, targetRate = 1.012f))
+        assertTrue(PartySync.shouldUpdateNudge(currentRate = 1.01f, targetRate = 1.016f))
         assertFalse(PartySync.shouldUpdateNudge(currentRate = 1.01f, targetRate = 1.01f))
+    }
+
+    @Test
+    fun rateNudgesMoveInBoundedSteps() {
+        assertEquals(1.51f, PartySync.smoothNudge(null, 1.5f, 1.55f), 0.0001f)
+        assertEquals(1.50f, PartySync.smoothNudge(1.51f, 1.5f, 1.47f), 0.0001f)
+        assertEquals(1.55f, PartySync.smoothNudge(1.55f, 1.5f, 1.55f), 0.0001f)
+    }
+
+    @Test
+    fun stateUpdatesSeekOnlyForAnAuthoritativePositionJump() {
+        val previous = playback(seq = 1, positionMs = 10_000, at = 1_000_000)
+        val rateUpdate = playback(seq = 2, positionMs = 11_000, rate = 1.5f, at = 1_001_000)
+
+        assertFalse(PartySync.isSeekTransition(previous, rateUpdate))
+        assertFalse(
+            PartySync.shouldSeekForPlaybackUpdate(
+                previous = previous,
+                next = rateUpdate,
+                localPositionMs = 15_000,
+                expectedPositionMs = 11_000,
+                initialSync = false,
+                ownUpdate = false,
+            ),
+        )
+
+        val seek = playback(seq = 3, positionMs = 50_000, at = 1_002_000)
+        assertTrue(PartySync.isSeekTransition(rateUpdate, seek))
+        assertTrue(PartySync.shouldDeferSeek(rateUpdate, seek, seekInFlight = true))
+        assertFalse(PartySync.shouldDeferSeek(rateUpdate, seek, seekInFlight = false))
+        assertTrue(
+            PartySync.shouldSeekForPlaybackUpdate(
+                previous = rateUpdate,
+                next = seek,
+                localPositionMs = 11_500,
+                expectedPositionMs = 50_000,
+                initialSync = false,
+                ownUpdate = false,
+            ),
+        )
+    }
+
+    @Test
+    fun initialAlignmentSeeksButOwnStateDoesNotEchoASeek() {
+        val local = playback(seq = 2, positionMs = 30_000, at = 1_001_000)
+        assertTrue(
+            PartySync.shouldSeekForPlaybackUpdate(
+                previous = null,
+                next = local,
+                localPositionMs = 0,
+                expectedPositionMs = 30_000,
+                initialSync = true,
+                ownUpdate = false,
+            ),
+        )
+        assertFalse(
+            PartySync.shouldSeekForPlaybackUpdate(
+                previous = playback(seq = 1, positionMs = 10_000, at = 1_000_000),
+                next = local,
+                localPositionMs = 0,
+                expectedPositionMs = 30_000,
+                initialSync = false,
+                ownUpdate = true,
+            ),
+        )
+    }
+
+    @Test
+    fun staleTimelineAnchorCannotBeTreatedAsANewSeek() {
+        val previous = playback(seq = 4, positionMs = 10_000, at = 1_000_000)
+        val stale = playback(seq = 5, positionMs = 0, at = 999_000)
+        assertFalse(PartySync.isSeekTransition(previous, stale))
     }
 
     @Test
