@@ -97,17 +97,17 @@ import java.util.concurrent.atomic.AtomicBoolean
 private const val TAG = "NuvioPlayer"
 private const val PLAYER_DIAGNOSTIC_TAG = "NuvioPlayerDiag"
 private fun logPlayerDiagnosticInfo(message: String) {
-    logPlayerDiagnosticInfo(message)
+    Log.i(PLAYER_DIAGNOSTIC_TAG, message)
     InAppLogger.info(PLAYER_DIAGNOSTIC_TAG, message.replace(Regex("https?://[^\\s]+"), "[redacted-url]"))
 }
 
 private fun logPlayerDiagnosticWarn(message: String) {
-    logPlayerDiagnosticWarn(message)
+    Log.w(PLAYER_DIAGNOSTIC_TAG, message)
     InAppLogger.warn(PLAYER_DIAGNOSTIC_TAG, message.replace(Regex("https?://[^\\s]+"), "[redacted-url]"))
 }
 
 private fun logPlayerDiagnosticError(message: String, throwable: Throwable? = null) {
-    if (throwable == null) logPlayerDiagnosticError(message) else logPlayerDiagnosticError(message, throwable)
+    if (throwable == null) Log.e(PLAYER_DIAGNOSTIC_TAG, message) else Log.e(PLAYER_DIAGNOSTIC_TAG, message, throwable)
     InAppLogger.error(PLAYER_DIAGNOSTIC_TAG, message.replace(Regex("https?://[^\\s]+"), "[redacted-url]"))
 }
 
