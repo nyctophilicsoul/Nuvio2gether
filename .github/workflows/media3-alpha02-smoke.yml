@@ -47,4 +47,4 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
-          script: ./gradlew :androidApp:connectedFullDebugAndroidTest -Pnuvio.android.distribution=full -Pnuvio.ios.distribution=appstore --stacktrace
+          script: ./gradlew :androidApp:connectedFullDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.nuvio.android.Media3RuntimeCompatibilityTest -Pnuvio.android.distribution=full -Pnuvio.ios.distribution=appstore --stacktrace
