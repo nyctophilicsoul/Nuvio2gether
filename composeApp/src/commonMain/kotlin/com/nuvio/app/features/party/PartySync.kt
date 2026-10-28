@@ -21,6 +21,7 @@ internal object PartySync {
     const val PAUSED_TOLERANCE_MS = 500L
     const val MIN_NUDGE_FACTOR = 0.01f
     const val MAX_NUDGE_FACTOR = 0.05f
+    const val RATE_UPDATE_THRESHOLD = 0.001f
     const val MIN_PLAYBACK_RATE = 0.25f
     const val MAX_PLAYBACK_RATE = 4f
     const val SEEK_NOTICE_MS = 2_000L
@@ -72,6 +73,14 @@ internal object PartySync {
             else -> PartyCorrection.InSync
         }
     }
+
+    /**
+     * Avoid reconfiguring the audio time-stretch processor for imperceptibly small rate changes.
+     * Party snapshots arrive frequently; without a deadband, integer-position jitter changes the
+     * calculated Float rate on almost every correction tick.
+     */
+    fun shouldUpdateNudge(currentRate: Float?, targetRate: Float): Boolean =
+        currentRate == null || abs(currentRate - targetRate) >= RATE_UPDATE_THRESHOLD
 
     fun coordinatorId(party: ActiveParty): String? {
         val online = party.presence.keys + party.memberId
