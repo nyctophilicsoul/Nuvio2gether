@@ -2520,8 +2520,8 @@
     <string name="settings_advanced_section_debugging">DEBUGGING</string>
     <string name="settings_advanced_debugging_copy_logs">Copy Logs to Clipboard</string>
     <string name="settings_advanced_debugging_copy_logs_description">Copy %1$d in-app log lines</string>
-    <string name="settings_advanced_debugging_export_logs">Save Logs to Downloads</string>
-    <string name="settings_advanced_debugging_export_logs_description">Save %1$d filtered log lines as a text file</string>
+    <string name="settings_advanced_debugging_export_logs">Export Logs to Downloads</string>
+    <string name="settings_advanced_debugging_export_logs_description">Export %1$d filtered log lines as a text file</string>
     <string name="settings_advanced_debugging_clear_logs">Clear Logs</string>
     <string name="settings_advanced_debugging_clear_logs_description">Clear the in-memory debug log buffer</string>
     <string name="settings_advanced_debugging_empty">No logs captured yet.</string>
