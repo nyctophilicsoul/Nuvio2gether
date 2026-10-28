@@ -600,7 +600,7 @@ private fun ExoPlayerSurface(
         Log.d(TAG, "$reason: preserving audio track index=${selection.index} id=${selection.id}")
     }
 
-    DisposableEffect(exoPlayer) {
+    DisposableEffect(exoPlayer, playerSourceKey, externalSubtitles) {
         PlayerPictureInPictureManager.registerPausePlaybackCallback {
             exoPlayer.pause()
         }
