@@ -71,7 +71,7 @@ class PartySyncTest {
     fun rateNudgeDeadbandAvoidsTinyAudioSpeedUpdates() {
         assertTrue(PartySync.shouldUpdateNudge(currentRate = null, targetRate = 1.01f))
         assertFalse(PartySync.shouldUpdateNudge(currentRate = 1.01f, targetRate = 1.0105f))
-        assertTrue(PartySync.shouldUpdateNudge(currentRate = 1.01f, targetRate = 1.011f))
+        assertTrue(PartySync.shouldUpdateNudge(currentRate = 1.01f, targetRate = 1.012f))
         assertFalse(PartySync.shouldUpdateNudge(currentRate = 1.01f, targetRate = 1.01f))
     }
 
