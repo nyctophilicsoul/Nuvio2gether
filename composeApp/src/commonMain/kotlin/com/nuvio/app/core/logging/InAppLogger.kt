@@ -164,7 +164,7 @@ object InAppLogger {
         val root = tag.substringBefore('/').substringBefore(':').trim()
         val normalized = root.lowercase()
         return when (normalized) {
-            "mpv", "exoplayer", "player", "p2p", "pip" -> "Player"
+            "mpv", "exoplayer", "player", "p2p", "pip", "nuvioplayerdiag", "partysync" -> "Player"
             "streams", "stream", "debrid" -> "Streams"
             "addons", "addon" -> "Addon"
             "plugins", "plugin", "pluginruntime" -> "Plugin"
