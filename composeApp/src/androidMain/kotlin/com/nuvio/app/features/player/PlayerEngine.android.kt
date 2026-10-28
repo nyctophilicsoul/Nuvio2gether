@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import com.nuvio.app.features.streams.redactedForLogs
 import com.nuvio.app.core.logging.InAppLogger
+import com.nuvio.app.core.logging.InAppLogLevel
 import kotlinx.coroutines.runBlocking
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
@@ -38,6 +39,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.C
 import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -775,6 +777,92 @@ private fun ExoPlayerSurface(
         }
         exoPlayer.addListener(listener)
         val audioDiagnosticsListener = object : AnalyticsListener {
+            override fun onAudioDecoderInitialized(
+                eventTime: AnalyticsListener.EventTime,
+                decoderName: String,
+                initializedTimestampMs: Long,
+                initializationDurationMs: Long,
+            ) {
+                logPlayerDiagnosticInfo(
+                    "AUDIO_DECODER_INITIALIZED decoder=$decoderName " +
+                        "initDurationMs=$initializationDurationMs " +
+                        "attempt=${playbackDiagnostics.attempt} " +
+                        "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)}",
+                )
+            }
+
+            override fun onAudioDecoderReleased(
+                eventTime: AnalyticsListener.EventTime,
+                decoderName: String,
+            ) {
+                logPlayerDiagnosticInfo(
+                    "AUDIO_DECODER_RELEASED decoder=$decoderName " +
+                        "attempt=${playbackDiagnostics.attempt} " +
+                        "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)}",
+                )
+            }
+
+            override fun onAudioInputFormatChanged(
+                eventTime: AnalyticsListener.EventTime,
+                format: Format,
+                decoderReuseEvaluation: androidx.media3.exoplayer.DecoderReuseEvaluation?,
+            ) {
+                logPlayerDiagnosticInfo(
+                    "AUDIO_INPUT_FORMAT_CHANGED mime=${format.sampleMimeType} " +
+                        "sampleRate=${format.sampleRate}Hz channels=${format.channelCount} " +
+                        "bitrate=${format.bitrate} decoderReuse=${decoderReuseEvaluation?.result ?: "unknown"} " +
+                        "attempt=${playbackDiagnostics.attempt} " +
+                        "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)}",
+                )
+            }
+
+            override fun onAudioPositionAdvancing(
+                eventTime: AnalyticsListener.EventTime,
+                playoutStartSystemTimeMs: Long,
+            ) {
+                logPlayerDiagnosticInfo(
+                    "AUDIO_POSITION_ADVANCING playoutStartSystemTimeMs=$playoutStartSystemTimeMs " +
+                        "attempt=${playbackDiagnostics.attempt} " +
+                        "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)} " +
+                        "positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)}",
+                )
+            }
+
+            override fun onAudioTrackInitialized(
+                eventTime: AnalyticsListener.EventTime,
+                audioTrackConfig: AudioSink.AudioTrackConfig,
+            ) {
+                logPlayerDiagnosticInfo(
+                    "AUDIO_TRACK_INITIALIZED config=$audioTrackConfig " +
+                        "attempt=${playbackDiagnostics.attempt} " +
+                        "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)}",
+                )
+            }
+
+            override fun onAudioTrackReleased(
+                eventTime: AnalyticsListener.EventTime,
+                audioTrackConfig: AudioSink.AudioTrackConfig,
+            ) {
+                logPlayerDiagnosticInfo(
+                    "AUDIO_TRACK_RELEASED config=$audioTrackConfig " +
+                        "attempt=${playbackDiagnostics.attempt} " +
+                        "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)}",
+                )
+            }
+
+            override fun onAudioCodecError(
+                eventTime: AnalyticsListener.EventTime,
+                audioCodecError: Exception,
+            ) {
+                logPlayerDiagnosticError(
+                    "AUDIO_CODEC_ERROR attempt=${playbackDiagnostics.attempt} " +
+                        "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)} " +
+                        "positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)} " +
+                        "error=${diagnosticThrowableChain(audioCodecError)}",
+                    audioCodecError,
+                )
+            }
+
             override fun onAudioUnderrun(
                 eventTime: AnalyticsListener.EventTime,
                 bufferSize: Int,
@@ -1336,9 +1424,29 @@ private fun LibmpvPlayerSurface(
         }
         val logObserver = object : MPV.LogObserver {
             override fun logMessage(prefix: String, level: Int, text: String) {
-                logPlayerDiagnosticWarn("mpv_log level=$level prefix=${diagnosticPlayerMessage(prefix)} " +
-                        "message=${diagnosticPlayerMessage(text)}",
-                )
+                val safePrefix = diagnosticPlayerMessage(prefix)
+                val safeMessage = diagnosticPlayerMessage(text)
+                val message = "mpv_log level=$level prefix=$safePrefix message=$safeMessage"
+                when {
+                    level <= 20 -> logPlayerDiagnosticError(message)
+                    level <= 30 -> logPlayerDiagnosticWarn(message)
+                    level <= 40 -> logPlayerDiagnosticInfo(message)
+                    Regex("(?i)audio|audiotrack|ao_|decoder|resampl|underrun|buffer|device").containsMatchIn(
+                        "$safePrefix $safeMessage",
+                    ) -> {
+                        // Keep audio-related verbose MPV output available in the in-app
+                        // export without allowing unrelated trace/debug noise to evict
+                        // the actual player transition and underrun records.
+                        Log.d(PLAYER_DIAGNOSTIC_TAG, message)
+                        InAppLogger.logMpv(
+                            platform = "Android",
+                            prefix = safePrefix,
+                            level = "debug",
+                            message = "level=$level $safeMessage",
+                        )
+                    }
+                    else -> Unit
+                }
             }
         }
         view.mpv.addObserver(observer)
