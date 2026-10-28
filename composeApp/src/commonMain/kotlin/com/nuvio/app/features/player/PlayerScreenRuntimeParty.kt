@@ -61,6 +61,7 @@ import com.nuvio.app.features.party.PartySource
 import com.nuvio.app.features.party.PartyStream
 import com.nuvio.app.features.party.isShareableStreamUrl
 import com.nuvio.app.features.party.PartySync
+import com.nuvio.app.core.logging.InAppLogger
 import com.nuvio.app.features.party.UnreadBadge
 import com.nuvio.app.features.party.messageRes
 import com.nuvio.app.features.party.partyMediaKey
@@ -543,6 +544,10 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
                         measureSeekLead = !playback.paused
                     }
                     if (abs(snapshot.playbackSpeed - playback.rate) > 0.01f) {
+                        InAppLogger.info(
+                            "PartySync",
+                            "Applying shared rate=${playback.rate} localRate=${snapshot.playbackSpeed} sequence=${playback.seq}",
+                        )
                         controller.setPlaybackSpeed(playback.rate)
                     }
                     mismatchSince = null
@@ -591,6 +596,11 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
                 when (val correction = PartySync.correction(snapshot.positionMs, expected, playback, partyRateNudge != null)) {
                     is PartyCorrection.Seek -> {
                         partyLog.i { "Seeking $drift ms back into sync with ${seekLeadMs} ms lead" }
+                        InAppLogger.info(
+                            "PartySync",
+                            "Seek driftMs=$drift actualMs=${snapshot.positionMs} expectedMs=$expected " +
+                                "leadMs=$seekLeadMs paused=${playback.paused}",
+                        )
                         clearPartyNudge(playback)
                         val target = if (playback.paused) correction.positionMs else correction.positionMs + seekLeadMs
                         controller.seekTo(if (snapshot.durationMs > 0L) target.coerceAtMost(snapshot.durationMs) else target)
@@ -600,6 +610,10 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
                     is PartyCorrection.Nudge -> {
                         if (partyRateNudge != correction.rate) {
                             partyLog.i { "Nudging speed to ${correction.rate} for ${snapshot.positionMs - expected} ms drift" }
+                            InAppLogger.info(
+                                "PartySync",
+                                "Rate nudge=${correction.rate} baseRate=${playback.rate} driftMs=${snapshot.positionMs - expected}",
+                            )
                             partyRateNudge = correction.rate
                             controller.setPlaybackSpeed(correction.rate)
                         }
@@ -628,9 +642,11 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
 }
 
 private fun PlayerScreenRuntime.clearPartyNudge(playback: PartyPlayback? = PartyRepository.playback.value) {
-    if (partyRateNudge == null) return
+    val previousNudge = partyRateNudge ?: return
+    val baseRate = playback?.rate ?: 1f
     partyRateNudge = null
-    playerController?.setPlaybackSpeed(playback?.rate ?: 1f)
+    InAppLogger.info("PartySync", "Clearing rate nudge=$previousNudge restoringRate=$baseRate")
+    playerController?.setPlaybackSpeed(baseRate)
 }
 
 @Composable
