@@ -68,6 +68,14 @@ class PartySyncTest {
     }
 
     @Test
+    fun rateNudgeDeadbandAvoidsTinyAudioSpeedUpdates() {
+        assertTrue(PartySync.shouldUpdateNudge(currentRate = null, targetRate = 1.01f))
+        assertFalse(PartySync.shouldUpdateNudge(currentRate = 1.01f, targetRate = 1.0105f))
+        assertTrue(PartySync.shouldUpdateNudge(currentRate = 1.01f, targetRate = 1.011f))
+        assertFalse(PartySync.shouldUpdateNudge(currentRate = 1.01f, targetRate = 1.01f))
+    }
+
+    @Test
     fun smallDriftIsLeftAlone() {
         val result = PartySync.correction(10_200, 10_000, playback(), nudging = false)
         assertEquals(PartyCorrection.InSync, result)
