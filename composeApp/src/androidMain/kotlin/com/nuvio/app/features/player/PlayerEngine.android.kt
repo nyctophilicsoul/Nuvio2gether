@@ -36,6 +36,7 @@ import org.jetbrains.compose.resources.getString
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.C
+import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -706,7 +707,36 @@ private fun ExoPlayerSurface(
             }
 
             override fun onPlaybackParametersChanged(playbackParameters: androidx.media3.common.PlaybackParameters) {
+                Log.i(
+                    PLAYER_DIAGNOSTIC_TAG,
+                    "PLAYBACK_PARAMETERS attempt=${playbackDiagnostics.attempt} " +
+                        "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)} " +
+                        "positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)} " +
+                        "speed=${playbackParameters.speed} pitch=${playbackParameters.pitch}",
+                )
                 dispatchExoPlayerSnapshot()
+            }
+
+            override fun onPositionDiscontinuity(
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int,
+            ) {
+                val reasonName = when (reason) {
+                    Player.DISCONTINUITY_REASON_AUTO_TRANSITION -> "AUTO_TRANSITION"
+                    Player.DISCONTINUITY_REASON_SEEK -> "SEEK"
+                    Player.DISCONTINUITY_REASON_SEEK_ADJUSTMENT -> "SEEK_ADJUSTMENT"
+                    Player.DISCONTINUITY_REASON_SKIP -> "SKIP"
+                    Player.DISCONTINUITY_REASON_REMOVE -> "REMOVE"
+                    else -> "OTHER($reason)"
+                }
+                Log.i(
+                    PLAYER_DIAGNOSTIC_TAG,
+                    "POSITION_DISCONTINUITY reason=$reasonName attempt=${playbackDiagnostics.attempt} " +
+                        "oldMs=${oldPosition.positionMs} newMs=${newPosition.positionMs} " +
+                        "speed=${exoPlayer.playbackParameters.speed} " +
+                        "audioFormat=${exoPlayer.audioFormat?.let { "${it.sampleMimeType}/${it.sampleRate}Hz/${it.channelCount}ch" } ?: "unknown"}",
+                )
             }
 
             override fun onVideoSizeChanged(videoSize: VideoSize) {
@@ -742,7 +772,43 @@ private fun ExoPlayerSurface(
 
         }
         exoPlayer.addListener(listener)
+        val audioDiagnosticsListener = object : AnalyticsListener {
+            override fun onAudioUnderrun(
+                eventTime: AnalyticsListener.EventTime,
+                bufferSize: Int,
+                bufferSizeMs: Long,
+                elapsedSinceLastFeedMs: Long,
+            ) {
+                Log.w(
+                    PLAYER_DIAGNOSTIC_TAG,
+                    "AUDIO_UNDERRUN attempt=${playbackDiagnostics.attempt} " +
+                        "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)} " +
+                        "positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)} " +
+                        "bufferSizeBytes=$bufferSize bufferSizeMs=$bufferSizeMs " +
+                        "elapsedSinceLastFeedMs=$elapsedSinceLastFeedMs " +
+                        "speed=${exoPlayer.playbackParameters.speed} " +
+                        "audioFormat=${exoPlayer.audioFormat?.let { "${it.sampleMimeType}/${it.sampleRate}Hz/${it.channelCount}ch" } ?: "unknown"}",
+                )
+            }
+
+            override fun onAudioSinkError(
+                eventTime: AnalyticsListener.EventTime,
+                audioSinkError: Exception,
+            ) {
+                Log.e(
+                    PLAYER_DIAGNOSTIC_TAG,
+                    "AUDIO_SINK_ERROR attempt=${playbackDiagnostics.attempt} " +
+                        "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)} " +
+                        "positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)} " +
+                        "speed=${exoPlayer.playbackParameters.speed} " +
+                        "error=${diagnosticThrowableChain(audioSinkError)}",
+                    audioSinkError,
+                )
+            }
+        }
+        exoPlayer.addAnalyticsListener(audioDiagnosticsListener)
         onDispose {
+            exoPlayer.removeAnalyticsListener(audioDiagnosticsListener)
             PlayerPictureInPictureManager.registerPausePlaybackCallback(null)
             PlayerPictureInPictureManager.registerTogglePlaybackCallback(null)
             exoPlayer.removeListener(listener)
