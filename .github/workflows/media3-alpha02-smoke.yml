@@ -15,7 +15,11 @@ concurrency:
 jobs:
   runtime-smoke:
     name: Build APK and verify Media3 runtime classes
-    runs-on: ubuntu-latest
+    # The Linux hosted runner has no KVM acceleration; the emulator repeatedly
+    # failed ADB commands during boot before Gradle ever started. Use macOS
+    # virtualization for a stable instrumented-test environment.
+    runs-on: macos-15
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -35,7 +39,7 @@ jobs:
         run: |
           if [ -n "$LOCAL_PROPERTIES_BASE64" ]; then
             printf '%s' "$LOCAL_PROPERTIES_BASE64" | base64 --decode > local.properties
-            sed -i -E '/^[[:space:]]*(sdk\.dir|NUVIO_RELEASE_STORE_FILE)[[:space:]]*=/d' local.properties
+            sed -i '' -E '/^[[:space:]]*(sdk\.dir|NUVIO_RELEASE_STORE_FILE)[[:space:]]*=/d' local.properties
           else
             touch local.properties
           fi
@@ -47,4 +51,5 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
+          emulator-boot-timeout: 600
           script: ./gradlew :androidApp:connectedFullDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.nuvio.android.Media3RuntimeCompatibilityTest -Pnuvio.android.distribution=full -Pnuvio.ios.distribution=appstore --stacktrace
