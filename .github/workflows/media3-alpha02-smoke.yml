@@ -27,9 +27,9 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
+      # GitHub's Ubuntu runner already includes Android SDK packages. Avoid
+      # setup-android's attempted installation of the obsolete "tools" package,
+      # which failed before Gradle ran in the previous attempt.
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
@@ -53,7 +53,7 @@ jobs:
             -Pnuvio.ios.distribution=appstore \
             --stacktrace
 
-      - name: Verify APK outputs and Media3 runtime class references
+      - name: Verify APK outputs
         shell: bash
         run: |
           set -euo pipefail
@@ -63,9 +63,7 @@ jobs:
           test -n "$TEST_APK" || { echo "Android instrumentation test APK was not produced"; exit 1; }
           echo "App APK: $APP_APK"
           echo "Test APK: $TEST_APK"
-          echo "App APK contents:"
           unzip -l "$APP_APK" | grep -E 'classes[0-9]*\.dex$'
-          echo "Test APK contents:"
           unzip -l "$TEST_APK" | grep -E 'classes[0-9]*\.dex$'
 
       - name: Upload APK artifacts
