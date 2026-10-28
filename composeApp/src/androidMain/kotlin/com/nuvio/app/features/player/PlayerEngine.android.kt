@@ -533,7 +533,13 @@ private fun ExoPlayerSurface(
         )
     }
 
+    fun isCurrentExoPlayerSource(): Boolean =
+        exoPlayer.currentMediaItem?.mediaId == sourceUrl
+
     fun dispatchExoPlayerSnapshot() {
+        // The ExoPlayer instance is shared across source switches. Do not publish a queued
+        // snapshot from the previous media item under the new playback identity.
+        if (!isCurrentExoPlayerSource()) return
         val snapshot = exoPlayer.snapshot()
         latestOnSnapshot.value(snapshot)
         nowPlayingController.syncPlayback(snapshot)
@@ -766,6 +772,7 @@ private fun ExoPlayerSurface(
             }
 
             override fun onVideoSizeChanged(videoSize: VideoSize) {
+                if (!isCurrentExoPlayerSource()) return
                 latestOnSnapshot.value(exoPlayer.snapshot())
                 if (videoSize.width > 0 && videoSize.height > 0) {
                     videoAspectRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
