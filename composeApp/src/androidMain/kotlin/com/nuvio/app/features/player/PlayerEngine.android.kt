@@ -1460,11 +1460,12 @@ private fun LibmpvPlayerSurface(
                         // export without allowing unrelated trace/debug noise to evict
                         // the actual player transition and underrun records.
                         Log.d(PLAYER_DIAGNOSTIC_TAG, message)
+                        val redactedMessage = safeMessage.replace(Regex("https?://[^\\s]+"), "[redacted-url]")
                         InAppLogger.logMpv(
                             platform = "Android",
                             prefix = safePrefix,
                             level = "debug",
-                            message = "level=$level $safeMessage",
+                            message = "level=$level $redactedMessage",
                         )
                     }
                     else -> Unit
