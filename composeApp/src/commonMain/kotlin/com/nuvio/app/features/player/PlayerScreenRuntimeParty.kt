@@ -431,8 +431,10 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
         var bufferingSince: TimeMark? = null
         var mismatchSince: TimeMark? = null
         var lastSeek: TimeMark? = null
+        var lastSeekTargetMs: Long? = null
         var lastCorrection: TimeMark? = null
         var lastSeq: Pair<Long, String?>? = null
+        var lastAppliedPlayback: PartyPlayback? = null
         var lastStatus: Triple<PartyMemberStatus, String, Long?>? = null
         var wasInBackground = false
         var publishedInitial = false
@@ -448,7 +450,10 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
                     (playerController as? PlayerSystemControlSource)?.keepsPlaybackInBackground != true
                 val resumedFromBackground = wasInBackground && !partyAppInBackground
                 wasInBackground = partyAppInBackground
-                if (resumedFromBackground) lastSeq = null
+                if (resumedFromBackground) {
+                    lastSeq = null
+                    lastAppliedPlayback = null
+                }
                 val behindGap = PartyRepository.playback.value
                     ?.takeIf { partyBehind && party.media.key == partyKey }
                     ?.let { PartySync.expectedPositionMs(it, PartyRepository.nowMs(), snapshot.durationMs) - currentPlaybackPositionMs() }
@@ -516,6 +521,7 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
                 if (wasBehind) {
                     wasBehind = false
                     lastSeq = null
+                    lastAppliedPlayback = null
                     partyBehindMs = null
                     if (!party.canControl) showGestureMessage(getString(Res.string.party_caught_up))
                 }
@@ -529,17 +535,60 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
                 }
     
                 val identity = playback.seq to playback.memberId
+                val seekElapsed = lastSeek?.elapsedNow()
+                val previousSeekTarget = lastSeekTargetMs
+                // Like the older merge-watchparty session, wait for the player to settle,
+                // not just for a fixed timer. A newer host seek remains pending in PartyRepository
+                // and will be applied as soon as this seek finishes.
+                val seekRecovering = seekElapsed != null &&
+                    seekElapsed <= SEEK_SETTLE &&
+                    (seekElapsed < SEEK_MIN_SETTLE ||
+                        snapshot.isLoading ||
+                        (shouldPlay && previousSeekTarget != null &&
+                            abs(snapshot.positionMs - previousSeekTarget) > SEEK_SETTLE_TOLERANCE_MS))
+                if (
+                    identity != lastSeq &&
+                    PartySync.shouldDeferSeek(lastAppliedPlayback, playback, seekRecovering)
+                ) {
+                    // A newer host seek supersedes the seek already in flight. Leave this state
+                    // unapplied so the latest target is coalesced and applied after settling.
+                    mismatchSince = null
+                    continue
+                }
+
                 if (identity != lastSeq) {
                     val forced = lastSeq == null
+                    val previousAppliedPlayback = lastAppliedPlayback
                     lastSeq = identity
-                    // A host seek/pause/resume/speed change supersedes any temporary drift nudge.
+                    lastAppliedPlayback = playback
+                    // A newer state supersedes the old rate correction. Seek only when its
+                    // timeline actually jumped, not merely because pause/rate state changed.
                     clearPartyNudge(playback)
                     applyPartyPaused(playback.paused, force = forced)
                     val own = playback.memberId == party.memberId && !forced
-                    val needsSeek = (!own || playback.paused) &&
-                        abs(snapshot.positionMs - expected) > PartySync.PAUSED_TOLERANCE_MS
+                    val needsSeek = PartySync.shouldSeekForPlaybackUpdate(
+                        previous = previousAppliedPlayback,
+                        next = playback,
+                        localPositionMs = snapshot.positionMs,
+                        expectedPositionMs = expected,
+                        initialSync = forced,
+                        ownUpdate = own,
+                    )
                     if (needsSeek) {
-                        controller.seekTo(if (playback.paused) expected else expected + seekLeadMs)
+                        InAppLogger.info(
+                            "PartySync",
+                            "Applying authoritative seek seq=${playback.seq} member=${playback.memberId} " +
+                                "initial=$forced localMs=${snapshot.positionMs} expectedMs=$expected " +
+                                "leadMs=$seekLeadMs paused=${playback.paused}",
+                        )
+                        val target = if (playback.paused) expected else expected + seekLeadMs
+                        val seekTarget = if (snapshot.durationMs > 0L) {
+                            target.coerceIn(0L, snapshot.durationMs)
+                        } else {
+                            target.coerceAtLeast(0L)
+                        }
+                        controller.seekTo(seekTarget)
+                        lastSeekTargetMs = seekTarget
                         lastSeek = clock.markNow()
                         measureSeekLead = !playback.paused
                     }
@@ -560,6 +609,13 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
                     continue
                 }
     
+                // A seek may briefly stop rendering without changing the party's play intent.
+                // Don't interpret that temporary mismatch as the guest choosing independent playback.
+                if (seekRecovering) {
+                    mismatchSince = null
+                    continue
+                }
+
                 if (snapshot.isPlaying != shouldPlay) {
                     val since = mismatchSince ?: clock.markNow().also { mismatchSince = it }
                     if (since.elapsedNow() > OUTSIDE_TOGGLE_DELAY) {
@@ -575,8 +631,10 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
                             }
                             snapshot.isPlaying -> applyPartyPaused(playback.paused, force = true)
                             else -> {
-                                partyBehind = true
-                                shouldPlay = false
+                                // Explicit guest opt-out is handled by toggleOwnPlayback().
+                                // A transient renderer/seek stall must not detach the guest and
+                                // suppress the very corrections needed to catch back up.
+                                applyPartyPaused(playback.paused, force = true)
                             }
                         }
                     }
@@ -603,19 +661,34 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
                         )
                         clearPartyNudge(playback)
                         val target = if (playback.paused) correction.positionMs else correction.positionMs + seekLeadMs
-                        controller.seekTo(if (snapshot.durationMs > 0L) target.coerceAtMost(snapshot.durationMs) else target)
+                        val seekTarget = if (snapshot.durationMs > 0L) {
+                            target.coerceAtMost(snapshot.durationMs)
+                        } else {
+                            target.coerceAtLeast(0L)
+                        }
+                        controller.seekTo(seekTarget)
+                        lastSeekTargetMs = seekTarget
                         lastSeek = clock.markNow()
                         measureSeekLead = !playback.paused
                     }
                     is PartyCorrection.Nudge -> {
-                        if (PartySync.shouldUpdateNudge(partyRateNudge, correction.rate)) {
-                            partyLog.i { "Nudging speed to ${correction.rate} for ${snapshot.positionMs - expected} ms drift" }
+                        val smoothedRate = PartySync.smoothNudge(
+                            currentNudgeRate = partyRateNudge,
+                            baseRate = playback.rate,
+                            targetRate = correction.rate,
+                        )
+                        if (PartySync.shouldUpdateNudge(partyRateNudge, smoothedRate)) {
+                            if (partyRateNudge == null) {
+                                partyRateNudgeBaseRate = playback.rate
+                            }
+                            partyLog.i { "Nudging speed to $smoothedRate (target=${correction.rate}) for ${snapshot.positionMs - expected} ms drift" }
                             InAppLogger.info(
                                 "PartySync",
-                                "Rate nudge=${correction.rate} baseRate=${playback.rate} driftMs=${snapshot.positionMs - expected}",
+                                "Rate nudge=$smoothedRate target=${correction.rate} baseRate=${playback.rate} " +
+                                    "driftMs=${snapshot.positionMs - expected}",
                             )
-                            partyRateNudge = correction.rate
-                            controller.setPlaybackSpeed(correction.rate)
+                            partyRateNudge = smoothedRate
+                            controller.setPlaybackSpeed(smoothedRate)
                         }
                     }
                     PartyCorrection.InSync -> clearPartyNudge(playback)
@@ -643,8 +716,9 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
 
 private fun PlayerScreenRuntime.clearPartyNudge(playback: PartyPlayback? = PartyRepository.playback.value) {
     val previousNudge = partyRateNudge ?: return
-    val baseRate = playback?.rate ?: 1f
+    val baseRate = PartySync.nudgeRestorationRate(playback?.rate, partyRateNudgeBaseRate)
     partyRateNudge = null
+    partyRateNudgeBaseRate = null
     InAppLogger.info("PartySync", "Clearing rate nudge=$previousNudge restoringRate=$baseRate")
     playerController?.setPlaybackSpeed(baseRate)
 }
@@ -806,7 +880,9 @@ private val NOTICE_DURATION = 3_000.milliseconds
 private val BUFFERING_REPORT_DELAY = 1_000.milliseconds
 private val OUTSIDE_TOGGLE_DELAY = 1_200.milliseconds
 private val SEEK_SETTLE = 2_500.milliseconds
-private val CORRECTION_INTERVAL = 500.milliseconds
+private val SEEK_MIN_SETTLE = 500.milliseconds
+private const val SEEK_SETTLE_TOLERANCE_MS = 500L
+private val CORRECTION_INTERVAL = 1_000.milliseconds
 private const val MAX_SEEK_LEAD_MS = 3_000L
 private const val BEHIND_DISPLAY_STEP_MS = 1_000L
 private const val DESCRIPTION_LIMIT = 600
