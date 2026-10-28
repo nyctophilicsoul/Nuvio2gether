@@ -545,7 +545,7 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
                     (seekElapsed < SEEK_MIN_SETTLE ||
                         snapshot.isLoading ||
                         (shouldPlay && previousSeekTarget != null &&
-                            snapshot.positionMs < previousSeekTarget + SEEK_SETTLE_ADVANCE_MS))
+                            abs(snapshot.positionMs - previousSeekTarget) > SEEK_SETTLE_TOLERANCE_MS))
                 if (
                     identity != lastSeq &&
                     PartySync.shouldDeferSeek(lastAppliedPlayback, playback, seekRecovering)
@@ -877,7 +877,7 @@ private val BUFFERING_REPORT_DELAY = 1_000.milliseconds
 private val OUTSIDE_TOGGLE_DELAY = 1_200.milliseconds
 private val SEEK_SETTLE = 2_500.milliseconds
 private val SEEK_MIN_SETTLE = 500.milliseconds
-private const val SEEK_SETTLE_ADVANCE_MS = 200L
+private const val SEEK_SETTLE_TOLERANCE_MS = 500L
 private val CORRECTION_INTERVAL = 500.milliseconds
 private const val MAX_SEEK_LEAD_MS = 3_000L
 private const val BEHIND_DISPLAY_STEP_MS = 1_000L
