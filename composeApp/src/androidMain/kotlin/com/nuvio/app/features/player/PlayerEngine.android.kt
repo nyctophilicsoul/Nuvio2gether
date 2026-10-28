@@ -370,32 +370,34 @@ private fun ExoPlayerSurface(
     }
 
     fun ExoPlayer.setPlaybackMediaItem(videoMediaItem: MediaItem, startPositionMs: Long? = null) {
-        if (!sourceAudioUrl.isNullOrBlank()) {
-            val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
+        // Build each source with the current stream's factory. The ExoPlayer itself is kept
+        // alive across ordinary source switches so a compatible audio output can be reused.
+        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
+        val mediaSource = if (!sourceAudioUrl.isNullOrBlank()) {
             val videoSource = mediaSourceFactory.createMediaSource(videoMediaItem)
             val audioSource = mediaSourceFactory.createMediaSource(playbackMediaItemFromUrl(sourceAudioUrl))
-            val mergedSource = MergingMediaSource(videoSource, audioSource)
-            if (startPositionMs != null) {
-                setMediaSource(mergedSource, startPositionMs.coerceAtLeast(0L))
-            } else {
-                setMediaSource(mergedSource)
-            }
-        } else if (startPositionMs != null) {
-            setMediaItem(videoMediaItem, startPositionMs.coerceAtLeast(0L))
+            MergingMediaSource(videoSource, audioSource)
         } else {
-            setMediaItem(videoMediaItem)
+            mediaSourceFactory.createMediaSource(videoMediaItem)
+        }
+        if (startPositionMs != null) {
+            setMediaSource(mediaSource, startPositionMs.coerceAtLeast(0L))
+        } else {
+            setMediaSource(mediaSource)
         }
     }
 
     val exoPlayer = remember(
-        sourceUrl,
-        sourceAudioUrl,
-        sanitizedSourceHeaders,
-        sanitizedSourceResponseHeaders,
-        normalizedStreamType,
-        useYoutubeChunkedPlayback,
+        // Stream URLs, per-stream headers, extractors and cache wrappers are handled by the
+        // per-source MediaSource built below. Do not recreate ExoPlayer/AudioTrack just because
+        // a user switches streams.
+        context,
         effectiveDecoderPriority,
-        initialPositionRequestKey,
+        useLibass,
+        libassRenderType,
+        playerSettings.libassRenderScale,
+        playerSettings.mapDV7ToHevc,
+        playerSettings.tunnelingEnabled,
         playerSettings.exoNativeMemoryEnabled,
         playerSettings.bufferEngineEnabled,
         playerSettings.minBufferMs,
@@ -532,7 +534,7 @@ private fun ExoPlayerSurface(
         onDispose { nowPlayingController.release() }
     }
 
-    LaunchedEffect(exoPlayer, resolvedMediaItem, initialPositionRequestKey) {
+    LaunchedEffect(exoPlayer, resolvedMediaItem, initialPositionRequestKey, dataSourceFactory, extractorsFactory, sourceAudioUrl) {
         val mediaItem = resolvedMediaItem
         val requestedStartPositionMs = fallbackStartPositionMs
             ?: initialPositionMs?.takeIf { it > 0L }
@@ -961,7 +963,7 @@ private fun ExoPlayerSurface(
         dispatchExoPlayerSnapshot()
     }
 
-    LaunchedEffect(exoPlayer) {
+    LaunchedEffect(exoPlayer, autoSyncCoordinator, playerSourceKey, dataSourceFactory, extractorsFactory, sourceAudioUrl, externalSubtitles) {
         onControllerReady(
             autoSyncCoordinator.wrap(object : PlayerEngineController { // AutoSync hook
                 override val playbackEngine = AndroidPlaybackEngine.ExoPlayer
