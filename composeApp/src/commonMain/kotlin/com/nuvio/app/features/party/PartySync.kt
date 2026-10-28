@@ -133,7 +133,7 @@ internal object PartySync {
         return next.coerceIn(MIN_PLAYBACK_RATE, MAX_PLAYBACK_RATE)
     }
 
-    fun coordinatorId(party: ActiveParty): String {
+    fun coordinatorId(party: ActiveParty): String? {
         val online = party.presence.keys + party.memberId
         val host = party.hostMemberId
         if (host != null && host in online) return host

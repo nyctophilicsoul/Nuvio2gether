@@ -431,6 +431,7 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
         var bufferingSince: TimeMark? = null
         var mismatchSince: TimeMark? = null
         var lastSeek: TimeMark? = null
+        var lastSeekTargetMs: Long? = null
         var lastCorrection: TimeMark? = null
         var lastSeq: Pair<Long, String?>? = null
         var lastAppliedPlayback: PartyPlayback? = null
@@ -534,7 +535,17 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
                 }
     
                 val identity = playback.seq to playback.memberId
-                val seekRecovering = lastSeek?.let { it.elapsedNow() <= SEEK_SETTLE } == true
+                val seekElapsed = lastSeek?.elapsedNow()
+                val previousSeekTarget = lastSeekTargetMs
+                // Like the older merge-watchparty session, wait for the player to settle,
+                // not just for a fixed timer. A newer host seek remains pending in PartyRepository
+                // and will be applied as soon as this seek finishes.
+                val seekRecovering = seekElapsed != null &&
+                    seekElapsed <= SEEK_SETTLE &&
+                    (seekElapsed < SEEK_MIN_SETTLE ||
+                        snapshot.isLoading ||
+                        (shouldPlay && previousSeekTarget != null &&
+                            snapshot.positionMs < previousSeekTarget + SEEK_SETTLE_ADVANCE_MS))
                 if (
                     identity != lastSeq &&
                     PartySync.shouldDeferSeek(lastAppliedPlayback, playback, seekRecovering)
@@ -571,9 +582,13 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
                                 "leadMs=$seekLeadMs paused=${playback.paused}",
                         )
                         val target = if (playback.paused) expected else expected + seekLeadMs
-                        controller.seekTo(
-                            if (snapshot.durationMs > 0L) target.coerceIn(0L, snapshot.durationMs) else target.coerceAtLeast(0L),
-                        )
+                        val seekTarget = if (snapshot.durationMs > 0L) {
+                            target.coerceIn(0L, snapshot.durationMs)
+                        } else {
+                            target.coerceAtLeast(0L)
+                        }
+                        controller.seekTo(seekTarget)
+                        lastSeekTargetMs = seekTarget
                         lastSeek = clock.markNow()
                         measureSeekLead = !playback.paused
                     }
@@ -646,7 +661,13 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
                         )
                         clearPartyNudge(playback)
                         val target = if (playback.paused) correction.positionMs else correction.positionMs + seekLeadMs
-                        controller.seekTo(if (snapshot.durationMs > 0L) target.coerceAtMost(snapshot.durationMs) else target)
+                        val seekTarget = if (snapshot.durationMs > 0L) {
+                            target.coerceAtMost(snapshot.durationMs)
+                        } else {
+                            target.coerceAtLeast(0L)
+                        }
+                        controller.seekTo(seekTarget)
+                        lastSeekTargetMs = seekTarget
                         lastSeek = clock.markNow()
                         measureSeekLead = !playback.paused
                     }
@@ -855,6 +876,8 @@ private val NOTICE_DURATION = 3_000.milliseconds
 private val BUFFERING_REPORT_DELAY = 1_000.milliseconds
 private val OUTSIDE_TOGGLE_DELAY = 1_200.milliseconds
 private val SEEK_SETTLE = 2_500.milliseconds
+private val SEEK_MIN_SETTLE = 500.milliseconds
+private const val SEEK_SETTLE_ADVANCE_MS = 200L
 private val CORRECTION_INTERVAL = 500.milliseconds
 private const val MAX_SEEK_LEAD_MS = 3_000L
 private const val BEHIND_DISPLAY_STEP_MS = 1_000L
