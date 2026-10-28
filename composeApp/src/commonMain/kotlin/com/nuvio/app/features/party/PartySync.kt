@@ -15,8 +15,8 @@ internal sealed interface OwnSeek {
 }
 
 internal object PartySync {
-    const val NUDGE_START_MS = 200L
-    const val NUDGE_STOP_MS = 80L
+    const val NUDGE_START_MS = 300L
+    const val NUDGE_STOP_MS = 120L
     const val SEEK_THRESHOLD_MS = 2_000L
     const val PAUSED_TOLERANCE_MS = 500L
     const val PAUSED_SEEK_THRESHOLD_MS = 1_000L

@@ -76,6 +76,17 @@ class PartySyncTest {
     }
 
     @Test
+    fun subsecondDriftDoesNotStartRateNudging() {
+        assertEquals(
+            PartyCorrection.InSync,
+            PartySync.correction(10_250, 10_000, playback(), nudging = false),
+        )
+        assertIs<PartyCorrection.Nudge>(
+            PartySync.correction(10_400, 10_000, playback(), nudging = false),
+        )
+    }
+
+    @Test
     fun rateNudgesMoveInBoundedSteps() {
         assertEquals(1.51f, PartySync.smoothNudge(null, 1.5f, 1.55f), 0.0001f)
         assertEquals(1.50f, PartySync.smoothNudge(1.51f, 1.5f, 1.47f), 0.0001f)
@@ -216,7 +227,7 @@ class PartySyncTest {
     @Test
     fun largerDriftGetsStrongerCorrectionThanSmallDrift() {
         val small = assertIs<PartyCorrection.Nudge>(
-            PartySync.correction(10_300, 10_000, playback(), nudging = false),
+            PartySync.correction(10_400, 10_000, playback(), nudging = false),
         )
         val large = assertIs<PartyCorrection.Nudge>(
             PartySync.correction(11_800, 10_000, playback(), nudging = false),
