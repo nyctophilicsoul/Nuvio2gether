@@ -19,6 +19,7 @@ internal object PartySync {
     const val NUDGE_STOP_MS = 80L
     const val SEEK_THRESHOLD_MS = 2_000L
     const val PAUSED_TOLERANCE_MS = 500L
+    const val PAUSED_SEEK_THRESHOLD_MS = 1_000L
     const val MIN_NUDGE_FACTOR = 0.01f
     const val MAX_NUDGE_FACTOR = 0.05f
     const val RATE_UPDATE_THRESHOLD = 0.005f
@@ -55,7 +56,7 @@ internal object PartySync {
         val drift = localPositionMs - expectedPositionMs
         val distance = abs(drift)
         if (playback.paused) {
-            return if (distance > PAUSED_TOLERANCE_MS) PartyCorrection.Seek(expectedPositionMs) else PartyCorrection.InSync
+            return if (distance > PAUSED_SEEK_THRESHOLD_MS) PartyCorrection.Seek(expectedPositionMs) else PartyCorrection.InSync
         }
         val threshold = if (nudging) NUDGE_STOP_MS else NUDGE_START_MS
         return when {
@@ -114,7 +115,10 @@ internal object PartySync {
         if (abs(localPositionMs - expectedPositionMs) <= PAUSED_TOLERANCE_MS) return false
         if (initialSync) return true
         if (ownUpdate) return false
-        if (next.paused) return true
+        if (next.paused) {
+            return isSeekTransition(previous, next) ||
+                abs(localPositionMs - expectedPositionMs) > PAUSED_SEEK_THRESHOLD_MS
+        }
         return isSeekTransition(previous, next)
     }
 

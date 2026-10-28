@@ -132,6 +132,30 @@ class PartySyncTest {
     }
 
     @Test
+    fun pausedPlaybackDoesNotSeekForSubsecondPositionNoise() {
+        val paused = playback(paused = true, positionMs = 20_000)
+        assertEquals(
+            PartyCorrection.InSync,
+            PartySync.correction(
+                localPositionMs = 20_548,
+                expectedPositionMs = 20_000,
+                playback = paused,
+                nudging = false,
+            ),
+        )
+        assertFalse(
+            PartySync.shouldSeekForPlaybackUpdate(
+                previous = playback(seq = 1, positionMs = 10_000, at = 1_000_000),
+                next = playback(seq = 2, paused = true, positionMs = 11_000, at = 1_001_000),
+                localPositionMs = 11_548,
+                expectedPositionMs = 11_000,
+                initialSync = false,
+                ownUpdate = false,
+            ),
+        )
+    }
+
+    @Test
     fun initialAlignmentSeeksButOwnStateDoesNotEchoASeek() {
         val local = playback(seq = 2, positionMs = 30_000, at = 1_001_000)
         assertTrue(
