@@ -203,9 +203,13 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
         }
         val playerSurfaceSourceUrl = if (isP2pPlaybackActive) p2pResolvedSourceUrl else activeSourceUrl
         val playbackKey = activePlaybackKey
+        val playerSurfaceEngineKey = playbackKey.playbackEngine ?: playerSettingsUiState.androidPlaybackEngine
         val initialPositionRequestKey = currentInitialPositionRequestKey()
         if (playerSurfaceSourceUrl != null) {
-            key(playbackKey) {
+            // Keep the player surface alive across URL/source changes so Android can replace
+            // the MediaSource without tearing down a compatible audio output. The engine is
+            // still a key because switching playback engines requires a new native surface.
+            key(playerSurfaceEngineKey) {
                 val active = remember { mutableStateOf(true) }
                 DisposableEffect(Unit) {
                     onDispose { active.value = false }
