@@ -114,6 +114,39 @@ private fun logPlayerDiagnosticError(message: String, throwable: Throwable? = nu
 }
 
 
+/**
+ * Applies the optional Nuvio-patched Dolby Vision Profile 7 mapping API when available.
+ * Stock Media3 does not expose setMapDV7ToHevc, so this must not be a compile-time call.
+ */
+private fun DefaultRenderersFactory.setMapDV7ToHevcCompat(
+    enabled: Boolean,
+): DefaultRenderersFactory {
+    val setter = javaClass.methods.firstOrNull { method ->
+        method.name == "setMapDV7ToHevc" &&
+            method.parameterCount == 1 &&
+            method.parameterTypes[0] == Boolean::class.javaPrimitiveType
+    }
+    if (setter == null) {
+        if (enabled) {
+            logPlayerDiagnosticWarn(
+                "DV7-to-HEVC mapping was requested, but this stock Media3 build does not expose " +
+                    "the Nuvio setMapDV7ToHevc extension; the setting is ignored on this build.",
+            )
+        }
+        return this
+    }
+
+    return try {
+        setter.invoke(this, enabled)
+        this
+    } catch (error: Exception) {
+        logPlayerDiagnosticWarn(
+            "Could not apply the Nuvio DV7-to-HEVC mapping extension: ${error.javaClass.simpleName}",
+        )
+        this
+    }
+}
+
 private class PlaybackDiagnostics {
     var prepareStartedAtMs: Long = 0L
     var attempt: Int = 0
@@ -430,7 +463,7 @@ private fun ExoPlayerSurface(
         )
             .setExtensionRendererMode(effectiveDecoderPriority)
             .setEnableDecoderFallback(true)
-            .setMapDV7ToHevc(playerSettings.mapDV7ToHevc)
+            .setMapDV7ToHevcCompat(playerSettings.mapDV7ToHevc)
 
         val trackSelector = DefaultTrackSelector(context).apply {
             var parameters = buildUponParameters()
