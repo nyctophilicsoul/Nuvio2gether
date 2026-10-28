@@ -116,6 +116,22 @@ class PartySyncTest {
     }
 
     @Test
+    fun rapidRepeatedSeeksRemainAuthoritativeWhileAnEarlierSeekSettles() {
+        val lastApplied = playback(seq = 1, positionMs = 10_000, at = 1_000_000)
+        val firstSkip = playback(seq = 2, positionMs = 20_000, at = 1_001_000)
+        val secondSkip = playback(seq = 3, positionMs = 30_000, at = 1_002_000)
+        val thirdSkip = playback(seq = 4, positionMs = 40_000, at = 1_003_000)
+
+        // While the first seek is settling, each newer state still represents a real seek.
+        // The runtime can leave these states pending and apply the latest target after settling.
+        for (target in listOf(firstSkip, secondSkip, thirdSkip)) {
+            assertTrue(PartySync.isSeekTransition(lastApplied, target))
+            assertTrue(PartySync.shouldDeferSeek(lastApplied, target, seekInFlight = true))
+        }
+        assertFalse(PartySync.shouldDeferSeek(lastApplied, thirdSkip, seekInFlight = false))
+    }
+
+    @Test
     fun initialAlignmentSeeksButOwnStateDoesNotEchoASeek() {
         val local = playback(seq = 2, positionMs = 30_000, at = 1_001_000)
         assertTrue(
