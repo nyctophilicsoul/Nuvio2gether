@@ -608,7 +608,7 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
                         measureSeekLead = !playback.paused
                     }
                     is PartyCorrection.Nudge -> {
-                        if (partyRateNudge != correction.rate) {
+                        if (PartySync.shouldUpdateNudge(partyRateNudge, correction.rate)) {
                             partyLog.i { "Nudging speed to ${correction.rate} for ${snapshot.positionMs - expected} ms drift" }
                             InAppLogger.info(
                                 "PartySync",
