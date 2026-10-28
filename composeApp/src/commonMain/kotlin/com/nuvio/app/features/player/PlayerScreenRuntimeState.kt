@@ -213,6 +213,7 @@ internal class PlayerScreenRuntime(
     var partyBehind by mutableStateOf(false)
     var partyBehindMs by mutableStateOf<Long?>(null)
     var partyRateNudge: Float? = null
+    var partyRateNudgeBaseRate: Float? = null
     var partyPreviousKey: String? = null
     var partyAppInBackground = false
     var playbackSnapshotMark: TimeMark? = null

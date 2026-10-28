@@ -76,6 +76,13 @@ class PartySyncTest {
     }
 
     @Test
+    fun nudgeRestorationPreservesBaseRateWhenPartyStateDisappears() {
+        assertEquals(1.5f, PartySync.nudgeRestorationRate(authoritativeRate = null, savedBaseRate = 1.5f))
+        assertEquals(1.25f, PartySync.nudgeRestorationRate(authoritativeRate = 1.25f, savedBaseRate = 1.5f))
+        assertEquals(1f, PartySync.nudgeRestorationRate(authoritativeRate = null, savedBaseRate = null))
+    }
+
+    @Test
     fun subsecondDriftDoesNotStartRateNudging() {
         assertEquals(
             PartyCorrection.InSync,

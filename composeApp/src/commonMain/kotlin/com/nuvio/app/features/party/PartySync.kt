@@ -84,6 +84,10 @@ internal object PartySync {
     fun shouldUpdateNudge(currentRate: Float?, targetRate: Float): Boolean =
         currentRate == null || abs(currentRate - targetRate) >= RATE_UPDATE_THRESHOLD
 
+    /** Prefer the room's authoritative speed, but retain the saved base rate if the room vanished. */
+    fun nudgeRestorationRate(authoritativeRate: Float?, savedBaseRate: Float?): Float =
+        (authoritativeRate ?: savedBaseRate ?: 1f).coerceIn(MIN_PLAYBACK_RATE, MAX_PLAYBACK_RATE)
+
     /**
      * Distinguishes an authoritative timeline jump from pause/rate updates that naturally carry
      * a newer sequence but do not represent a seek. Comparing against the previous state's

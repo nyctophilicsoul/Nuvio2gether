@@ -678,6 +678,9 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
                             targetRate = correction.rate,
                         )
                         if (PartySync.shouldUpdateNudge(partyRateNudge, smoothedRate)) {
+                            if (partyRateNudge == null) {
+                                partyRateNudgeBaseRate = playback.rate
+                            }
                             partyLog.i { "Nudging speed to $smoothedRate (target=${correction.rate}) for ${snapshot.positionMs - expected} ms drift" }
                             InAppLogger.info(
                                 "PartySync",
@@ -713,8 +716,9 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
 
 private fun PlayerScreenRuntime.clearPartyNudge(playback: PartyPlayback? = PartyRepository.playback.value) {
     val previousNudge = partyRateNudge ?: return
-    val baseRate = playback?.rate ?: 1f
+    val baseRate = PartySync.nudgeRestorationRate(playback?.rate, partyRateNudgeBaseRate)
     partyRateNudge = null
+    partyRateNudgeBaseRate = null
     InAppLogger.info("PartySync", "Clearing rate nudge=$previousNudge restoringRate=$baseRate")
     playerController?.setPlaybackSpeed(baseRate)
 }
