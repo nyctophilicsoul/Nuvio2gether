@@ -491,6 +491,10 @@ kotlin {
                 implementation(files("libs/nuvio-libass-release.aar"))
                 implementation(libs.ktor.client.okhttp)
                 implementation(libs.sentry.android)
+                // Use the complete Maven Media3 player stack at one pinned version.
+                // Legacy precompiled core/UI/data-source AARs are intentionally excluded
+                // below because they do not follow the version catalog.
+                implementation(libs.androidx.media3.exoplayer)
                 implementation(libs.androidx.media3.exoplayer.hls)
                 implementation(libs.androidx.media3.exoplayer.dash)
                 implementation(libs.androidx.media3.exoplayer.smoothstreaming)
@@ -502,11 +506,25 @@ kotlin {
                 implementation(libs.androidx.media3.common)
                 implementation(libs.androidx.media3.container)
                 implementation(libs.androidx.media3.extractor)
+                implementation(libs.androidx.media3.ui)
+                implementation(libs.androidx.media3.database)
                 implementation("com.google.guava:guava:33.3.1-android")
-                implementation("androidx.media3:media3-database:1.8.0")
                 implementation("androidx.annotation:annotation-experimental:1.3.1")
                 implementation(libs.mpv.android.lib)
-                implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("lib-*.aar"))))
+                // Keep Nuvio's custom decoder extensions and native streaming engine.
+                // Maven now supplies the standard ExoPlayer, HLS, common, data-source,
+                // extractor and UI components to prevent old AARs shadowing Media3.
+                implementation(
+                    fileTree(
+                        mapOf(
+                            "dir" to "libs",
+                            "include" to listOf(
+                                "lib-decoder-*-release.aar",
+                                "lib-nuvio-engine-android-0.1.6.aar",
+                            ),
+                        ),
+                    ),
+                )
                 if (androidDistribution == "full") {
                     implementation(files("libs/quickjs-kt-android-1.0.5-nuvio.aar"))
                     implementation(libs.ksoup)
@@ -588,12 +606,4 @@ configurations.matching { it.name == "iosMainImplementation" }.configureEach {
     project.dependencies.add(name, libs.ktor.client.darwin)
 }
 
-configurations.all {
-    exclude(group = "androidx.media3", module = "media3-exoplayer")
-    exclude(group = "androidx.media3", module = "media3-exoplayer-hls")
-    exclude(group = "androidx.media3", module = "media3-ui")
-    exclude(group = "androidx.media3", module = "media3-common")
-    exclude(group = "androidx.media3", module = "media3-datasource")
-    exclude(group = "androidx.media3", module = "media3-datasource-okhttp")
-    exclude(group = "androidx.media3", module = "media3-extractor")
-}
+
