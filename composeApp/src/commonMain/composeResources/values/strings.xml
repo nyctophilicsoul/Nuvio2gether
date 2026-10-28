@@ -2516,4 +2516,19 @@
     <string name="trakt_device_start_failed">Could not start Trakt device authorization. Please try again.</string>
     <string name="trakt_device_code_expired">The Trakt device code has expired. Please start connecting again.</string>
     <string name="trakt_device_activation_instruction">Enter this code on the Trakt activation page to connect your account.</string>
+
+    <string name="settings_advanced_section_debugging">DEBUGGING</string>
+    <string name="settings_advanced_debugging_copy_logs">Copy Logs to Clipboard</string>
+    <string name="settings_advanced_debugging_copy_logs_description">Copy %1$d in-app log lines</string>
+    <string name="settings_advanced_debugging_export_logs">Save Logs to Downloads</string>
+    <string name="settings_advanced_debugging_export_logs_description">Save %1$d filtered log lines as a text file</string>
+    <string name="settings_advanced_debugging_clear_logs">Clear Logs</string>
+    <string name="settings_advanced_debugging_clear_logs_description">Clear the in-memory debug log buffer</string>
+    <string name="settings_advanced_debugging_empty">No logs captured yet.</string>
+    <string name="settings_advanced_debugging_log_viewer_description">Logs are kept in memory while the app is running. Exported logs may contain diagnostic details; review them before sharing.</string>
+    <string name="settings_advanced_debugging_filter_category">Category</string>
+    <string name="settings_advanced_debugging_filter_level">Level</string>
+    <string name="settings_advanced_debugging_filter_all">All</string>
+    <string name="settings_advanced_debugging_no_filter_matches">No logs match the selected filters.</string>
+    <string name="settings_advanced_debugging_showing_logs">Showing latest %1$d of %2$d filtered logs · %3$d/%4$d retained</string>
 </resources>
