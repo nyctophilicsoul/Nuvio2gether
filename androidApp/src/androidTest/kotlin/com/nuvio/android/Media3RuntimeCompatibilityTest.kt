@@ -26,6 +26,13 @@ class Media3RuntimeCompatibilityTest {
             "androidx.media3.datasource.okhttp.OkHttpDataSource",
             "androidx.media3.database.StandaloneDatabaseProvider",
             "androidx.media3.ui.PlayerView",
+            // Custom codec extension AARs remain local; verify their Java entry points
+            // still link against the updated Media3 core before attempting playback.
+            "androidx.media3.decoder.ffmpeg.FfmpegAudioRenderer",
+            "androidx.media3.decoder.ffmpeg.FfmpegLibrary",
+            "androidx.media3.decoder.av1.Libgav1VideoRenderer",
+            "androidx.media3.decoder.mpegh.MpeghAudioRenderer",
+            "androidx.media3.decoder.mpegh.MpeghLibrary",
         )
 
         requiredClasses.forEach { className ->
