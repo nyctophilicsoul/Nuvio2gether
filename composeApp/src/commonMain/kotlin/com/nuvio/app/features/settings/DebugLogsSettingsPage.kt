@@ -42,6 +42,8 @@ import nuvio.composeapp.generated.resources.settings_advanced_debugging_clear_lo
 import nuvio.composeapp.generated.resources.settings_advanced_debugging_copy_logs
 import nuvio.composeapp.generated.resources.settings_advanced_debugging_copy_logs_description
 import nuvio.composeapp.generated.resources.settings_advanced_debugging_empty
+import nuvio.composeapp.generated.resources.settings_advanced_debugging_export_logs
+import nuvio.composeapp.generated.resources.settings_advanced_debugging_export_logs_description
 import nuvio.composeapp.generated.resources.settings_advanced_debugging_filter_all
 import nuvio.composeapp.generated.resources.settings_advanced_debugging_filter_category
 import nuvio.composeapp.generated.resources.settings_advanced_debugging_filter_level
@@ -87,6 +89,7 @@ private fun DebugLogsSection(isTablet: Boolean) {
     }
     val displayedEntries = filteredEntries.takeLast(MAX_DISPLAYED_LOG_LINES)
     val logText = displayedEntries.joinToString(separator = "\n") { it.line }
+    val exportLogText = filteredEntries.joinToString(separator = "\n") { it.line }
     val viewerText = when {
         logEntries.isEmpty() -> stringResource(Res.string.settings_advanced_debugging_empty)
         filteredEntries.isEmpty() -> stringResource(Res.string.settings_advanced_debugging_no_filter_matches)
@@ -125,11 +128,11 @@ private fun DebugLogsSection(isTablet: Boolean) {
                 title = stringResource(Res.string.settings_advanced_debugging_export_logs),
                 description = stringResource(
                     Res.string.settings_advanced_debugging_export_logs_description,
-                    displayedEntries.size,
+                    filteredEntries.size,
                 ),
-                enabled = displayedEntries.isNotEmpty(),
+                enabled = filteredEntries.isNotEmpty(),
                 isTablet = isTablet,
-                onClick = { exportLogs(logText) },
+                onClick = { exportLogs(exportLogText) },
             )
             SettingsGroupDivider(isTablet = isTablet)
             SettingsNavigationRow(
