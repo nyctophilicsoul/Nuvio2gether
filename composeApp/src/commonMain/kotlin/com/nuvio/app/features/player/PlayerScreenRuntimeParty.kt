@@ -92,6 +92,7 @@ import nuvio.composeapp.generated.resources.party_host_only_note
 import nuvio.composeapp.generated.resources.party_paused_for_you
 import nuvio.composeapp.generated.resources.party_reconnecting
 import nuvio.composeapp.generated.resources.party_waiting
+import nuvio.composeapp.generated.resources.party_waiting_shared_content
 import nuvio.composeapp.generated.resources.party_waiting_for
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
@@ -851,6 +852,8 @@ private fun PlayerScreenRuntime.clearPartyNudge(playback: PartyPlayback? = Party
 internal fun BoxScope.RenderParty(runtime: PlayerScreenRuntime) {
     val partyState by PartyRepository.state.collectAsStateWithLifecycle()
     val playback by PartyRepository.playback.collectAsStateWithLifecycle()
+    val hostSharingEnabled by PartyRepository.hostSharingEnabled.collectAsStateWithLifecycle()
+    val sharedStream by PartyRepository.sharedStream.collectAsStateWithLifecycle()
     val unread by PartyChat.unread.collectAsStateWithLifecycle()
     var notice by remember { mutableStateOf<PartyNotice?>(null) }
     LaunchedEffect(Unit) {
@@ -861,6 +864,13 @@ internal fun BoxScope.RenderParty(runtime: PlayerScreenRuntime) {
         }
     }
     val party = partyState.party
+    val pendingMedia = runtime.pendingPartyMediaChange
+    val awaitingSharedContent = party?.let { currentParty ->
+        !currentParty.isHost &&
+            pendingMedia?.key == currentParty.media.key &&
+            hostSharingEnabled &&
+            sharedStream?.let { it.mediaKey == currentParty.media.key && isShareableStreamUrl(it.url) } != true
+    } == true
     runtime.run {
         if (party != null) {
             val waitingNames = if (playback?.paused == true && playback?.waiting == true) {
@@ -870,12 +880,16 @@ internal fun BoxScope.RenderParty(runtime: PlayerScreenRuntime) {
             }
             val noticeText = notice?.text()
             PartyStatusPill(
-                visible = (controlsVisible || waitingNames.isNotEmpty() || !party.connected || noticeText != null || (partyBehind && !shouldPlay)) &&
+                visible = (awaitingSharedContent || controlsVisible || waitingNames.isNotEmpty() || !party.connected || noticeText != null || (partyBehind && !shouldPlay)) &&
                     !playerControlsLocked && !showPartyPanel,
                 members = party.members,
                 unread = unread,
                 message = when {
                     !party.connected -> stringResource(Res.string.party_reconnecting)
+                    awaitingSharedContent -> stringResource(
+                        Res.string.party_waiting_shared_content,
+                        party.media.displayTitle(),
+                    )
                     waitingNames.isNotEmpty() -> stringResource(Res.string.party_waiting_for, waitingNames.joinToString())
                     playback?.waiting == true -> stringResource(Res.string.party_waiting)
                     noticeText != null -> noticeText
