@@ -137,4 +137,110 @@ class PartyStreamTest {
             ),
         )
     }
+    @Test
+    fun differentContentPromptsWhenHostSharingIsDisabled() {
+        val target = PartyMedia(type = "movie", metaId = "tt2", metaType = "movie", title = "New movie")
+        assertEquals(
+            PartyMediaChangeDecision.Prompt,
+            decidePartyMediaChange(
+                isHost = false,
+                localMediaKey = "movie|tt1||",
+                media = target,
+                sharingEnabled = false,
+                sharedStream = null,
+            ),
+        )
+    }
+
+    @Test
+    fun enabledSharingWaitsForAValidStreamForTheNewMedia() {
+        val target = PartyMedia(type = "movie", metaId = "tt2", metaType = "movie", title = "New movie")
+        assertEquals(
+            PartyMediaChangeDecision.WaitForSharedStream,
+            decidePartyMediaChange(false, "movie|tt1||", target, true, null),
+        )
+        assertEquals(
+            PartyMediaChangeDecision.WaitForSharedStream,
+            decidePartyMediaChange(
+                false,
+                "movie|tt1||",
+                target,
+                true,
+                stream.copy(mediaKey = "movie|tt1||"),
+            ),
+        )
+        assertEquals(
+            PartyMediaChangeDecision.WaitForSharedStream,
+            decidePartyMediaChange(
+                false,
+                "movie|tt1||",
+                target,
+                true,
+                stream.copy(mediaKey = target.key, url = "http://localhost:8096/video"),
+            ),
+        )
+    }
+
+    @Test
+    fun enabledSharingAutomaticallySwitchesOnlyToTheMatchingMediaStream() {
+        val target = PartyMedia(type = "movie", metaId = "tt2", metaType = "movie", title = "New movie")
+        assertEquals(
+            PartyMediaChangeDecision.AutoSwitch,
+            decidePartyMediaChange(
+                isHost = false,
+                localMediaKey = "movie|tt1||",
+                media = target,
+                sharingEnabled = true,
+                sharedStream = stream.copy(mediaKey = target.key),
+            ),
+        )
+        assertEquals(
+            PartyMediaChangeDecision.Ignore,
+            decidePartyMediaChange(
+                isHost = false,
+                localMediaKey = "movie|tt1||",
+                media = target,
+                sharingEnabled = true,
+                sharedStream = stream.copy(mediaKey = target.key),
+                dismissedMediaKey = target.key,
+            ),
+        )
+    }
+
+    @Test
+    fun hostAndUnchangedMediaNeverTriggerGuestSwitchHandling() {
+        val target = PartyMedia(type = "movie", metaId = "tt2", metaType = "movie", title = "New movie")
+        assertEquals(
+            PartyMediaChangeDecision.Ignore,
+            decidePartyMediaChange(true, "movie|tt1||", target, true, stream.copy(mediaKey = target.key)),
+        )
+        assertEquals(
+            PartyMediaChangeDecision.Ignore,
+            decidePartyMediaChange(false, target.key, target, false, null),
+        )
+    }
+
+    @Test
+    fun aDifferentEpisodeIsTreatedAsDifferentPartyContent() {
+        val target = PartyMedia(
+            type = "series",
+            metaId = "show1",
+            metaType = "series",
+            season = 1,
+            episode = 2,
+            title = "Example Show",
+        )
+        val oldEpisodeKey = partyMediaKey("series", "show1", 1, 1)
+        assertEquals(
+            PartyMediaChangeDecision.AutoSwitch,
+            decidePartyMediaChange(
+                isHost = false,
+                localMediaKey = oldEpisodeKey,
+                media = target,
+                sharingEnabled = true,
+                sharedStream = stream.copy(mediaKey = target.key),
+            ),
+        )
+    }
+
 }
