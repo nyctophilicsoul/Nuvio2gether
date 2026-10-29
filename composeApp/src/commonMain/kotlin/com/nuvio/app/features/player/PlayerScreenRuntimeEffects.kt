@@ -58,8 +58,8 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
                 val guestFollowingHostSource =
                     party != null &&
                         !party.isHost &&
-                        party.media.key == partyKey &&
-                        PartyRepository.hostSharingEnabled.value
+                        PartyRepository.hostSharingEnabled.value &&
+                        (party.media.key == partyKey || pendingPartyMediaChange != null)
                 PlayerSettingsRepository.uiState.value.deadLinkTimeoutEnabled &&
                     !guestFollowingHostSource
             },
@@ -127,6 +127,7 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         partyState.party?.isHost,
         partyState.party?.media?.key,
         hostSharingEnabled,
+        pendingPartyMediaChange?.key,
     ) {
         // A guest following the host must not independently select a competing fallback.
         // Re-evaluate the watchdog whenever party role or sharing state changes.

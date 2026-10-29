@@ -137,6 +137,7 @@ class PartyStreamTest {
             ),
         )
     }
+
     @Test
     fun differentContentPromptsWhenHostSharingIsDisabled() {
         val target = PartyMedia(type = "movie", metaId = "tt2", metaType = "movie", title = "New movie")
