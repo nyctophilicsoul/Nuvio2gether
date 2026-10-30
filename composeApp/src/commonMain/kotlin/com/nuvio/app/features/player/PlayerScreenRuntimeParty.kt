@@ -466,14 +466,10 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
         PartyRepository.events.collect { event ->
             if (event is PartyEvent.MediaChanged) {
                 val party = PartyRepository.state.value.party
-                if (party?.hostOnly == true && !party.isHost) {
-                    // Host-only mode follows content changes immediately. The existing
-                    // shared-stream effect replaces the source when the host publishes it.
-                    if (autoOpeningPartyMediaKey != event.media.key) {
-                        autoOpeningPartyMediaKey = event.media.key
-                        switchToPartyMedia(event.media)
-                    }
-                } else {
+                if (party != null && !party.isHost) {
+                    // Media selection is host-authoritative regardless of playback-control
+                    // permissions. Guests automatically open the new movie/episode and
+                    // resolve their own source; shared-stream following may replace it later.
                     handlePartyMediaChange(event.media)
                 }
             }
