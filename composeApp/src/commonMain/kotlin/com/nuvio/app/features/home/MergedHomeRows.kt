@@ -3,6 +3,9 @@ package com.nuvio.app.features.home
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+const val MAX_MERGED_HOME_ROW_SOURCES = 8
+const val HOME_MERGED_ROW_ITEM_LIMIT = 72
+
 /**
  * A virtual home row assembled from existing addon catalogs. Source catalogs remain independent.
  *
