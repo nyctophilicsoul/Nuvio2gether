@@ -521,6 +521,7 @@ internal fun StreamDestination(
             requestedQuality = requestedQuality,
             debridEnabled = debridEnabledForQualitySelection,
             preferredSourceOrder = qualityPreferredSourceOrder,
+            p2pEnabled = p2pEnabled,
         )
         val targetHeight = requestedQuality.targetHeight
         val rankedTopThreeCandidates = QualityFirstAutoPlayPolicy.rankCandidates(
@@ -528,17 +529,16 @@ internal fun StreamDestination(
             requestedQuality = requestedQuality,
             debridEnabled = debridEnabledForQualitySelection,
             preferredSourceOrder = qualityPreferredSourceOrder,
+            p2pEnabled = p2pEnabled,
         )
         val earlyStartCandidates = if (targetHeight == null) rankedTopThreeCandidates else
             rankedTopThreeCandidates.filter { QualityFirstAutoPlayPolicy.detectQualityHeight(it) == targetHeight }
-        // Respect the intended threshold: more than ten distinct selectable links at this tier.
-        val canStartEarlyFromTopThree = earlyStartCandidates.size > 10
-        // Never start at a lower quality merely because the requested tier has not
-        // arrived yet. Playback must begin from an exact-tier source; lower tiers are
-        // queued behind it and become eligible only after startup/resolution fallback.
-        if (rankedFallbackCandidates.isNotEmpty() &&
-            (canStartEarlyFromTopThree || qualitySearchFinished)
-        ) {
+        // Start as soon as one playable source at the selected tier is available.
+        // The provider jobs remain active; the player-side fallback monitor reads
+        // the live stream groups so links arriving later join the fallback pool.
+        // Lower-quality links are queued behind the exact tier and never start first.
+        val hasExactTierCandidate = earlyStartCandidates.isNotEmpty()
+        if (rankedFallbackCandidates.isNotEmpty() && hasExactTierCandidate) {
             val started = StreamsRepository.beginQualityFirstAutoPlay(
                 expectedRequestToken = expectedStreamsRequestToken,
                 candidates = (earlyStartCandidates + rankedFallbackCandidates).distinct(),
