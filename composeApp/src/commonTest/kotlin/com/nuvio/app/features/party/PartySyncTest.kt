@@ -292,8 +292,9 @@ class PartySyncTest {
         val large = assertIs<PartyCorrection.Nudge>(
             PartySync.correction(11_800, 10_000, playback(), nudging = false),
         )
-        assertTrue(small.rate > 1f)
-        assertTrue(large.rate > small.rate)
+        // The guest is ahead of the room, so stronger correction means a lower rate.
+        assertTrue(small.rate < 1f)
+        assertTrue(large.rate < small.rate)
     }
 
     @Test
