@@ -45,6 +45,7 @@ import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.p2p.P2pConsentDialog
 import com.nuvio.app.features.p2p.P2pSettingsRepository
 import com.nuvio.app.features.player.PlayerLaunch
+import com.nuvio.app.features.player.PlayerStreamsRepository
 import com.nuvio.app.features.player.PlayerLaunchStore
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.player.resolveContentLanguage
@@ -499,7 +500,6 @@ internal fun StreamDestination(
             .filterNot { it in configuredAddonOrder }
             .distinct()
     }
-    val topThreeQualityAddonNames = configuredAddonOrder.take(3).toSet()
     val showQualityPicker = qualityFlowEnabled &&
         !qualityPickerDismissed && !qualitySelectionStarted &&
         !autoPlayNavigationStarted && !reuseNavigated
@@ -641,6 +641,15 @@ internal fun StreamDestination(
                 isAutoPlay = true,
             )
             StreamsRepository.consumeAutoPlay()
+            if (qualityFlowEnabled) {
+                PlayerStreamsRepository.loadSources(
+                    type = launch.type,
+                    videoId = effectiveVideoId,
+                    season = launch.seasonNumber,
+                    episode = launch.episodeNumber,
+                )
+            }
+            StreamsRepository.cancelLoading()
             return@LaunchedEffect
         }
         if (sourceUrl == null) {
@@ -709,11 +718,22 @@ internal fun StreamDestination(
         if (playerSettings.externalPlayerEnabled && stream.serverTarget == null) {
             openExternalPlayback(playerLaunch)
             StreamsRepository.consumeAutoPlay()
-            if (!qualityFlowEnabled) StreamsRepository.cancelLoading()
+            StreamsRepository.cancelLoading()
             return@LaunchedEffect
         }
         StreamsRepository.consumeAutoPlay()
-        if (!qualityFlowEnabled) StreamsRepository.cancelLoading()
+        if (qualityFlowEnabled) {
+            // Transfer ongoing discovery to the player-side repository before
+            // stopping the stream-picker request. The player can now build its
+            // fallback pool while the selected source is starting.
+            PlayerStreamsRepository.loadSources(
+                type = launch.type,
+                videoId = effectiveVideoId,
+                season = launch.seasonNumber,
+                episode = launch.episodeNumber,
+            )
+        }
+        StreamsRepository.cancelLoading()
         autoPlayNavigationStarted = true
         val launchId = PlayerLaunchStore.put(playerLaunch)
         navController.navigate(PlayerRoute(launchId = launchId, title = playerLaunch.title)) {
