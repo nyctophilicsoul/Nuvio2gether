@@ -641,6 +641,7 @@ internal fun StreamDestination(
                 isAutoPlay = true,
             )
             StreamsRepository.consumeAutoPlay()
+            StreamsRepository.cancelLoading()
             if (qualityFlowEnabled) {
                 PlayerStreamsRepository.loadSources(
                     type = launch.type,
@@ -649,7 +650,6 @@ internal fun StreamDestination(
                     episode = launch.episodeNumber,
                 )
             }
-            StreamsRepository.cancelLoading()
             return@LaunchedEffect
         }
         if (sourceUrl == null) {
@@ -722,10 +722,11 @@ internal fun StreamDestination(
             return@LaunchedEffect
         }
         StreamsRepository.consumeAutoPlay()
+        // Stop the picker request first, then hand provider discovery to the
+        // player repository. Both repositories share the plugin-search pause
+        // switch, so this order ensures the background fallback search stays live.
+        StreamsRepository.cancelLoading()
         if (qualityFlowEnabled) {
-            // Transfer ongoing discovery to the player-side repository before
-            // stopping the stream-picker request. The player can now build its
-            // fallback pool while the selected source is starting.
             PlayerStreamsRepository.loadSources(
                 type = launch.type,
                 videoId = effectiveVideoId,
@@ -733,7 +734,6 @@ internal fun StreamDestination(
                 episode = launch.episodeNumber,
             )
         }
-        StreamsRepository.cancelLoading()
         autoPlayNavigationStarted = true
         val launchId = PlayerLaunchStore.put(playerLaunch)
         navController.navigate(PlayerRoute(launchId = launchId, title = playerLaunch.title)) {
@@ -1082,6 +1082,7 @@ internal fun StreamDestination(
                     streams = qualityEligibleStreams,
                     requestedQuality = quality,
                     debridEnabled = debridEnabledForQualitySelection,
+                    p2pEnabled = p2pEnabled,
                 ).count { QualityFirstAutoPlayPolicy.detectQualityHeight(it) == quality.targetHeight }
             }
         }
