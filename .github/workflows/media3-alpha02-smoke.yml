@@ -2,7 +2,7 @@ name: Media3 Alpha02 Build Smoke Test
 
 on:
   push:
-    branches: [test-media-update, watchparty-sync-correction]
+    branches: [test-media-update, cmp-rewrite, watchparty-sync-correction]
   workflow_dispatch:
 
 permissions:
