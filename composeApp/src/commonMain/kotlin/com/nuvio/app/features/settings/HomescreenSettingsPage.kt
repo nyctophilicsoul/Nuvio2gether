@@ -57,6 +57,7 @@ import com.nuvio.app.features.home.HomeCatalogSettingsItem
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.HomeCatalogRowPlacement
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
+import nuvio.composeapp.generated.resources.settings_merged_rows_manage
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_retry
 import nuvio.composeapp.generated.resources.action_reset
@@ -126,9 +127,21 @@ internal fun LazyListScope.homescreenSettingsContent(
     addonRowOrderPolicy: HomeAddonRowOrderPolicy,
     isCatalogLoading: Boolean,
     catalogErrorMessage: String?,
+    onMergedRowsClick: (() -> Unit)? = null,
 ) {
     val selectedHeroSourceCount = items.count { it.heroSourceEnabled }
     val enabledCatalogCount = items.count { it.isVisible }
+
+    if (onMergedRowsClick != null) {
+        item(key = "merged_rows_settings_entry") {
+            Button(
+                onClick = onMergedRowsClick,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = if (isTablet) 24.dp else 16.dp),
+            ) {
+                Text(stringResource(Res.string.settings_merged_rows_manage))
+            }
+        }
+    }
     item {
         HomescreenSummaryCard(
             isTablet = isTablet,
@@ -748,7 +761,7 @@ private fun HomescreenCatalogList(
                 it.addonId == fromItem.addonId && it.addonLayoutMode != HomeAddonLayoutMode.NORMAL
             }
         // Managed dynamic groups can move internally but cannot leave their configured slot.
-        if (crossesManagedGroup && !staysInsideSameManagedGroup && !fromItem.isCollection) {
+        if (crossesManagedGroup && !staysInsideSameManagedGroup && !fromItem.isCollection && !fromItem.isMergedRow) {
             if (!pinnedDragFeedbackShown) {
                 pinnedDragFeedbackShown = true
                 onPinnedDragAttempt()

@@ -18,6 +18,7 @@ import nuvio.composeapp.generated.resources.compose_settings_page_content_discov
 import nuvio.composeapp.generated.resources.compose_settings_page_debrid
 import nuvio.composeapp.generated.resources.compose_settings_page_continue_watching
 import nuvio.composeapp.generated.resources.compose_settings_page_homescreen
+import nuvio.composeapp.generated.resources.settings_merged_rows_title
 import nuvio.composeapp.generated.resources.compose_settings_page_integrations
 import nuvio.composeapp.generated.resources.compose_settings_page_licenses_attributions
 import nuvio.composeapp.generated.resources.compose_settings_page_mdblist_ratings
@@ -136,6 +137,11 @@ internal enum class SettingsPage(
         titleRes = Res.string.compose_settings_page_homescreen,
         category = SettingsCategory.General,
         parentPage = Appearance,
+    ),
+    MergedRows(
+        titleRes = Res.string.settings_merged_rows_title,
+        category = SettingsCategory.General,
+        parentPage = Homescreen,
     ),
     MetaScreen(
         titleRes = Res.string.compose_settings_page_meta_screen,

@@ -185,7 +185,7 @@ object HomeRepository {
         fun HomeCatalogSection.withPosterOverlay(): HomeCatalogSection =
             copy(items = items.reapplyCustomPosterUrls(posterPattern))
 
-        val sections = orderHomeCatalogDefinitions(currentDefinitions, snapshot)
+        val catalogSections = orderHomeCatalogDefinitions(currentDefinitions, snapshot)
             .mapNotNull { definition ->
                 val preference = preferences[definition.key]
                 if (preference?.enabled == false) return@mapNotNull null
@@ -200,6 +200,90 @@ object HomeRepository {
                     title = customTitle.ifBlank { definition.titleFor(snapshot.showCatalogType) },
                 )
             }
+
+        // Reuse the already-fetched source sections. A catalog hidden as its own home row can
+        // still be included in a merged row; the two layout preferences are deliberately separate.
+        val visibleCatalogSectionsByKey = catalogSections.associateBy(HomeCatalogSection::key)
+        val sourceSectionsByKey = currentDefinitions.mapNotNull { definition ->
+            // Reuse the already-normalized section when its own row is visible. Only transform the
+            // cached raw section again for a source whose standalone home row is hidden.
+            val section = visibleCatalogSectionsByKey[definition.key]
+                ?: cachedSections[definition.cacheKey]
+                    ?.withPosterOverlay()
+                    ?.withReleaseFilter()
+                ?: return@mapNotNull null
+            if (section.items.isEmpty()) return@mapNotNull null
+            val customTitle = preferences[definition.key]?.customTitle.orEmpty()
+            definition.key to section.copy(
+                title = customTitle.ifBlank { definition.titleFor(snapshot.showCatalogType) },
+            )
+        }.toMap()
+
+        val mergedSections = snapshot.mergedRows
+            .sortedBy { it.order }
+            .mapNotNull { mergedRow ->
+                val rowKey = mergedHomeRowKey(mergedRow.id)
+                if (preferences[rowKey]?.enabled == false) return@mapNotNull null
+                val sourceSections = mergedRow.sourceKeys.mapNotNull(sourceSectionsByKey::get)
+                if (sourceSections.isEmpty()) return@mapNotNull null
+                val mergedItems = mergeHomeRowItems(
+                    sourceItems = sourceSections.map(HomeCatalogSection::items),
+                    deduplicate = mergedRow.deduplicate,
+                    maxItems = HOME_MERGED_ROW_ITEM_LIMIT,
+                )
+                if (mergedItems.isEmpty()) return@mapNotNull null
+
+                val sourceTabs = if (
+                    mergedRow.resolvedDisplayMode() == MergedHomeRowDisplayMode.SOURCE_TABS
+                ) {
+                    buildList {
+                        add(
+                            HomeCatalogTab(
+                                key = "all",
+                                title = "All",
+                                items = mergedItems,
+                                availableItemCount = mergedItems.size,
+                                hasMore = sourceSections.any(HomeCatalogSection::hasMore),
+                            ),
+                        )
+                        sourceSections.forEach { source ->
+                            add(
+                                HomeCatalogTab(
+                                    key = source.key,
+                                    title = source.title,
+                                    items = source.items,
+                                    availableItemCount = source.availableItemCount,
+                                    hasMore = source.hasMore,
+                                ),
+                            )
+                        }
+                    }
+                } else {
+                    emptyList()
+                }
+                val customTitle = preferences[rowKey]?.customTitle.orEmpty()
+                HomeCatalogSection(
+                    key = rowKey,
+                    title = customTitle.ifBlank { mergedRow.title },
+                    subtitle = "Merged row",
+                    addonName = "Merged row",
+                    target = CatalogTarget.MergedRow(rowId = mergedRow.id),
+                    items = mergedItems,
+                    availableItemCount = mergedItems.size,
+                    hasMore = sourceSections.any(HomeCatalogSection::hasMore),
+                    isMergedRow = true,
+                    displayMode = mergedRow.displayMode,
+                    sourceTabs = sourceTabs,
+                    supportsViewAll = true,
+                )
+            }
+        val sectionByKey = (catalogSections + mergedSections).associateBy(HomeCatalogSection::key)
+        val configuredHomeOrder = HomeCatalogSettingsRepository.uiState.value.items
+            .mapIndexed { index, item -> item.key to index }
+            .toMap()
+        val sections = sectionByKey.values.sortedBy { section ->
+            configuredHomeOrder[section.key] ?: Int.MAX_VALUE
+        }
 
         val catalogHeroItems = if (snapshot.heroEnabled) {
             val heroRandom = Random((requestKey?.hashCode() ?: 0).absoluteValue + 1)
