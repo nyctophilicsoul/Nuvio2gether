@@ -251,8 +251,8 @@ class HomeAddonLayoutTest {
             listOf("A:two", "A:one", "collection_favorites", "B:one"),
             ordered.map(::settingLabel),
         )
-        assertEquals(1, ordered.count { it.key == "A:two" })
-        assertEquals(1, ordered.count { it.key == "B:one" })
+        assertEquals(1, ordered.count { settingLabel(it) == "A:two" })
+        assertEquals(1, ordered.count { settingLabel(it) == "B:one" })
     }
 
     @Test

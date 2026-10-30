@@ -44,7 +44,8 @@ internal object PartySync {
 
     /**
      * Estimate the playhead between player snapshots without extrapolating indefinitely.
-     * Use the effective rate so temporary WatchParty nudges are reflected in the estimate.
+     * Correction decisions use the effective local rate, including a temporary sync nudge,
+     * rather than the base rate exposed to the rest of the player UI.
      */
     fun estimatedLocalPositionMs(
         positionMs: Long,
@@ -64,7 +65,7 @@ internal object PartySync {
         return if (durationMs > 0L) predicted.coerceAtMost(durationMs) else predicted
     }
 
-    /** Prevent feedback correction from stale moving-playhead samples. */
+    /** Don't run feedback correction from a stale moving-playhead sample. */
     fun isPositionSampleFresh(sampleAgeMs: Long): Boolean =
         sampleAgeMs in 0L..MAX_LOCAL_POSITION_EXTRAPOLATION_MS
 

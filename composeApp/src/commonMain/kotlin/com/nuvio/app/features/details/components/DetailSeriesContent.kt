@@ -249,9 +249,9 @@ fun DetailSeriesContent(
                                 EpisodeListCard(
                                     video = episode,
                                     fallbackImage = meta.background ?: meta.poster,
-                                    progressEntry = progressByVideoId[episodeVideoId],
+                                    progressEntry = progressByVideoId[episodeVideoId] ?: progressByVideoId[episode.id],
                                     imdbRating = episode.seasonEpisodeKey()?.let { episodeRatings[it] } ?: episode.rating,
-                                    isWatched = progressByVideoId[episodeVideoId]?.isEffectivelyCompleted == true ||
+                                    isWatched = (progressByVideoId[episodeVideoId] ?: progressByVideoId[episode.id])?.isEffectivelyCompleted == true ||
                                         WatchingState.isEpisodeWatched(
                                             watchedKeys = watchedKeys,
                                             metaType = meta.type,
@@ -334,9 +334,9 @@ internal fun DetailSeriesListEpisode(
         EpisodeListCard(
             video = episode,
             fallbackImage = meta.background ?: meta.poster,
-            progressEntry = progressByVideoId[episodeVideoId],
+            progressEntry = progressByVideoId[episodeVideoId] ?: progressByVideoId[episode.id],
             imdbRating = episode.seasonEpisodeKey()?.let { episodeRatings[it] } ?: episode.rating,
-            isWatched = progressByVideoId[episodeVideoId]?.isEffectivelyCompleted == true ||
+            isWatched = (progressByVideoId[episodeVideoId] ?: progressByVideoId[episode.id])?.isEffectivelyCompleted == true ||
                 WatchingState.isEpisodeWatched(
                     watchedKeys = watchedKeys,
                     metaType = meta.type,
@@ -756,9 +756,9 @@ private fun EpisodeHorizontalRow(
             EpisodeHorizontalCard(
                 video = episode,
                 fallbackImage = fallbackImage,
-                progressEntry = progressByVideoId[episodeVideoId],
+                progressEntry = progressByVideoId[episodeVideoId] ?: progressByVideoId[episode.id],
                 imdbRating = episode.seasonEpisodeKey()?.let { episodeRatings[it] } ?: episode.rating,
-                isWatched = progressByVideoId[episodeVideoId]?.isEffectivelyCompleted == true ||
+                isWatched = (progressByVideoId[episodeVideoId] ?: progressByVideoId[episode.id])?.isEffectivelyCompleted == true ||
                     WatchingState.isEpisodeWatched(
                         watchedKeys = watchedKeys,
                         metaType = metaType,

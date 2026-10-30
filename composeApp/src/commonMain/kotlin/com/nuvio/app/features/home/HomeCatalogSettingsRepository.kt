@@ -644,8 +644,20 @@ object HomeCatalogSettingsRepository {
             orderedKeys[globalIndex] = reorderedCohortKeys[index]
         }
 
-        // Manual row placement and add-on priority are independent. Never derive saved
-        // add-on priority from a row drag: the Add-ons Row Order section owns that setting.
+        // Manual row placement and add-on priority are independent. Materialize the
+        // current add-on order before changing row indices; otherwise groups without an
+        // explicit layout inherit their order from the first catalog row and silently move.
+        val currentAddonGroups = _uiState.value.addonGroups
+        addonLayouts = addonLayouts + currentAddonGroups.associate { group ->
+            group.addonId to (addonLayouts[group.addonId] ?: StoredHomeAddonLayoutPreference(
+                addonId = group.addonId,
+                mode = group.mode.storageValue,
+                order = group.order,
+                anchorOrder = group.anchorOrder,
+                anchorKey = group.anchorKey,
+                catalogsEnabled = group.catalogsEnabled,
+            ))
+        }
         val preserveManualCatalogOrder = movingCollection || fromItem.addonId != toItem.addonId
         persistVisibleOrder(orderedKeys, updateAddonOrder = false)
         // Collections and cross-add-on moves can split catalog groups. Freeze the current

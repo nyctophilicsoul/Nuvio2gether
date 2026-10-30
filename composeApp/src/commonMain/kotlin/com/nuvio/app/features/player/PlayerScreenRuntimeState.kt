@@ -14,6 +14,7 @@ import com.nuvio.app.features.details.MetaScreenSettingsUiState
 import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.p2p.P2pSettingsUiState
 import com.nuvio.app.features.p2p.P2pStreamingState
+import com.nuvio.app.features.party.PartyMedia
 import com.nuvio.app.features.player.skip.NextEpisodeInfo
 import com.nuvio.app.features.player.skip.SkipInterval
 import com.nuvio.app.features.streams.StreamsUiState
@@ -210,6 +211,10 @@ internal class PlayerScreenRuntime(
     var showStreamInfo by mutableStateOf(false)
     var showPartyPanel by mutableStateOf(false)
     var showPartyChat by mutableStateOf(false)
+    var pendingPartyMediaChange by mutableStateOf<PartyMedia?>(null)
+    var showPartyMediaChangePrompt by mutableStateOf(false)
+    var dismissedPartyMediaKey by mutableStateOf<String?>(null)
+    var partyMediaChangeResumePlayback by mutableStateOf<Boolean?>(null)
     var partyBehind by mutableStateOf(false)
     var partyBehindMs by mutableStateOf<Long?>(null)
     var partyRateNudge: Float? = null

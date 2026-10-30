@@ -2,7 +2,7 @@ name: Media3 Alpha02 Build Smoke Test
 
 on:
   push:
-    branches: [test-media-update, cmp-rewrite]
+    branches: [test-media-update, cmp-rewrite, watchparty-sync-correction]
   workflow_dispatch:
 
 permissions:
@@ -44,12 +44,8 @@ jobs:
             touch local.properties
           fi
 
-      - name: Run focused WatchParty sync tests
-        run: |
-          ./gradlew --no-daemon \
-            :composeApp:testAndroidHostTest \
-            --tests com.nuvio.app.features.party.PartySyncTest \
-            --stacktrace
+      - name: Run Android host unit tests
+        run: ./gradlew --no-daemon :composeApp:testAndroidHostTest --stacktrace
 
       - name: Build full-debug app and instrumentation test APKs
         run: |

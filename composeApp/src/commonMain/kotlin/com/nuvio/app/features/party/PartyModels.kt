@@ -98,6 +98,41 @@ internal fun shouldFollowSharedPartyStream(
         stream.url != activeSourceUrl
 }
 
+internal enum class PartyMediaChangeDecision {
+    Ignore,
+    Prompt,
+    WaitForSharedStream,
+    AutoSwitch,
+}
+
+/**
+ * Selects the safe response when the host changes the party's media identity.
+ * A shared URL must be explicitly announced for the target movie/episode before
+ * an enabled share can trigger automatic navigation.
+ */
+internal fun decidePartyMediaChange(
+    isHost: Boolean,
+    localMediaKey: String,
+    media: PartyMedia,
+    sharingEnabled: Boolean,
+    sharedStream: PartyStream?,
+    dismissedMediaKey: String? = null,
+): PartyMediaChangeDecision {
+    if (isHost || media.key == localMediaKey || media.key == dismissedMediaKey) {
+        return PartyMediaChangeDecision.Ignore
+    }
+    if (!sharingEnabled) return PartyMediaChangeDecision.Prompt
+
+    val matchingSharedStream = sharedStream?.takeIf {
+        it.mediaKey == media.key && isShareableStreamUrl(it.url)
+    }
+    return if (matchingSharedStream != null) {
+        PartyMediaChangeDecision.AutoSwitch
+    } else {
+        PartyMediaChangeDecision.WaitForSharedStream
+    }
+}
+
 private val SHAREABLE_URL = Regex("^https?://(?!localhost|127\\.|0\\.0\\.0\\.0|\\[::1])[^\\s/]+", RegexOption.IGNORE_CASE)
 
 internal fun partyMediaKey(metaType: String, metaId: String, season: Int?, episode: Int?): String =
