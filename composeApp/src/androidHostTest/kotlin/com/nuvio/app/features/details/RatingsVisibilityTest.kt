@@ -12,7 +12,6 @@ import com.nuvio.app.features.details.components.DetailSeriesListEpisode
 import com.nuvio.app.features.mdblist.MdbListMetadataService.PROVIDER_TMDB
 import com.nuvio.app.features.watched.watchedItemKeys
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
-import com.nuvio.app.features.watchprogress.buildPlaybackVideoId
 import org.junit.Rule
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -126,12 +125,7 @@ class RatingsVisibilityTest {
             compose.onNodeWithText("6.2").assertDoesNotExist()
 
             compose.runOnIdle {
-                progress.value = mapOf(buildPlaybackVideoId(
-                    parentMetaId = meta.id,
-                    seasonNumber = episode.season,
-                    episodeNumber = episode.episode,
-                    fallbackVideoId = episode.id,
-                ) to WatchProgressEntry(
+                progress.value = mapOf(episode.id to WatchProgressEntry(
                     contentType = meta.type,
                     parentMetaId = meta.id,
                     parentMetaType = meta.type,
@@ -139,8 +133,8 @@ class RatingsVisibilityTest {
                     title = meta.name,
                     seasonNumber = 1,
                     episodeNumber = 1,
-                    lastPositionMs = 95_000,
-                    durationMs = 100_000,
+                    lastPositionMs = 1_410_000,
+                    durationMs = 1_500_000,
                     lastUpdatedEpochMs = 1,
                 ))
             }
