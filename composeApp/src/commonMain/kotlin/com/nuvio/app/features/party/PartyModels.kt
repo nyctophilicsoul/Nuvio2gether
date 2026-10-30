@@ -121,16 +121,10 @@ internal fun decidePartyMediaChange(
     if (isHost || media.key == localMediaKey || media.key == dismissedMediaKey) {
         return PartyMediaChangeDecision.Ignore
     }
-    if (!sharingEnabled) return PartyMediaChangeDecision.Prompt
-
-    val matchingSharedStream = sharedStream?.takeIf {
-        it.mediaKey == media.key && isShareableStreamUrl(it.url)
-    }
-    return if (matchingSharedStream != null) {
-        PartyMediaChangeDecision.AutoSwitch
-    } else {
-        PartyMediaChangeDecision.WaitForSharedStream
-    }
+    // A guest follows the host's media selection automatically. If stream sharing is
+    // enabled, the shared-stream effect replaces the locally resolved source once the
+    // host publishes a valid URL for this exact media.
+    return PartyMediaChangeDecision.AutoSwitch
 }
 
 private val SHAREABLE_URL = Regex("^https?://(?!localhost|127\\.|0\\.0\\.0\\.0|\\[::1])[^\\s/]+", RegexOption.IGNORE_CASE)
