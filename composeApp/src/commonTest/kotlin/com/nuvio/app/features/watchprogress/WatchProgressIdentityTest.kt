@@ -89,8 +89,8 @@ class WatchProgressIdentityTest {
                 "title": "Show",
                 "seasonNumber": 1,
                 "episodeNumber": 2,
-                "lastPositionMs": 940,
-                "durationMs": 1000,
+                "lastPositionMs": 94000,
+                "durationMs": 100000,
                 "lastUpdatedEpochMs": 100
               }]
             }
