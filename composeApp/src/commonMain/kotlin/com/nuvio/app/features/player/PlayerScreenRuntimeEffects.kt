@@ -103,6 +103,7 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
                             requestedQuality = requestedQuality,
                             debridEnabled = DebridSettingsRepository.snapshot().canResolvePlayableLinks,
                             preferredSourceOrder = preferredSourceOrder,
+                            p2pEnabled = P2pSettingsRepository.isVisible && p2pSettingsUiState.p2pEnabled,
                         )
                     }
                 }
