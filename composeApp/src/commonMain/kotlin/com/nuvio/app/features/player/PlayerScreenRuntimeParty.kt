@@ -453,6 +453,7 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
 
     LaunchedEffect(key) {
         partyBehind = false
+        if (autoOpeningPartyMediaKey == key) autoOpeningPartyMediaKey = null
         val previous = partyPreviousKey
         partyPreviousKey = key
         val party = PartyRepository.state.value.party ?: return@LaunchedEffect
@@ -463,7 +464,19 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
 
     LaunchedEffect(Unit) {
         PartyRepository.events.collect { event ->
-            if (event is PartyEvent.MediaChanged) handlePartyMediaChange(event.media)
+            if (event is PartyEvent.MediaChanged) {
+                val party = PartyRepository.state.value.party
+                if (party?.hostOnly == true && !party.isHost) {
+                    // Host-only mode follows content changes immediately. The existing
+                    // shared-stream effect replaces the source when the host publishes it.
+                    if (autoOpeningPartyMediaKey != event.media.key) {
+                        autoOpeningPartyMediaKey = event.media.key
+                        switchToPartyMedia(event.media)
+                    }
+                } else {
+                    handlePartyMediaChange(event.media)
+                }
+            }
         }
     }
 
