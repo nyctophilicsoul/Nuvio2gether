@@ -3,6 +3,7 @@ package com.nuvio.app.features.addons
 import co.touchlab.kermit.Logger
 import com.nuvio.app.core.network.SupabaseProvider
 import com.nuvio.app.core.sync.putSyncOriginClientId
+import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.features.profiles.ProfileRepository
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Order
@@ -285,6 +286,7 @@ object AddonRepository {
     fun refreshAddon(
         manifestUrl: String,
         forceRefresh: Boolean = false,
+        notifyOnSuccess: Boolean = false,
     ) {
         val existingJob = activeRefreshJobs[manifestUrl]
         if (existingJob?.isActive == true) return
@@ -328,6 +330,9 @@ object AddonRepository {
                             }
                         },
                     )
+                }
+                if (notifyOnSuccess && result.isSuccess) {
+                    NuvioToastController.show(getString(Res.string.addons_and_plugins_refreshed))
                 }
             } finally {
                 if (activeRefreshJobs[manifestUrl] === refreshJob) {
