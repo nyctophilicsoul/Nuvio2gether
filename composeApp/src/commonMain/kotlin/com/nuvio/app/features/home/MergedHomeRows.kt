@@ -19,7 +19,7 @@ data class MergedHomeRowDefinition(
     @SerialName("source_keys")
     val sourceKeys: List<String>,
     @SerialName("display_mode")
-    val displayMode: String = MergedHomeRowDisplayMode.UNIFIED_CAROUSEL.storageValue,
+    val displayMode: String = MergedHomeRowDisplayMode.SOURCE_TABS.storageValue,
     val deduplicate: Boolean = true,
     val order: Int = 0,
 ) {
@@ -44,7 +44,7 @@ enum class MergedHomeRowDisplayMode(val storageValue: String) {
 
     companion object {
         fun fromStorage(value: String?): MergedHomeRowDisplayMode =
-            values().firstOrNull { it.storageValue == value } ?: UNIFIED_CAROUSEL
+            values().firstOrNull { it.storageValue == value } ?: SOURCE_TABS
     }
 }
 

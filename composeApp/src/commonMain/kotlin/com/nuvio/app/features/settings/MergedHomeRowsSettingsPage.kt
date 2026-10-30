@@ -91,7 +91,7 @@ private fun MergedHomeRowsEditor(
     var editingId by remember { mutableStateOf<String?>(null) }
     var draftTitle by remember { mutableStateOf("") }
     var draftSourceKeys by remember { mutableStateOf(setOf<String>()) }
-    var draftMode by remember { mutableStateOf(MergedHomeRowDisplayMode.UNIFIED_CAROUSEL) }
+    var draftMode by remember { mutableStateOf(MergedHomeRowDisplayMode.SOURCE_TABS) }
     var draftDeduplicate by remember { mutableStateOf(true) }
     var deleteTarget by remember { mutableStateOf<MergedHomeRowDefinition?>(null) }
 
@@ -99,7 +99,7 @@ private fun MergedHomeRowsEditor(
         editingId = null
         draftTitle = ""
         draftSourceKeys = emptySet()
-        draftMode = MergedHomeRowDisplayMode.UNIFIED_CAROUSEL
+        draftMode = MergedHomeRowDisplayMode.SOURCE_TABS
         draftDeduplicate = true
         editorOpen = true
     }

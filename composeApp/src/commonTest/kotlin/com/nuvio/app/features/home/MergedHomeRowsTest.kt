@@ -6,6 +6,16 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class MergedHomeRowsTest {
+    @Test
+    fun sourceTabsIsTheDefaultDisplayMode() {
+        assertEquals(MergedHomeRowDisplayMode.SOURCE_TABS, MergedHomeRowDisplayMode.fromStorage(null))
+        assertEquals(MergedHomeRowDisplayMode.SOURCE_TABS.storageValue, MergedHomeRowDefinition(
+            id = "default",
+            title = "Default",
+            sourceKeys = listOf("source-a", "source-b"),
+        ).displayMode)
+    }
+
     private fun item(id: String, type: String = "movie", name: String = id) =
         MetaPreview(id = id, type = type, name = name)
 
