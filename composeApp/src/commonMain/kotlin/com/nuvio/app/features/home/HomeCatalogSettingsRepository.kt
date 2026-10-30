@@ -573,22 +573,7 @@ object HomeCatalogSettingsRepository {
     private fun validMergedRowKey(key: String): Boolean =
         mergedRows.any { mergedHomeRowKey(it.id) == key }
 
-    fun setAddonCatalogsEnabled(addonId: String, enabled: Boolean) {
-        ensureLoaded()
-        val group = _uiState.value.addonGroups.firstOrNull { it.addonId == addonId } ?: return
-        val existing = addonLayouts[addonId]
-        if ((existing?.catalogsEnabled ?: true) == enabled) return
-        val base = existing ?: StoredHomeAddonLayoutPreference(
-            addonId = addonId,
-            order = group.order,
-            anchorOrder = group.anchorOrder,
-        )
-        addonLayouts = addonLayouts + (addonId to base.copy(catalogsEnabled = enabled))
-        publish()
-        persist()
-        HomeRepository.applyCurrentSettings()
-        HomeCatalogSettingsSyncService.triggerPush()
-    }
+
 
     fun setAddonLayoutMode(addonId: String, mode: HomeAddonLayoutMode) {
         ensureLoaded()
