@@ -55,6 +55,7 @@ data class SyncHomeCatalogPayload(
     @SerialName("addon_layouts") val addonLayouts: List<SyncAddonLayoutPreference>? = null,
     @SerialName("addon_row_order_policy") val addonRowOrderPolicy: String = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS.storageValue,
     @SerialName("upcoming_row_keys") val upcomingRowKeys: List<String> = emptyList(),
+    @SerialName("merged_rows") val mergedRows: List<MergedHomeRowDefinition> = emptyList(),
 )
 
 @Serializable
@@ -93,6 +94,7 @@ object HomeCatalogSettingsSyncService {
     private const val SHOW_CATALOG_TYPE_KEY = "show_catalog_type"
     private const val ADDON_ROW_ORDER_POLICY_KEY = "addon_row_order_policy"
     private const val UPCOMING_ROW_KEYS_KEY = "upcoming_row_keys"
+    private const val MERGED_ROWS_KEY = "merged_rows"
 
     @Volatile
     var isSyncingFromRemote: Boolean = false
@@ -243,6 +245,13 @@ object HomeCatalogSettingsSyncService {
                 decoded.upcomingRowKeys
             } else {
                 localPayload.upcomingRowKeys
+            },
+            // Older app versions don't write merged_rows. Preserve the local profile's value
+            // when syncing from those payloads instead of interpreting a missing field as delete.
+            mergedRows = if (settingsJson.containsKey(MERGED_ROWS_KEY)) {
+                decoded.mergedRows
+            } else {
+                localPayload.mergedRows
             },
         )
     }.getOrNull()

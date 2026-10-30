@@ -84,6 +84,7 @@ import nuvio.composeapp.generated.resources.settings_homescreen_section_hero_sou
 import nuvio.composeapp.generated.resources.settings_homescreen_selected_count
 import nuvio.composeapp.generated.resources.settings_homescreen_show_hero
 import nuvio.composeapp.generated.resources.settings_homescreen_show_hero_description
+import nuvio.composeapp.generated.resources.settings_merged_rows_manage
 import nuvio.composeapp.generated.resources.settings_homescreen_summary
 import nuvio.composeapp.generated.resources.settings_homescreen_summary_hint
 import nuvio.composeapp.generated.resources.settings_homescreen_addon_row_order
@@ -115,9 +116,22 @@ internal fun LazyListScope.homescreenSettingsContent(
     addonRowOrderPolicy: HomeAddonRowOrderPolicy,
     isCatalogLoading: Boolean,
     catalogErrorMessage: String?,
+    onMergedRowsClick: (() -> Unit)? = null,
 ) {
     val selectedHeroSourceCount = items.count { it.heroSourceEnabled }
     val enabledCatalogCount = items.count { it.enabled }
+
+    if (onMergedRowsClick != null) {
+        item(key = "merged_rows_settings_entry") {
+            Button(
+                onClick = onMergedRowsClick,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = if (isTablet) 24.dp else 16.dp),
+            ) {
+                Text(stringResource(Res.string.settings_merged_rows_manage))
+            }
+        }
+    }
+
     item {
         HomescreenSummaryCard(
             isTablet = isTablet,
@@ -159,7 +173,7 @@ internal fun LazyListScope.homescreenSettingsContent(
         }
     }
     item {
-        val catalogOnlyItems = items.filter { !it.isCollection }
+        val catalogOnlyItems = items.filter { !it.isCollection && !it.isMergedRow }
         if (heroEnabled && catalogOnlyItems.isNotEmpty()) {
             var heroSourcesExpanded by remember { mutableStateOf(false) }
             SettingsSection(
@@ -646,7 +660,7 @@ private fun HomescreenCatalogList(
             }
         // A managed dynamic group can be reordered internally, but cannot be dragged out
         // of its configured insertion slot. Row pins remain independent overrides.
-        if (crossesManagedGroup && !staysInsideSameManagedGroup && fromItem?.isCollection != true) {
+        if (crossesManagedGroup && !staysInsideSameManagedGroup && fromItem?.isCollection != true && fromItem?.isMergedRow != true) {
             onPinnedDragAttempt()
             return@rememberReorderableLazyListState
         }
