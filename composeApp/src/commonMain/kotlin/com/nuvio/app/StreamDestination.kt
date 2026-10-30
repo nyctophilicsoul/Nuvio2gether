@@ -524,15 +524,15 @@ internal fun StreamDestination(
             p2pEnabled = p2pEnabled,
         )
         val targetHeight = requestedQuality.targetHeight
-        val rankedTopThreeCandidates = QualityFirstAutoPlayPolicy.rankCandidates(
-            streams = qualityEligibleStreams.filter { it.addonName in topThreeQualityAddonNames },
-            requestedQuality = requestedQuality,
-            debridEnabled = debridEnabledForQualitySelection,
-            preferredSourceOrder = qualityPreferredSourceOrder,
-            p2pEnabled = p2pEnabled,
-        )
-        val earlyStartCandidates = if (targetHeight == null) rankedTopThreeCandidates else
-            rankedTopThreeCandidates.filter { QualityFirstAutoPlayPolicy.detectQualityHeight(it) == targetHeight }
+        // Any eligible provider may satisfy the selected tier. Do not wait for the
+        // top-three-provider threshold or for the complete provider search.
+        val earlyStartCandidates = if (targetHeight == null) {
+            rankedFallbackCandidates
+        } else {
+            rankedFallbackCandidates.filter {
+                QualityFirstAutoPlayPolicy.detectQualityHeight(it) == targetHeight
+            }
+        }
         // Start as soon as one playable source at the selected tier is available.
         // The provider jobs remain active; the player-side fallback monitor reads
         // the live stream groups so links arriving later join the fallback pool.
