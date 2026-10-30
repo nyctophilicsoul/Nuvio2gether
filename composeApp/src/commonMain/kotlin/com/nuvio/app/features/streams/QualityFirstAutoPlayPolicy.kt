@@ -32,9 +32,11 @@ object QualityFirstAutoPlayPolicy {
         requestedQuality: StreamAutoPlayPreferredQuality,
         debridEnabled: Boolean,
         preferredSourceOrder: List<String> = emptyList(),
+        p2pEnabled: Boolean = true,
     ): List<StreamItem> {
         val targetHeight = requestedQuality.targetHeight
         val candidates = streams
+            .filter { p2pEnabled || it.p2pInfoHash == null }
             .filter { it.isSelectableForPlayback(debridEnabled) }
             .distinctBy(::identityKey)
             .filter { stream ->
@@ -75,6 +77,7 @@ object QualityFirstAutoPlayPolicy {
         requestedQuality: StreamAutoPlayPreferredQuality,
         debridEnabled: Boolean,
         preferredSourceOrder: List<String> = emptyList(),
+        p2pEnabled: Boolean = true,
     ): List<StreamItem> {
         val targetHeight = requestedQuality.targetHeight
             ?: return rankCandidates(
@@ -82,6 +85,7 @@ object QualityFirstAutoPlayPolicy {
                 requestedQuality = StreamAutoPlayPreferredQuality.ANY,
                 debridEnabled = debridEnabled,
                 preferredSourceOrder = preferredSourceOrder,
+                p2pEnabled = p2pEnabled,
             )
 
         return StreamAutoPlayPreferredQuality.entries
@@ -94,6 +98,7 @@ object QualityFirstAutoPlayPolicy {
                     requestedQuality = quality,
                     debridEnabled = debridEnabled,
                     preferredSourceOrder = preferredSourceOrder,
+                    p2pEnabled = p2pEnabled,
                 ).asSequence()
             }
             .distinctBy(::identityKey)
@@ -149,19 +154,19 @@ object QualityFirstAutoPlayPolicy {
     }
 
     fun detectQualityHeight(stream: StreamItem): Int? {
-        // Explicit parser fields are more reliable than loose labels such as HD.
+        // Prefer the strongest, most source-specific metadata. Do not let a loose
+        // description tag (e.g. "4K available") override a 1080p filename.
         val parsed = stream.clientResolve?.stream?.raw?.parsed
-        val structured = listOfNotNull(parsed?.resolution, parsed?.quality).joinToString(" ")
-        val descriptive = listOf(
+        val metadataCandidates = listOfNotNull(
+            parsed?.resolution,
             stream.behaviorHints.filename,
+            parsed?.parsedTitle,
+            parsed?.rawTitle,
+            parsed?.quality,
             stream.name,
             stream.title,
             stream.description,
-            parsed?.rawTitle,
-            parsed?.parsedTitle,
-        ).filterNotNull().joinToString(" ")
-        val metadata = if (structured.isNotBlank()) "$structured $descriptive" else descriptive
-
+        )
         val markers = listOf(
             Regex("""(?i)(?:\b4320p?\b|\b8k\b)""") to 4320,
             Regex("""(?i)(?:\b2160p?\b|\b4k\b|\buhd\b)""") to 2160,
@@ -171,7 +176,9 @@ object QualityFirstAutoPlayPolicy {
             Regex("""(?i)\b480p?\b""") to 480,
             Regex("""(?i)\b360p?\b""") to 360,
         )
-        return markers.firstOrNull { (regex, _) -> regex.containsMatchIn(metadata) }?.second
+        return metadataCandidates.firstNotNullOfOrNull { metadata ->
+            markers.firstOrNull { (regex, _) -> regex.containsMatchIn(metadata) }?.second
+        }
     }
 
     private fun identityKey(stream: StreamItem): String {
