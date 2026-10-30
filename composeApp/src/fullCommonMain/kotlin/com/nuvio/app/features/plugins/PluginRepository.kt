@@ -283,7 +283,7 @@ actual object PluginRepository {
                     pushToServer()
                 }
                 if (pushAfterRefresh && result.isSuccess) {
-                    NuvioToastController.show(getString(Res.string.addons_and_plugins_refreshed))
+                    NuvioToastController.show("Addons and plugins refreshed")
                 }
             } finally {
                 if (activeRefreshJobs[manifestUrl] === refreshJob) {
