@@ -54,7 +54,7 @@ object CatalogRepository {
             return
         }
         if (target is CatalogTarget.MergedRow) {
-            fetchMergedPage(request, forceRefresh)
+            fetchMergedPage(request, force)
             return
         }
         fetchPage(
