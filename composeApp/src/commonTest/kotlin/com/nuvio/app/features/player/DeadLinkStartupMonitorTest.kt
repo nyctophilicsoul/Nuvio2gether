@@ -1,6 +1,9 @@
 package com.nuvio.app.features.player
 
 import com.nuvio.app.features.streams.StreamItem
+import com.nuvio.app.features.streams.StreamBehaviorHints
+import com.nuvio.app.features.streams.QualityFirstAutoPlayPolicy
+import com.nuvio.app.features.streams.StreamAutoPlayPreferredQuality
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.advanceTimeBy
@@ -757,6 +760,59 @@ class DeadLinkStartupMonitorTest {
         advanceTimeBy(1)
         runCurrent()
         assertEquals(listOf(secondKey), dead.map { it.second })
+        monitor.close()
+    }
+
+    @Test
+    fun semiAutomaticFallbackUsesLiveDiscoveryKeepsQualityCeilingAndSkipsTorrentWhenP2pOff() = runTest {
+        val selected = stream("Selected 1080p", "addon:selected", "https://media.example/selected-1080.mp4")
+        val second1080 = stream("Second 1080p", "addon:second", "https://media.example/second-1080.mp4")
+        val lower720 = stream("Fallback 720p", "plugin:lower", "https://media.example/lower-720.mp4")
+        val higher2160 = stream("Above selection 2160p", "addon:higher", "https://media.example/higher-2160.mp4")
+        val torrent1080 = StreamItem(
+            name = "Torrent 1080p",
+            url = "https://media.example/torrent-1080.mp4",
+            infoHash = "0123456789abcdef0123456789abcdef01234567",
+            addonName = "Torrent",
+            addonId = "addon:torrent",
+            behaviorHints = StreamBehaviorHints(filename = "Movie.1080p.mkv"),
+        )
+        var discovered = listOf(selected)
+        val fallbacks = mutableListOf<StreamItem>()
+        val monitor = newMonitor(
+            scope = backgroundScope,
+            timeoutSeconds = { 5 },
+            candidates = {
+                QualityFirstAutoPlayPolicy.rankCandidatesWithFallback(
+                    streams = discovered,
+                    requestedQuality = StreamAutoPlayPreferredQuality.P1080,
+                    debridEnabled = true,
+                    p2pEnabled = false,
+                )
+            },
+            onFallback = fallbacks::add,
+            sourceDiscoveryLoading = { true },
+            preserveCandidateOrder = { true },
+        )
+
+        monitor.sourceSelected(selected)
+        runCurrent()
+        advanceTimeBy(5_000)
+        runCurrent()
+        assertTrue(fallbacks.isEmpty())
+
+        // Providers continue returning results after playback has already begun.
+        discovered = listOf(selected, higher2160, torrent1080, second1080, lower720)
+        advanceTimeBy(300)
+        runCurrent()
+        assertEquals(listOf(second1080), fallbacks)
+
+        monitor.sourceSelected(second1080)
+        runCurrent()
+        advanceTimeBy(5_000)
+        runCurrent()
+        assertEquals(listOf(second1080, lower720), fallbacks)
+        assertTrue(fallbacks.none { it == higher2160 || it == torrent1080 })
         monitor.close()
     }
 
