@@ -189,15 +189,6 @@ private fun MergedHomeRowsEditor(
                             TextButton(onClick = { deleteTarget = row }) {
                                 Text(stringResource(Res.string.settings_merged_rows_delete))
                             }
-                            Spacer(Modifier.weight(1f))
-                            TextButton(
-                                enabled = index > 0,
-                                onClick = { HomeCatalogSettingsRepository.moveMergedRowDefinition(index, index - 1) },
-                            ) { Text("↑") }
-                            TextButton(
-                                enabled = index < orderedRows.lastIndex,
-                                onClick = { HomeCatalogSettingsRepository.moveMergedRowDefinition(index, index + 1) },
-                            ) { Text("↓") }
                         }
                     }
                 }
@@ -230,6 +221,30 @@ private fun MergedHomeRowsEditor(
                         singleLine = true,
                         label = { Text(stringResource(Res.string.settings_merged_rows_name)) },
                     )
+                    Text(stringResource(Res.string.settings_merged_rows_display_mode), style = MaterialTheme.typography.titleSmall)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(
+                            selected = draftMode == MergedHomeRowDisplayMode.UNIFIED_CAROUSEL,
+                            onClick = { draftMode = MergedHomeRowDisplayMode.UNIFIED_CAROUSEL },
+                        )
+                        Text(
+                            stringResource(Res.string.settings_merged_rows_mode_unified),
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(
+                            selected = draftMode == MergedHomeRowDisplayMode.SOURCE_TABS,
+                            onClick = { draftMode = MergedHomeRowDisplayMode.SOURCE_TABS },
+                        )
+                        Text(
+                            stringResource(Res.string.settings_merged_rows_mode_tabs),
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+
                     Text(stringResource(Res.string.settings_merged_rows_select_sources), style = MaterialTheme.typography.titleSmall)
                     Text(stringResource(Res.string.settings_merged_rows_source_limit), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
@@ -274,29 +289,6 @@ private fun MergedHomeRowsEditor(
                         }
                     }
 
-                    Text(stringResource(Res.string.settings_merged_rows_display_mode), style = MaterialTheme.typography.titleSmall)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(
-                            selected = draftMode == MergedHomeRowDisplayMode.UNIFIED_CAROUSEL,
-                            onClick = { draftMode = MergedHomeRowDisplayMode.UNIFIED_CAROUSEL },
-                        )
-                        Text(
-                            stringResource(Res.string.settings_merged_rows_mode_unified),
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(
-                            selected = draftMode == MergedHomeRowDisplayMode.SOURCE_TABS,
-                            onClick = { draftMode = MergedHomeRowDisplayMode.SOURCE_TABS },
-                        )
-                        Text(
-                            stringResource(Res.string.settings_merged_rows_mode_tabs),
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(
                             checked = draftDeduplicate,
