@@ -156,6 +156,52 @@ class QualityFirstAutoPlayPolicyTest {
         )
     }
 
+    @Test
+    fun `filename quality takes precedence over conflicting description metadata`() {
+        val stream = StreamItem(
+            name = "Movie 1080p BluRay",
+            url = "https://media.example/movie.mkv",
+            addonName = "provider",
+            addonId = "addon:provider",
+            behaviorHints = StreamBehaviorHints(filename = "Movie.1080p.BluRay.mkv"),
+            description = "4K version also available",
+        )
+
+        assertEquals(1080, QualityFirstAutoPlayPolicy.detectQualityHeight(stream))
+    }
+
+    @Test
+    fun `torrent candidates are excluded from fallback when p2p is disabled`() {
+        val direct = stream("direct", "https://media.example/direct", "1080p")
+        val torrent = StreamItem(
+            name = "torrent",
+            url = "https://media.example/torrent",
+            infoHash = "0123456789abcdef0123456789abcdef01234567",
+            addonName = "torrent",
+            addonId = "addon:torrent",
+            behaviorHints = StreamBehaviorHints(filename = "Movie.1080p.mkv"),
+        )
+
+        assertEquals(
+            listOf("direct"),
+            QualityFirstAutoPlayPolicy.rankCandidatesWithFallback(
+                streams = listOf(torrent, direct),
+                requestedQuality = StreamAutoPlayPreferredQuality.P1080,
+                debridEnabled = true,
+                p2pEnabled = false,
+            ).map { it.addonName },
+        )
+        assertEquals(
+            listOf("torrent", "direct"),
+            QualityFirstAutoPlayPolicy.rankCandidatesWithFallback(
+                streams = listOf(torrent, direct),
+                requestedQuality = StreamAutoPlayPreferredQuality.P1080,
+                debridEnabled = true,
+                p2pEnabled = true,
+            ).map { it.addonName },
+        )
+    }
+
     private fun stream(addon: String, url: String?, name: String) = StreamItem(
         name = name,
         url = url,
