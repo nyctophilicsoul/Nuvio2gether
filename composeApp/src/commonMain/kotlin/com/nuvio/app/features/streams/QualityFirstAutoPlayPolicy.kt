@@ -36,7 +36,7 @@ object QualityFirstAutoPlayPolicy {
     ): List<StreamItem> {
         val targetHeight = requestedQuality.targetHeight
         val candidates = streams
-            .filter { p2pEnabled || it.p2pInfoHash == null }
+            .filter { p2pEnabled || !it.isTorrentStream }
             .filter { it.isSelectableForPlayback(debridEnabled) }
             .distinctBy(::identityKey)
             .filter { stream ->
