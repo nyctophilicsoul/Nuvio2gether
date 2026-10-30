@@ -265,6 +265,11 @@ private fun MergedHomeRowsEditor(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(source.displayTitle, style = MaterialTheme.typography.bodyMedium)
                                 Text(source.addonName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    text = "${source.key.substringBeforeLast(':').substringAfterLast(':')}/${source.key.substringAfterLast(':')}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
                         }
                     }

@@ -287,6 +287,42 @@ object HomeCatalogSettingsRepository {
         HomeRepository.applyCurrentSettings()
     }
 
+    fun resolveMergedHomeRow(id: String): ResolvedMergedHomeRow? {
+        ensureLoaded()
+        val row = mergedRows.firstOrNull { it.id == id } ?: return null
+        val currentSettings = snapshot()
+        val availableDefinitions = row.sourceKeys.mapNotNull { sourceKey ->
+            definitions.firstOrNull { definition ->
+                definition.key == sourceKey &&
+                    definition.serverConnectionId == null &&
+                    !ServerCatalog.isServerKey(definition.key)
+            }
+        }
+        val baseTitles = availableDefinitions.map { definition ->
+            currentSettings.preferences[definition.key]?.customTitle
+                ?.takeIf(String::isNotBlank)
+                ?: definition.titleFor(currentSettings.showCatalogType)
+        }
+        val duplicateTitleCounts = baseTitles.groupingBy { it }.eachCount()
+        val sources = availableDefinitions.mapIndexed { index, definition ->
+            val baseTitle = baseTitles[index]
+            val title = if ((duplicateTitleCounts[baseTitle] ?: 0) > 1) {
+                "$baseTitle (${definition.type}/${definition.catalogId})"
+            } else {
+                baseTitle
+            }
+            ResolvedMergedHomeRowSource(
+                definition = definition,
+                title = title,
+            )
+        }
+        return ResolvedMergedHomeRow(
+            definition = row,
+            sources = sources,
+            unavailableSourceCount = (row.sourceKeys.distinct().size - sources.size).coerceAtLeast(0),
+        )
+    }
+
     internal fun snapshot(): HomeCatalogSettingsSnapshot {
         ensureLoaded()
         return HomeCatalogSettingsSnapshot(

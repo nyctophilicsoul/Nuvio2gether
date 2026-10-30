@@ -27,6 +27,17 @@ data class MergedHomeRowDefinition(
         MergedHomeRowDisplayMode.fromStorage(displayMode)
 }
 
+data class ResolvedMergedHomeRowSource(
+    val definition: HomeCatalogDefinition,
+    val title: String,
+)
+
+data class ResolvedMergedHomeRow(
+    val definition: MergedHomeRowDefinition,
+    val sources: List<ResolvedMergedHomeRowSource>,
+    val unavailableSourceCount: Int,
+)
+
 enum class MergedHomeRowDisplayMode(val storageValue: String) {
     UNIFIED_CAROUSEL("unified_carousel"),
     SOURCE_TABS("source_tabs");

@@ -266,14 +266,14 @@ object HomeRepository {
                     title = customTitle.ifBlank { mergedRow.title },
                     subtitle = "Merged row",
                     addonName = "Merged row",
-                    target = sourceSections.first().target,
+                    target = CatalogTarget.MergedRow(rowId = mergedRow.id),
                     items = mergedItems,
                     availableItemCount = mergedItems.size,
                     hasMore = sourceSections.any(HomeCatalogSection::hasMore),
                     isMergedRow = true,
                     displayMode = mergedRow.displayMode,
                     sourceTabs = sourceTabs,
-                    supportsViewAll = false,
+                    supportsViewAll = true,
                 )
             }
         val sections = catalogSections + mergedSections

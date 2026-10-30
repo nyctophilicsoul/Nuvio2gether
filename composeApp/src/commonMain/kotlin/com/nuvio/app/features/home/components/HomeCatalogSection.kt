@@ -18,7 +18,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.NuvioShelfSection
@@ -99,19 +98,8 @@ private fun HomeCatalogRowSectionContent(
     val selectedTab = sourceTabs.firstOrNull { it.key == selectedTabKey }
         ?: sourceTabs.firstOrNull()
     val visibleEntries = selectedTab?.items?.take(HOME_MERGED_ROW_TAB_PREVIEW_LIMIT) ?: entries
-
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        if (sourceTabs.isNotEmpty()) {
-            Text(
-                text = section.title,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = sectionPadding),
-                style = androidx.compose.material3.MaterialTheme.typography.titleLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+    val sourceTabsHeader: (@Composable () -> Unit)? = if (sourceTabs.isNotEmpty()) {
+        {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -128,14 +116,22 @@ private fun HomeCatalogRowSectionContent(
                 }
             }
         }
+    } else {
+        null
+    }
 
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         NuvioShelfSection(
-            title = if (sourceTabs.isNotEmpty()) "" else section.title,
+            title = section.title,
             entries = visibleEntries,
             modifier = Modifier.fillMaxWidth(),
             headerHorizontalPadding = sectionPadding,
             rowContentPadding = PaddingValues(horizontal = sectionPadding),
             onViewAllClick = onViewAllClick,
+            headerContent = sourceTabsHeader,
             viewAllPillSize = NuvioViewAllPillSize.Compact,
             key = { item -> item.stableKey() },
         ) { item ->

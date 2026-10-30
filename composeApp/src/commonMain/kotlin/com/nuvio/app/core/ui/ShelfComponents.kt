@@ -67,6 +67,7 @@ fun <T> NuvioShelfSection(
     rowModifier: Modifier = Modifier,
     itemSpacing: Dp = 10.dp,
     onViewAllClick: (() -> Unit)? = null,
+    headerContent: (@Composable () -> Unit)? = null,
     viewAllPillSize: NuvioViewAllPillSize = NuvioViewAllPillSize.Default,
     key: ((T) -> Any)? = null,
     animatePlacement: Boolean = false,
@@ -89,6 +90,7 @@ fun <T> NuvioShelfSection(
                 viewAllPillSize = viewAllPillSize,
             )
         }
+        headerContent?.invoke()
         LazyRow(
             modifier = rowModifier,
             state = state,

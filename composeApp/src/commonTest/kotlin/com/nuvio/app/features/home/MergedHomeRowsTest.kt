@@ -1,11 +1,28 @@
 package com.nuvio.app.features.home
 
 import kotlin.test.Test
+import com.nuvio.app.features.catalog.CatalogTarget
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class MergedHomeRowsTest {
     private fun item(id: String, type: String = "movie", name: String = id) =
         MetaPreview(id = id, type = type, name = name)
+
+    @Test
+    fun mergedRowsCanOpenEvenWhenTheirPreviewIsShorterThanTheShelfLimit() {
+        val section = HomeCatalogSection(
+            key = mergedHomeRowKey("test"),
+            title = "Latest Indian",
+            subtitle = "Merged row",
+            addonName = "Merged row",
+            target = CatalogTarget.MergedRow(rowId = "test"),
+            items = listOf(item("one")),
+            isMergedRow = true,
+        )
+
+        assertTrue(section.canOpenCatalog(previewLimit = 18))
+    }
 
     @Test
     fun mergeInterleavesSourcesRatherThanExhaustingFirstSource() {
@@ -44,6 +61,20 @@ class MergedHomeRowsTest {
         )
 
         assertEquals(listOf("movie:same-id", "series:same-id"), merged.map { it.stableKey() })
+    }
+
+    @Test
+    fun mergeDeduplicatesAcrossPreviouslyLoadedSourcePages() {
+        val merged = mergeHomeRowItems(
+            sourceItems = listOf(
+                listOf(item("a1"), item("a2")),
+                listOf(item("b1"), item("a1"), item("b2")),
+            ),
+            deduplicate = true,
+            maxItems = Int.MAX_VALUE,
+        )
+
+        assertEquals(listOf("a1", "b1", "a2", "b2"), merged.map { it.id })
     }
 
     @Test

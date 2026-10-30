@@ -55,7 +55,7 @@ data class HomeCatalogSection(
 )
 
 fun HomeCatalogSection.canOpenCatalog(previewLimit: Int): Boolean =
-    supportsViewAll && (availableItemCount > previewLimit || hasMore)
+    supportsViewAll && (isMergedRow || availableItemCount > previewLimit || hasMore)
 
 data class HomeUiState(
     val isLoading: Boolean = false,
