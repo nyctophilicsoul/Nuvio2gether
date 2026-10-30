@@ -139,10 +139,10 @@ class PartyStreamTest {
     }
 
     @Test
-    fun differentContentPromptsWhenHostSharingIsDisabled() {
+    fun guestAutomaticallySwitchesWhenHostSharingIsDisabled() {
         val target = PartyMedia(type = "movie", metaId = "tt2", metaType = "movie", title = "New movie")
         assertEquals(
-            PartyMediaChangeDecision.Prompt,
+            PartyMediaChangeDecision.AutoSwitch,
             decidePartyMediaChange(
                 isHost = false,
                 localMediaKey = "movie|tt1||",
@@ -154,14 +154,14 @@ class PartyStreamTest {
     }
 
     @Test
-    fun enabledSharingWaitsForAValidStreamForTheNewMedia() {
+    fun guestAutomaticallySwitchesWithoutWaitingForAHostSharedStream() {
         val target = PartyMedia(type = "movie", metaId = "tt2", metaType = "movie", title = "New movie")
         assertEquals(
-            PartyMediaChangeDecision.WaitForSharedStream,
+            PartyMediaChangeDecision.AutoSwitch,
             decidePartyMediaChange(false, "movie|tt1||", target, true, null),
         )
         assertEquals(
-            PartyMediaChangeDecision.WaitForSharedStream,
+            PartyMediaChangeDecision.AutoSwitch,
             decidePartyMediaChange(
                 false,
                 "movie|tt1||",
@@ -171,7 +171,7 @@ class PartyStreamTest {
             ),
         )
         assertEquals(
-            PartyMediaChangeDecision.WaitForSharedStream,
+            PartyMediaChangeDecision.AutoSwitch,
             decidePartyMediaChange(
                 false,
                 "movie|tt1||",
