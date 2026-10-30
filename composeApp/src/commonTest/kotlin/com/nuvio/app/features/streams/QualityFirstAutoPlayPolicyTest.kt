@@ -26,7 +26,7 @@ class QualityFirstAutoPlayPolicyTest {
     }
 
     @Test
-    fun `selected quality only includes exact resolution tier` {
+    fun `selected quality only includes exact resolution tier`() {
         val streams = listOf(
             stream("1080", "https://a/1080", "1080p"),
             stream("2160", "https://b/2160", "2160p"),
