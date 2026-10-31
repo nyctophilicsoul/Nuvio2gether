@@ -1768,6 +1768,8 @@ private class NuvioLibmpvView(
     private var currentSourceAudioUrl: String? = null
     private var currentRequestHeaders: Map<String, String> = emptyMap()
     private var currentExternalSubtitles: List<com.nuvio.app.features.streams.StreamSubtitle> = emptyList()
+    private var originalUserAgent: String? = null
+    private var originalUserAgentCaptured = false
     @Volatile
     private var latestSnapshot = PlayerPlaybackSnapshot()
     @Volatile
@@ -2272,9 +2274,17 @@ private class NuvioLibmpvView(
     }
 
     private fun applyRequestHeadersNow(headers: Map<String, String>) {
+        if (!originalUserAgentCaptured) {
+            originalUserAgent = runCatching { mpv.getPropertyString("user-agent") }.getOrNull()
+            originalUserAgentCaptured = true
+        }
         val userAgent = headers.entries.firstOrNull { it.key.equals("User-Agent", ignoreCase = true) }?.value
         if (!userAgent.isNullOrBlank()) {
             mpv.setPropertyString("user-agent", userAgent)
+        } else {
+            // User-Agent is a separate mpv property; restore its original value when a request
+            // does not override it, rather than leaking the previous subtitle/source's value.
+            originalUserAgent?.let { mpv.setPropertyString("user-agent", it) }
         }
         val serialized = headers
             .filterKeys { !it.equals("User-Agent", ignoreCase = true) }
