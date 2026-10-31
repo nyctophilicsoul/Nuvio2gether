@@ -226,7 +226,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
                 // loaded the engine is frozen, because a late metadata update must never
                 // restart a playing stream.
                 val resolvedAutoEngineState =
-                    remember(playbackKey.copy(playbackEngine = null)) { mutableStateOf<AndroidPlaybackEngine?>(null) }
+                    remember(playbackKey.copy(playbackEngine = null), playerSettingsUiState.androidPlaybackEngine) { mutableStateOf<AndroidPlaybackEngine?>(null) }
                 if (!initialLoadCompleted || resolvedAutoEngineState.value == null) {
                     resolvedAutoEngineState.value = resolveAutoPlaybackEngine(
                         playbackEngineSetting = playerSettingsUiState.androidPlaybackEngine,
