@@ -999,7 +999,7 @@ object HomeCatalogSettingsRepository {
         // Keep unknown catalog preferences during that window; the next complete catalog sync
         // will retain keys that still exist and prune genuinely stale ones.
         val preserveUnknownCatalogPreferences =
-            !hasSynchronizedCatalogDefinitions || hasUnresolvedEnabledAddonCatalogs
+            !hasSynchronizedCatalogDefinitions || hasUnresolvedEnabledAddonCatalogs || definitions.isEmpty()
         val normalized = if (preserveUnknownCatalogPreferences) {
             current.toMutableMap()
         } else {
