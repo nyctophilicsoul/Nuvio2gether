@@ -111,9 +111,14 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
                         season = activeSeasonNumber,
                         episode = activeEpisodeNumber,
                     )
+                    val p2pEnabled = P2pSettingsRepository.isVisible && p2pSettingsUiState.p2pEnabled
+                    // Never put torrent/magnet sources into the automatic fallback chain when
+                    // the user has disabled P2P. Apply this before branching into manual-quality
+                    // and normal fallback modes so both paths obey the same setting.
+                    val p2pScoped = if (p2pEnabled) discovered else discovered.filterNot { it.isTorrentStream }
                     val requestedQuality = args.semiAutoSelectedQuality
                     if (requestedQuality == null) {
-                        discovered
+                        p2pScoped
                     } else {
                         val settings = PlayerSettingsRepository.uiState.value
                         val installedAddonNames = addonsUiState.addons
@@ -121,11 +126,11 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
                             .mapNotNull { it.manifest?.name }
                             .toSet()
                         val sourceScoped = when (settings.streamAutoPlaySource) {
-                            StreamAutoPlaySource.ALL_SOURCES -> discovered
+                            StreamAutoPlaySource.ALL_SOURCES -> p2pScoped
                             StreamAutoPlaySource.INSTALLED_ADDONS_ONLY ->
-                                discovered.filter { it.serverTarget != null || it.addonName in installedAddonNames }
+                                p2pScoped.filter { it.serverTarget != null || it.addonName in installedAddonNames }
                             StreamAutoPlaySource.ENABLED_PLUGINS_ONLY ->
-                                discovered.filter { it.addonName !in installedAddonNames }
+                                p2pScoped.filter { it.addonName !in installedAddonNames }
                         }
                         val selectedSources = sourceScoped.filter { stream ->
                             when {
@@ -147,7 +152,7 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
                             requestedQuality = requestedQuality,
                             debridEnabled = DebridSettingsRepository.snapshot().canResolvePlayableLinks,
                             preferredSourceOrder = preferredSourceOrder,
-                            p2pEnabled = P2pSettingsRepository.isVisible && p2pSettingsUiState.p2pEnabled,
+                            p2pEnabled = p2pEnabled,
                         )
                     }
                 }
