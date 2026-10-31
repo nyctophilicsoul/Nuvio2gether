@@ -703,6 +703,11 @@ class HomeCatalogSettingsRepositoryTest {
             mergedRows = listOf(row),
         )
 
+        // Keep a local preference for a source that is absent from the incoming payload.
+        // It must survive while manifests are unavailable, then bind back to its catalog.
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(addon(listOf("popular", "latest"))))
+        HomeCatalogSettingsRepository.setCustomTitle("test:movie:latest", "Local Latest")
+
         // This is the startup ordering where remote settings arrive before manifests.
         HomeCatalogSettingsRepository.syncCatalogs(emptyList())
         HomeCatalogSettingsRepository.syncCollections(listOf(collection()))
@@ -712,6 +717,10 @@ class HomeCatalogSettingsRepositoryTest {
         val source = HomeCatalogSettingsRepository.uiState.value.items.single { it.key == "test:movie:popular" }
         assertFalse(source.enabled)
         assertEquals("Remote Popular", source.customTitle)
+        assertEquals(
+            "Local Latest",
+            HomeCatalogSettingsRepository.uiState.value.items.single { it.key == "test:movie:latest" }.customTitle,
+        )
         assertEquals(row.id, HomeCatalogSettingsRepository.uiState.value.mergedRows.single().id)
         assertEquals(2, assertNotNull(HomeCatalogSettingsRepository.resolveMergedHomeRow(row.id)).sources.size)
     }
