@@ -1889,11 +1889,29 @@ private class NuvioLibmpvView(
 
     fun attachStartupSubtitles() {
         executeMpv {
-            currentExternalSubtitles.forEachIndexed { index, subtitle ->
-                val flag = if (index == 0) "auto" else "cached"
-                mpv.command("sub-add", subtitle.url.toMpvSource(), flag, subtitle.name ?: subtitle.language, subtitle.language)
+            try {
+                currentExternalSubtitles.forEachIndexed { index, subtitle ->
+                    val flag = if (index == 0) "auto" else "cached"
+                    applyRequestHeadersNow(requestHeadersForSubtitle(subtitle))
+                    mpv.command("sub-add", subtitle.url.toMpvSource(), flag, subtitle.name ?: subtitle.language, subtitle.language)
+                }
+            } finally {
+                // Subtitle-specific headers must not leak into the active video request.
+                applyRequestHeadersNow(currentRequestHeaders)
             }
         }
+    }
+
+    private fun requestHeadersForSubtitle(
+        subtitle: com.nuvio.app.features.streams.StreamSubtitle,
+    ): Map<String, String> {
+        val merged = currentRequestHeaders.toMutableMap()
+        subtitle.headers.orEmpty().forEach { (key, value) ->
+            val existingKey = merged.keys.firstOrNull { it.equals(key, ignoreCase = true) }
+            if (existingKey != null) merged.remove(existingKey)
+            merged[key] = value
+        }
+        return sanitizePlaybackHeaders(merged)
     }
 
     private fun String.toMpvSource(): String =
@@ -2107,7 +2125,17 @@ private class NuvioLibmpvView(
             }
 
             override fun setSubtitleUri(url: String) {
-                executeMpv { mpv.command("sub-add", url, "select") }
+                executeMpv {
+                    val subtitle = currentExternalSubtitles.firstOrNull { it.url == url }
+                    try {
+                        if (subtitle != null) {
+                            applyRequestHeadersNow(requestHeadersForSubtitle(subtitle))
+                        }
+                        mpv.command("sub-add", url, "select")
+                    } finally {
+                        applyRequestHeadersNow(currentRequestHeaders)
+                    }
+                }
             }
 
             override fun clearExternalSubtitle() {
