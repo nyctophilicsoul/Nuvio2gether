@@ -870,7 +870,7 @@ final class MPVPlayerViewController: UIViewController {
         let previousHeaders = activeRequestHeaders
 
         if !subtitleHeaders.isEmpty {
-            applyRequestHeaders(previousHeaders.merging(subtitleHeaders) { _, subtitleValue in subtitleValue })
+            applyRequestHeaders(mergingRequestHeaders(previousHeaders, overriding: subtitleHeaders))
         }
 
         command(
@@ -1395,6 +1395,20 @@ final class MPVPlayerViewController: UIViewController {
         if status < 0 {
             print("[MPV] API error: \(String(cString: mpv_error_string(status)))")
         }
+    }
+
+    private func mergingRequestHeaders(
+        _ base: [String: String],
+        overriding overrides: [String: String]
+    ) -> [String: String] {
+        var merged = base
+        for (key, value) in overrides {
+            if let existingKey = merged.keys.first(where: { $0.caseInsensitiveCompare(key) == .orderedSame }) {
+                merged.removeValue(forKey: existingKey)
+            }
+            merged[key] = value
+        }
+        return merged
     }
 
     private func sanitizeRequestHeaders(_ headers: [String: String]) -> [String: String] {
