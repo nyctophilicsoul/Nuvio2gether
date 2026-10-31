@@ -240,7 +240,8 @@ actual fun PlatformPlayerSurface(
 
             override fun setSubtitleUri(url: String) {
                 Logger.d(TAG) { "setSubtitleUri: $url" }
-                bridge.setSubtitleUrl(url)
+                val subtitleHeaders = externalSubtitles.firstOrNull { it.url == url }?.headers.orEmpty()
+                bridge.setSubtitleUrl(url, encodePlaybackHeadersForBridge(subtitleHeaders))
             }
 
             override fun clearExternalSubtitle() {
