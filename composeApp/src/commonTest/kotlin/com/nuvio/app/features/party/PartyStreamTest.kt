@@ -139,6 +139,36 @@ class PartyStreamTest {
     }
 
     @Test
+    fun hostDepartureFreezesPlaybackWithoutChangingItsAuthoritySequence() {
+        val playing = PartyPlayback(
+            seq = 7,
+            memberId = "host",
+            paused = false,
+            positionMs = 10_000,
+            rate = 1.5f,
+            at = 1_000,
+            mediaKey = "movie|tt1||",
+        )
+
+        val paused = pausePartyPlaybackForHostDeparture(playing, at = 3_000)
+
+        assertEquals(7L, paused?.seq)
+        assertEquals("host", paused?.memberId)
+        assertEquals(13_000L, paused?.positionMs)
+        assertEquals(3_000L, paused?.at)
+        assertTrue(paused?.paused == true)
+        assertFalse(paused?.waiting == true)
+    }
+
+    @Test
+    fun hostOnlyPublishesDifferentPartyMediaAfterPlayerIsReady() {
+        assertTrue(shouldPublishHostPartyMedia(true, "movie|old||", "movie|new||", playerReady = true))
+        assertFalse(shouldPublishHostPartyMedia(false, "movie|old||", "movie|new||", playerReady = true))
+        assertFalse(shouldPublishHostPartyMedia(true, "movie|same||", "movie|same||", playerReady = true))
+        assertFalse(shouldPublishHostPartyMedia(true, "movie|old||", "movie|new||", playerReady = false))
+    }
+
+    @Test
     fun guestAutomaticallySwitchesWhenHostSharingIsDisabled() {
         val target = PartyMedia(type = "movie", metaId = "tt2", metaType = "movie", title = "New movie")
         assertEquals(
