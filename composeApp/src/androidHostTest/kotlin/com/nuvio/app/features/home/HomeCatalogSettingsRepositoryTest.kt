@@ -634,6 +634,9 @@ class HomeCatalogSettingsRepositoryTest {
         assertTrue(createdItem.enabled)
         assertEquals(id, createdItem.mergedRowId)
         assertEquals(3, assertNotNull(HomeCatalogSettingsRepository.resolveMergedHomeRow(id)).sources.size)
+        val createdSyncPayload = HomeCatalogSettingsRepository.exportToSyncPayload()
+        assertEquals(listOf(id), createdSyncPayload.mergedRows.map { it.id })
+        assertTrue(createdSyncPayload.items.any { it.key == key })
 
         HomeCatalogSettingsRepository.setEnabled(key, false)
         assertFalse(HomeCatalogSettingsRepository.uiState.value.items.single { it.key == key }.enabled)
