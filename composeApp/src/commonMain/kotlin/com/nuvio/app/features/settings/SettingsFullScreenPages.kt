@@ -33,6 +33,7 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun HomescreenSettingsScreen(
     onBack: () -> Unit,
+    onMergedRowsClick: () -> Unit,
 ) {
     val addonsUiState by AddonRepository.uiState.collectAsStateWithLifecycle()
     val homescreenCatalogRefreshKey = remember(addonsUiState.addons) {
@@ -81,6 +82,7 @@ fun HomescreenSettingsScreen(
             addonRowOrderPolicy = homescreenSettingsUiState.addonRowOrderPolicy,
             isCatalogLoading = addonManifestsLoading,
             catalogErrorMessage = addonManifestErrorMessage,
+            onMergedRowsClick = onMergedRowsClick,
         )
     }
 }
