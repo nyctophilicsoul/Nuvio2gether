@@ -73,6 +73,7 @@ import com.nuvio.app.features.party.UnreadBadge
 import com.nuvio.app.features.party.messageRes
 import com.nuvio.app.features.party.partyMediaKey
 import com.nuvio.app.features.party.shouldFollowSharedPartyStream
+import com.nuvio.app.features.party.shouldPublishHostPartyMedia
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.isActive
@@ -451,6 +452,26 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
         activeInitialProgressFraction = null
     }
 
+    // A host that opens a different title gets a new PlayerScreenRuntime. The old
+    // runtime's key-change observer cannot publish across that boundary, so announce
+    // the new content once the new player's initial source is ready.
+    LaunchedEffect(partyId, key, partyState.party?.isHost, initialLoadCompleted) {
+        val party = PartyRepository.state.value.party ?: return@LaunchedEffect
+        if (
+            shouldPublishHostPartyMedia(
+                isHost = party.isHost,
+                partyMediaKey = party.media.key,
+                localMediaKey = key,
+                playerReady = initialLoadCompleted,
+            )
+        ) {
+            PartyRepository.publishMedia(
+                currentPartyMedia(),
+                positionMs = currentPlaybackPositionMs(),
+            )
+        }
+    }
+
     LaunchedEffect(key) {
         partyBehind = false
         if (autoOpeningPartyMediaKey == key) autoOpeningPartyMediaKey = null
@@ -464,14 +485,27 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
 
     LaunchedEffect(Unit) {
         PartyRepository.events.collect { event ->
-            if (event is PartyEvent.MediaChanged) {
-                val party = PartyRepository.state.value.party
-                if (party != null && !party.isHost) {
-                    // Media selection is host-authoritative regardless of playback-control
-                    // permissions. Guests automatically open the new movie/episode and
-                    // resolve their own source; shared-stream following may replace it later.
-                    handlePartyMediaChange(event.media)
+            when (event) {
+                is PartyEvent.MediaChanged -> {
+                    val party = PartyRepository.state.value.party
+                    if (party != null && !party.isHost) {
+                        // Media selection is host-authoritative regardless of playback-control
+                        // permissions. Guests automatically open the new movie/episode and
+                        // resolve their own source; shared-stream following may replace it later.
+                        handlePartyMediaChange(event.media)
+                    }
                 }
+                PartyEvent.HostLeft -> {
+                    // Stop the guest locally and freeze the received timeline. The host's
+                    // next playback/media update has a newer sequence and resumes the party.
+                    waitingForSharedSource = false
+                    lastFollowedSharedStream = null
+                    partyBehind = false
+                    partyBehindMs = null
+                    clearPartyNudge()
+                    applyPartyPaused(paused = true, force = true)
+                }
+                else -> Unit
             }
         }
     }
@@ -837,11 +871,12 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
         onDispose {
             val party = PartyRepository.state.value.party ?: return@onDispose
             val playback = PartyRepository.playback.value
-            val othersWatching = party.presence.values.any {
-                it.memberId != party.memberId && it.mediaKey == party.media.key && it.status != PartyMemberStatus.Browsing
-            }
-            if (party.media.key == partyKey && playback != null && !playback.paused && !othersWatching) {
-                PartyRepository.publishPlayback(paused = true, positionMs = playbackSnapshot.positionMs, rate = playback.rate)
+            if (party.isHost && party.media.key == partyKey && playback != null && !playback.paused) {
+                PartyRepository.publishPlayback(
+                    paused = true,
+                    positionMs = currentPlaybackPositionMs(),
+                    rate = playback.rate,
+                )
             }
             PartyRepository.setLocalStatus(PartyMemberStatus.Browsing, null)
         }
