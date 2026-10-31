@@ -702,6 +702,7 @@ class HomeCatalogSettingsRepositoryTest {
 
         // This is the startup ordering where remote settings arrive before manifests.
         HomeCatalogSettingsRepository.syncCatalogs(emptyList())
+        HomeCatalogSettingsRepository.syncCollections(listOf(collection()))
         HomeCatalogSettingsRepository.applyFromRemote(payload)
         HomeCatalogSettingsRepository.syncCatalogs(listOf(addon(listOf("popular", "latest"))))
 
