@@ -106,19 +106,6 @@ private fun formatP2pCacheBytes(bytes: Long): String {
     }
 }
 
-fun snapToStep(value: Float, step: Float): Float {
-    return (value / step).roundToInt() * step
-}
-
-fun calculateSteps(
-    min: Float,
-    max: Float,
-    stepSize: Float
-): Int {
-    val totalSteps = ((max - min) / stepSize).roundToInt()
-    return (totalSteps - 1).coerceAtLeast(0)
-}
-
 private fun vodCacheSliderStep(minMb: Int, maxMb: Int): Int {
     val span = (maxMb - minMb).coerceAtLeast(1)
     val rough = span / 40
@@ -128,26 +115,6 @@ private fun vodCacheSliderStep(minMb: Int, maxMb: Int): Int {
         rough <= 250 -> 250
         rough <= 500 -> 500
         else -> 1024
-    }
-}
-
-@Composable
-fun ValueBox(
-    text: String,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier,
-        contentAlignment = Alignment.CenterEnd
-    ) {
-        Text(
-            text = text,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.SemiBold,
-        )
     }
 }
 
