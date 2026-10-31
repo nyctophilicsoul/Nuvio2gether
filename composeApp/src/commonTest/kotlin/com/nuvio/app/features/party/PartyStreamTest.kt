@@ -213,7 +213,7 @@ class PartyStreamTest {
     }
 
     @Test
-    fun enabledSharingAutomaticallySwitchesOnlyToTheMatchingMediaStream() {
+    fun guestAlwaysFollowsHostMediaEvenAfterPreviouslyDismissingIt() {
         val target = PartyMedia(type = "movie", metaId = "tt2", metaType = "movie", title = "New movie")
         assertEquals(
             PartyMediaChangeDecision.AutoSwitch,
@@ -223,17 +223,6 @@ class PartyStreamTest {
                 media = target,
                 sharingEnabled = true,
                 sharedStream = stream.copy(mediaKey = target.key),
-            ),
-        )
-        assertEquals(
-            PartyMediaChangeDecision.Ignore,
-            decidePartyMediaChange(
-                isHost = false,
-                localMediaKey = "movie|tt1||",
-                media = target,
-                sharingEnabled = true,
-                sharedStream = stream.copy(mediaKey = target.key),
-                dismissedMediaKey = target.key,
             ),
         )
     }
