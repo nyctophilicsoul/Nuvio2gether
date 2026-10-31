@@ -495,8 +495,8 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
                         handlePartyMediaChange(event.media)
                     }
                 }
-                PartyEvent.HostLeft -> {
-                    // Stop the guest locally and freeze the received timeline. The host's
+                PartyEvent.HostLeft, PartyEvent.Ended -> {
+                    // Stop playback when the host leaves or the party ends. The host's
                     // next playback/media update has a newer sequence and resumes the party.
                     waitingForSharedSource = false
                     lastFollowedSharedStream = null
@@ -871,11 +871,11 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
         onDispose {
             val party = PartyRepository.state.value.party ?: return@onDispose
             val playback = PartyRepository.playback.value
-            if (party.isHost && party.media.key == partyKey && playback != null && !playback.paused) {
+            if (party.isHost && party.media.key == partyKey && playback?.paused != true) {
                 PartyRepository.publishPlayback(
                     paused = true,
                     positionMs = currentPlaybackPositionMs(),
-                    rate = playback.rate,
+                    rate = playback?.rate ?: playbackSnapshot.playbackSpeed,
                 )
             }
             PartyRepository.setLocalStatus(PartyMemberStatus.Browsing, null)
