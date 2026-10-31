@@ -46,6 +46,27 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
     @get:Input
     abstract val tmdbApiKey: Property<String>
 
+    @get:Input
+    abstract val traktClientId: Property<String>
+
+    @get:Input
+    abstract val traktClientSecret: Property<String>
+
+    @get:Input
+    abstract val traktRedirectUri: Property<String>
+
+    @get:Input
+    abstract val simklClientId: Property<String>
+
+    @get:Input
+    abstract val simklRedirectUri: Property<String>
+
+    @get:Input
+    abstract val simklAppName: Property<String>
+
+    @get:Input
+    abstract val mdblistClientId: Property<String>
+
     @TaskAction
     fun generate() {
         val props = Properties()
@@ -101,9 +122,9 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
                 |package com.nuvio.app.features.trakt
                 |
                 |object TraktConfig {
-                |    const val CLIENT_ID = "${props.getProperty("TRAKT_CLIENT_ID", "")}" 
-                |    const val CLIENT_SECRET = "${props.getProperty("TRAKT_CLIENT_SECRET", "")}" 
-                |    const val REDIRECT_URI = "${props.getProperty("TRAKT_REDIRECT_URI", "nuvio://auth/trakt")}" 
+                |    const val CLIENT_ID = "${traktClientId.get()}" 
+                |    const val CLIENT_SECRET = "${traktClientSecret.get()}" 
+                |    const val REDIRECT_URI = "${traktRedirectUri.get()}" 
                 |}
                 """.trimMargin()
             )
@@ -116,9 +137,9 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
                 |package com.nuvio.app.features.simkl
                 |
                 |object SimklConfig {
-                |    const val CLIENT_ID = "${props.getProperty("SIMKL_CLIENT_ID", "")}"
-                |    const val REDIRECT_URI = "${props.getProperty("SIMKL_REDIRECT_URI", "nuvio://auth/simkl")}"
-                |    const val APP_NAME = "${props.getProperty("SIMKL_APP_NAME", "nuvio")}"
+                |    const val CLIENT_ID = "${simklClientId.get()}"
+                |    const val REDIRECT_URI = "${simklRedirectUri.get()}"
+                |    const val APP_NAME = "${simklAppName.get()}"
                 |}
                 """.trimMargin()
             )
@@ -131,7 +152,7 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
                 |package com.nuvio.app.features.mdblist
                 |
                 |object MdbListConfig {
-                |    const val CLIENT_ID = "${props.getProperty("MDBLIST_CLIENT_ID", "")}"
+                |    const val CLIENT_ID = "${mdblistClientId.get()}"
                 |}
                 """.trimMargin()
             )
@@ -171,7 +192,7 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
                 |package com.nuvio.app.features.debrid
                 |
                 |object PremiumizeConfig {
-                |    const val CLIENT_ID = "${props.getProperty("PREMIUMIZE_CLIENT_ID", "")}"
+                |    const val CLIENT_ID = "${props.getProperty("PREMIUMIZE_CLIENT_ID", "") }"
                 |}
                 """.trimMargin()
             )
@@ -199,7 +220,7 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
                 |
                 |object CommunityConfig {
                 |    const val CONTRIBUTIONS_URL = "${props.getProperty("CONTRIBUTIONS_URL", "")}" 
-                |    const val SUPPORTERS_WALL_URL = "${props.getProperty("SUPPORTERS_WALL_URL", "https://nuvio.tv/api/supporters/wall")}"
+                |    const val SUPPORTERS_WALL_URL = "${props.getProperty("SUPPORTERS_WALL_URL", "https://nuvio.tv/api/supporters/wall") }"
                 |    const val DONATIONS_BASE_URL = "${props.getProperty("DONATIONS_BASE_URL", "")}" 
                 |    const val DONATIONS_DONATE_URL = "${props.getProperty("DONATIONS_DONATE_URL", "")}" 
                 |}
@@ -315,13 +336,31 @@ fun runtimeConfigBoolean(key: String, default: Boolean): Boolean =
         else -> default
     }
 
+// MDBList is optional; keep an empty value when no client ID is configured.
+val mdblistClientIdValue = runtimeConfigValue("MDBLIST_CLIENT_ID")
+
 val generateRuntimeConfigs = tasks.register<GenerateRuntimeConfigsTask>("generateRuntimeConfigs") {
     outputDir.set(generatedRuntimeConfigDir)
     localPropertiesFile.set(rootProject.layout.projectDirectory.file("local.properties"))
+    // Tracking credentials may be supplied either by local.properties or GitHub Actions env vars.
+    traktClientId.set(runtimeConfigValue("TRAKT_CLIENT_ID"))
+    traktClientSecret.set(runtimeConfigValue("TRAKT_CLIENT_SECRET"))
+    traktRedirectUri.set(runtimeConfigValue("TRAKT_REDIRECT_URI", "nuvio://auth/trakt"))
+    simklClientId.set(runtimeConfigValue("SIMKL_CLIENT_ID"))
+    simklRedirectUri.set(runtimeConfigValue("SIMKL_REDIRECT_URI", "nuvio://auth/simkl"))
+    simklAppName.set(runtimeConfigValue("SIMKL_APP_NAME", "nuvio"))
+    mdblistClientId.set(mdblistClientIdValue)
     appVersionName.set(releaseAppVersionName)
     appVersionCode.set(releaseAppVersionCode)
-    supabaseUrl.set(runtimeConfigValue("NUVIO_SUPABASE_URL"))
-    supabaseAnonKey.set(runtimeConfigValue("NUVIO_SUPABASE_ANON_KEY"))
+    supabaseUrl.set(
+        runtimeConfigValue("NUVIO_SUPABASE_URL", "https://api.nuvio.tv")
+    )
+    supabaseAnonKey.set(
+        runtimeConfigValue(
+            "NUVIO_SUPABASE_ANON_KEY",
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzgxNTIxMzQ2LCJleHAiOjE5MzkyMDEzNDZ9.tmQaj682pwzehpqlgCDMnySOqiUvpgRbrE43T4VJpDI"
+        )
+    )
     supabaseFallbackUrl.set(runtimeConfigValue("NUVIO_SUPABASE_FALLBACK_URL"))
     sentryDsn.set(runtimeConfigValue("SENTRY_DSN"))
     tmdbApiKey.set(runtimeConfigValue("TMDB_API_KEY"))
@@ -452,6 +491,10 @@ kotlin {
                 implementation(files("libs/nuvio-libass-release.aar"))
                 implementation(libs.ktor.client.okhttp)
                 implementation(libs.sentry.android)
+                // Use the complete Maven Media3 player stack at one pinned version.
+                // Legacy precompiled core/UI/data-source AARs are intentionally excluded
+                // below because they do not follow the version catalog.
+                implementation(libs.androidx.media3.exoplayer)
                 implementation(libs.androidx.media3.exoplayer.hls)
                 implementation(libs.androidx.media3.exoplayer.dash)
                 implementation(libs.androidx.media3.exoplayer.smoothstreaming)
@@ -463,12 +506,27 @@ kotlin {
                 implementation(libs.androidx.media3.common)
                 implementation(libs.androidx.media3.container)
                 implementation(libs.androidx.media3.extractor)
+                implementation(libs.androidx.media3.ui)
+                implementation(libs.androidx.media3.database)
                 implementation("com.google.guava:guava:33.3.1-android")
                 implementation("androidx.media3:media3-database:1.8.0")
                 implementation("androidx.media3:media3-effect:1.8.0")
                 implementation("androidx.annotation:annotation-experimental:1.3.1")
                 implementation(libs.mpv.android.lib)
-                implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("lib-*.aar"))))
+                // Keep Nuvio's custom decoder extensions and native streaming engine.
+                // Maven now supplies the standard ExoPlayer, HLS, common, data-source,
+                // extractor and UI components to prevent old AARs shadowing Media3.
+                implementation(
+                    fileTree(
+                        mapOf(
+                            "dir" to "libs",
+                            "include" to listOf(
+                                "lib-decoder-*-release.aar",
+                                "lib-nuvio-engine-android-0.1.6.aar",
+                            ),
+                        ),
+                    ),
+                )
                 if (androidDistribution == "full") {
                     implementation(files("libs/quickjs-kt-android-1.0.5-nuvio.aar"))
                     implementation(libs.ksoup)
@@ -550,12 +608,4 @@ configurations.matching { it.name == "iosMainImplementation" }.configureEach {
     project.dependencies.add(name, libs.ktor.client.darwin)
 }
 
-configurations.all {
-    exclude(group = "androidx.media3", module = "media3-exoplayer")
-    exclude(group = "androidx.media3", module = "media3-exoplayer-hls")
-    exclude(group = "androidx.media3", module = "media3-ui")
-    exclude(group = "androidx.media3", module = "media3-common")
-    exclude(group = "androidx.media3", module = "media3-datasource")
-    exclude(group = "androidx.media3", module = "media3-datasource-okhttp")
-    exclude(group = "androidx.media3", module = "media3-extractor")
-}
+

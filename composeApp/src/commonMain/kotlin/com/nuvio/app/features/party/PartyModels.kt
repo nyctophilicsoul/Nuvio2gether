@@ -12,6 +12,7 @@ data class PartySource(
     @SerialName("info_hash") val infoHash: String? = null,
     @SerialName("file_idx") val fileIdx: Int? = null,
     val filename: String? = null,
+    @SerialName("video_hash") val videoHash: String? = null,
     @SerialName("video_size") val videoSize: Long? = null,
     @SerialName("binge_group") val bingeGroup: String? = null,
     @SerialName("addon_id") val addonId: String? = null,
@@ -50,6 +51,7 @@ data class PartyStream(
     @SerialName("addon_id") val addonId: String = "",
     @SerialName("addon_logo") val addonLogo: String? = null,
     val filename: String? = null,
+    @SerialName("video_hash") val videoHash: String? = null,
     @SerialName("video_size") val videoSize: Long? = null,
     @SerialName("binge_group") val bingeGroup: String? = null,
     @SerialName("stream_type") val streamType: String? = null,
@@ -67,6 +69,7 @@ data class PartyStream(
             bingeGroup = bingeGroup,
             videoSize = videoSize,
             filename = filename,
+            videoHash = videoHash,
             proxyHeaders = StreamProxyHeaders(request = headers, response = responseHeaders),
         ),
         badges = badges,
@@ -74,6 +77,55 @@ data class PartyStream(
 }
 
 internal fun isShareableStreamUrl(url: String): Boolean = SHAREABLE_URL.containsMatchIn(url)
+
+/**
+ * True when a guest must replace its current source with the host's shared HTTP source.
+ * Shared URL delivery is authoritative; labels and filenames are not sufficient to prove
+ * that independently resolved streams are identical.
+ */
+internal fun shouldFollowSharedPartyStream(
+    isHost: Boolean,
+    sharingEnabled: Boolean,
+    partyMediaKey: String?,
+    localMediaKey: String,
+    sharedStream: PartyStream?,
+    activeSourceUrl: String,
+): Boolean {
+    if (isHost || !sharingEnabled || partyMediaKey != localMediaKey) return false
+    val stream = sharedStream ?: return false
+    return stream.mediaKey == localMediaKey &&
+        isShareableStreamUrl(stream.url) &&
+        stream.url != activeSourceUrl
+}
+
+internal enum class PartyMediaChangeDecision {
+    Ignore,
+    Prompt,
+    WaitForSharedStream,
+    AutoSwitch,
+}
+
+/**
+ * Selects the safe response when the host changes the party's media identity.
+ * A shared URL must be explicitly announced for the target movie/episode before
+ * an enabled share can trigger automatic navigation.
+ */
+internal fun decidePartyMediaChange(
+    isHost: Boolean,
+    localMediaKey: String,
+    media: PartyMedia,
+    sharingEnabled: Boolean,
+    sharedStream: PartyStream?,
+    dismissedMediaKey: String? = null,
+): PartyMediaChangeDecision {
+    if (isHost || media.key == localMediaKey || media.key == dismissedMediaKey) {
+        return PartyMediaChangeDecision.Ignore
+    }
+    // A guest follows the host's media selection automatically. If stream sharing is
+    // enabled, the shared-stream effect replaces the locally resolved source once the
+    // host publishes a valid URL for this exact media.
+    return PartyMediaChangeDecision.AutoSwitch
+}
 
 private val SHAREABLE_URL = Regex("^https?://(?!localhost|127\\.|0\\.0\\.0\\.0|\\[::1])[^\\s/]+", RegexOption.IGNORE_CASE)
 

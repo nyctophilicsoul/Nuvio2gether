@@ -52,6 +52,27 @@ class CatalogPaginationStateTest {
     }
 
     @Test
+    fun `merged sources advance their pagination cursors independently`() {
+        val movies = nextCatalogPaginationState(
+            supportsPagination = true,
+            requestedSkip = 0,
+            page = page(rawItemCount = 100, nextSkip = 100),
+            loadedNewItems = true,
+            consecutiveDuplicatePages = 0,
+        )
+        val series = nextCatalogPaginationState(
+            supportsPagination = true,
+            requestedSkip = 0,
+            page = page(rawItemCount = 37, nextSkip = 37),
+            loadedNewItems = true,
+            consecutiveDuplicatePages = 0,
+        )
+
+        assertEquals(100, movies.nextSkip)
+        assertEquals(37, series.nextSkip)
+    }
+
+    @Test
     fun `pagination support matches skip extra case insensitively`() {
         val catalog = AddonCatalog(
             type = "movie",

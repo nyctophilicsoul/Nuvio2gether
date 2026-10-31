@@ -2,6 +2,7 @@ package com.nuvio.app.features.plugins
 
 import co.touchlab.kermit.Logger
 import com.nuvio.app.core.network.SupabaseProvider
+import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.features.addons.httpGetText
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.tmdb.TmdbService
@@ -280,6 +281,9 @@ actual object PluginRepository {
                 persist()
                 if (pushAfterRefresh) {
                     pushToServer()
+                }
+                if (pushAfterRefresh && result.isSuccess) {
+                    NuvioToastController.show("Addons and plugins refreshed")
                 }
             } finally {
                 if (activeRefreshJobs[manifestUrl] === refreshJob) {

@@ -14,6 +14,7 @@ import com.nuvio.app.features.details.MetaScreenSettingsUiState
 import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.p2p.P2pSettingsUiState
 import com.nuvio.app.features.p2p.P2pStreamingState
+import com.nuvio.app.features.party.PartyMedia
 import com.nuvio.app.features.player.skip.NextEpisodeInfo
 import com.nuvio.app.features.player.skip.SkipInterval
 import com.nuvio.app.features.streams.StreamsUiState
@@ -114,6 +115,8 @@ internal class PlayerScreenRuntime(
     var showRemainingTime by mutableStateOf(false)
     var playerControlsLocked by mutableStateOf(false)
     var activeSourceUrl by mutableStateOf(sourceUrl)
+    /** Monotonic token used to ignore stale async source-resolution callbacks. */
+    var sourceSwitchGeneration: Long = 0L
     var activeSourceAudioUrl by mutableStateOf(sourceAudioUrl)
     var activeSourceHeaders by mutableStateOf(sanitizePlaybackHeaders(sourceHeaders))
     var activeSourceResponseHeaders by mutableStateOf(sanitizePlaybackResponseHeaders(sourceResponseHeaders))
@@ -125,9 +128,10 @@ internal class PlayerScreenRuntime(
     var activeTorrentTrackers by mutableStateOf(torrentTrackers)
     var p2pResolvedSourceUrl by mutableStateOf<String?>(null)
     var activeSourceIdentityKey by mutableStateOf(
-        torrentInfoHash?.trim()?.lowercase()?.takeIf { it.isNotBlank() }?.let { hash ->
-            "torrent:$hash:${torrentFileIdx ?: -1}"
-        } ?: sourceUrl.trim().takeIf { it.isNotBlank() }?.let { url -> "url:$url" },
+        args.stream?.playerSourceIdentityKey()
+            ?: torrentInfoHash?.trim()?.lowercase()?.takeIf { it.isNotBlank() }?.let { hash ->
+                "torrent:$hash:${torrentFileIdx ?: -1}"
+            } ?: sourceUrl.trim().takeIf { it.isNotBlank() }?.let { url -> "url:$url" },
     )
     var activeStreamTitle by mutableStateOf(streamTitle)
     var activeStreamSubtitle by mutableStateOf(streamSubtitle)
@@ -136,6 +140,7 @@ internal class PlayerScreenRuntime(
     var activeProviderName by mutableStateOf(providerName)
     var activeProviderAddonId by mutableStateOf(providerAddonId)
     var activeStream by mutableStateOf(args.stream)
+    var deadLinkStatusMessage by mutableStateOf<String?>(null)
     var currentStreamBingeGroup by mutableStateOf(initialBingeGroup)
     var currentStreamFilename by mutableStateOf(args.stream?.behaviorHints?.filename)
     var currentStreamInfoHash by mutableStateOf(args.stream?.infoHash)
@@ -179,6 +184,10 @@ internal class PlayerScreenRuntime(
     var pendingSeekScrobbleRestart by mutableStateOf(false)
     var hasSentCompletionScrobbleForCurrentItem by mutableStateOf(false)
     var currentTrackingMedia by mutableStateOf<TrackingMediaReference?>(null)
+    var showCompletionRatingPrompt by mutableStateOf(false)
+    var completionRatingMedia by mutableStateOf<TrackingMediaReference?>(null)
+    var pendingCompletionRatingPromptKey by mutableStateOf<String?>(null)
+    var lastCompletionRatingPromptKey: String? = null
 
     var showSourcesPanel by mutableStateOf(false)
     var showEpisodesPanel by mutableStateOf(false)
@@ -231,9 +240,14 @@ internal class PlayerScreenRuntime(
     val isPanelOpen: Boolean
         get() = showAudioModal || showSubtitleModal || showVideoSettingsModal || showStreamInfo ||
             showPartyPanel || showSourcesPanel || showEpisodesPanel || showSubmitIntroModal
+    var pendingPartyMediaChange by mutableStateOf<PartyMedia?>(null)
+    var showPartyMediaChangePrompt by mutableStateOf(false)
+    var dismissedPartyMediaKey by mutableStateOf<String?>(null)
+    var partyMediaChangeResumePlayback by mutableStateOf<Boolean?>(null)
     var partyBehind by mutableStateOf(false)
     var partyBehindMs by mutableStateOf<Long?>(null)
     var partyRateNudge: Float? = null
+    var partyRateNudgeBaseRate: Float? = null
     var partyPreviousKey: String? = null
     var partyAppInBackground = false
     var playbackSnapshotMark: TimeMark? = null

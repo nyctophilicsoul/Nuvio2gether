@@ -33,6 +33,35 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 import nuvio.composeapp.generated.resources.*
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.compose_settings_category_about
+import nuvio.composeapp.generated.resources.compose_settings_category_general
+import nuvio.composeapp.generated.resources.compose_settings_page_account
+import nuvio.composeapp.generated.resources.compose_settings_page_addons
+import nuvio.composeapp.generated.resources.compose_settings_page_advanced
+import nuvio.composeapp.generated.resources.compose_settings_page_appearance
+import nuvio.composeapp.generated.resources.compose_settings_page_content_discovery
+import nuvio.composeapp.generated.resources.compose_settings_page_debrid
+import nuvio.composeapp.generated.resources.compose_settings_page_continue_watching
+import nuvio.composeapp.generated.resources.compose_settings_page_homescreen
+import nuvio.composeapp.generated.resources.settings_merged_rows_title
+import nuvio.composeapp.generated.resources.compose_settings_page_integrations
+import nuvio.composeapp.generated.resources.compose_settings_page_licenses_attributions
+import nuvio.composeapp.generated.resources.compose_settings_page_mdblist_ratings
+import nuvio.composeapp.generated.resources.compose_settings_page_media_server
+import nuvio.composeapp.generated.resources.compose_settings_page_media_servers
+import nuvio.composeapp.generated.resources.compose_settings_page_meta_screen
+import nuvio.composeapp.generated.resources.compose_settings_page_notifications
+import nuvio.composeapp.generated.resources.compose_settings_page_playback
+import nuvio.composeapp.generated.resources.compose_settings_page_plugins
+import nuvio.composeapp.generated.resources.compose_settings_page_poster_customization
+import nuvio.composeapp.generated.resources.compose_settings_page_root
+import nuvio.composeapp.generated.resources.compose_settings_page_streams
+import nuvio.composeapp.generated.resources.compose_settings_page_supporters_contributors
+import nuvio.composeapp.generated.resources.compose_settings_page_tmdb_enrichment
+import nuvio.composeapp.generated.resources.compose_settings_page_trakt
+import nuvio.composeapp.generated.resources.compose_settings_page_tracking
+import nuvio.composeapp.generated.resources.settings_account
 import org.jetbrains.compose.resources.StringResource
 
 internal enum class SettingsCategory(
@@ -195,6 +224,11 @@ internal enum class SettingsPage(
         titleRes = Res.string.compose_settings_page_homescreen,
         category = SettingsCategory.Look,
         parentPage = Layout,
+    ),
+    MergedRows(
+        titleRes = Res.string.settings_merged_rows_title,
+        category = SettingsCategory.General,
+        parentPage = Homescreen,
     ),
     MetaScreen(
         titleRes = Res.string.compose_settings_page_meta_screen,

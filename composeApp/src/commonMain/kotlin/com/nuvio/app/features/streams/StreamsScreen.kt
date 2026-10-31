@@ -111,6 +111,7 @@ fun StreamsScreen(
     resumePositionMs: Long? = null,
     resumeProgressFraction: Float? = null,
     manualSelection: Boolean = false,
+    qualitySelectionMode: Boolean = false,
     startFromBeginning: Boolean = false,
     showLoadingScreen: Boolean = false,
     onStreamSelected: (stream: StreamItem, resumePositionMs: Long?, resumeProgressFraction: Float?) -> Unit = { _, _, _ -> },
@@ -179,7 +180,7 @@ fun StreamsScreen(
     val effectiveResumePositionMs = resumeState.positionMs
     val effectiveResumeProgressFraction = resumeState.progressFraction
 
-    LaunchedEffect(type, videoId, seasonNumber, episodeNumber, manualSelection) {
+    LaunchedEffect(type, videoId, seasonNumber, episodeNumber, manualSelection, qualitySelectionMode) {
         StreamsRepository.load(
             type = type,
             videoId = videoId,
@@ -187,6 +188,7 @@ fun StreamsScreen(
             season = seasonNumber,
             episode = episodeNumber,
             manualSelection = manualSelection,
+            qualitySelectionMode = qualitySelectionMode,
         )
     }
 
@@ -222,6 +224,7 @@ fun StreamsScreen(
             season = seasonNumber,
             episode = episodeNumber,
             manualSelection = manualSelection,
+            qualitySelectionMode = qualitySelectionMode,
         )
     }
 

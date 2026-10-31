@@ -89,6 +89,7 @@ import com.nuvio.app.features.addons.AddAddonResult
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.addons.isWaitingForFirstEnabledManifest
+import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.catalog.CatalogTarget
 import com.nuvio.app.features.cloud.CloudLibraryContentType
 import com.nuvio.app.features.cloud.CloudLibraryFile
@@ -245,6 +246,12 @@ internal fun MainAppContent(
             remember {
                 ProfileSettingsSync.startObserving()
             }
+        }
+        LaunchedEffect(ownsAppRuntime) {
+            if (!ownsAppRuntime) return@LaunchedEffect
+            AddonRepository.initialize()
+            AddonRepository.refreshAll()
+            PluginRepository.refreshAll()
         }
         val hapticFeedback = LocalHapticFeedback.current
         val focusManager = LocalFocusManager.current
@@ -1139,6 +1146,8 @@ internal fun MainAppContent(
             LibrarySourceMode.TRAKT -> stringResource(Res.string.compose_catalog_subtitle_trakt_library)
             LibrarySourceMode.SIMKL -> stringResource(Res.string.compose_catalog_subtitle_simkl_library)
                                     LibrarySourceMode.MDBLIST -> stringResource(Res.string.library_mdblist_title)
+            LibrarySourceMode.ANILIST -> stringResource(Res.string.library_anilist_title)
+            LibrarySourceMode.WETRAKR -> stringResource(Res.string.library_wetrakr_title)
         }
 
         val resolveLibrarySectionTitle = rememberLibrarySectionTitleResolver()

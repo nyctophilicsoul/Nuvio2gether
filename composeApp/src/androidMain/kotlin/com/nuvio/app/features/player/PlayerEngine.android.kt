@@ -36,12 +36,16 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import com.nuvio.app.features.streams.redactedForLogs
+import com.nuvio.app.core.logging.InAppLogger
+import com.nuvio.app.core.logging.InAppLogLevel
 import kotlinx.coroutines.runBlocking
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.C
+import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -105,6 +109,54 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 private const val TAG = "NuvioPlayer"
 private const val PLAYER_DIAGNOSTIC_TAG = "NuvioPlayerDiag"
+private fun logPlayerDiagnosticInfo(message: String) {
+    Log.i(PLAYER_DIAGNOSTIC_TAG, message)
+    InAppLogger.info(PLAYER_DIAGNOSTIC_TAG, message.replace(Regex("https?://[^\\s]+"), "[redacted-url]"))
+}
+
+private fun logPlayerDiagnosticWarn(message: String) {
+    Log.w(PLAYER_DIAGNOSTIC_TAG, message)
+    InAppLogger.warn(PLAYER_DIAGNOSTIC_TAG, message.replace(Regex("https?://[^\\s]+"), "[redacted-url]"))
+}
+
+private fun logPlayerDiagnosticError(message: String, throwable: Throwable? = null) {
+    if (throwable == null) Log.e(PLAYER_DIAGNOSTIC_TAG, message) else Log.e(PLAYER_DIAGNOSTIC_TAG, message, throwable)
+    InAppLogger.error(PLAYER_DIAGNOSTIC_TAG, message.replace(Regex("https?://[^\\s]+"), "[redacted-url]"))
+}
+
+
+/**
+ * Applies the optional Nuvio-patched Dolby Vision Profile 7 mapping API when available.
+ * Stock Media3 does not expose setMapDV7ToHevc, so this must not be a compile-time call.
+ */
+private fun DefaultRenderersFactory.setMapDV7ToHevcCompat(
+    enabled: Boolean,
+): DefaultRenderersFactory {
+    val setter = javaClass.methods.firstOrNull { method ->
+        method.name == "setMapDV7ToHevc" &&
+            method.parameterCount == 1 &&
+            method.parameterTypes[0] == Boolean::class.javaPrimitiveType
+    }
+    if (setter == null) {
+        if (enabled) {
+            logPlayerDiagnosticWarn(
+                "DV7-to-HEVC mapping was requested, but this stock Media3 build does not expose " +
+                    "the Nuvio setMapDV7ToHevc extension; the setting is ignored on this build.",
+            )
+        }
+        return this
+    }
+
+    return try {
+        setter.invoke(this, enabled)
+        this
+    } catch (error: Exception) {
+        logPlayerDiagnosticWarn(
+            "Could not apply the Nuvio DV7-to-HEVC mapping extension: ${error.javaClass.simpleName}",
+        )
+        this
+    }
+}
 
 private class PlaybackDiagnostics {
     var prepareStartedAtMs: Long = 0L
@@ -266,6 +318,15 @@ private fun ExoPlayerSurface(
     // Tracks whether an ASS track was actively selected and video effects need activation.
     // When this flips to true, the player remember key changes and player rebuilds with effects.
     var videoEffectsNeeded by remember(playerSourceKey) { mutableStateOf(false) }
+    // Track restores/jobs belong to the stream, not to a one-off resume/seek request.
+    val playerTrackIdentityKey = listOf(
+        sourceUrl,
+        sourceAudioUrl.orEmpty(),
+        sanitizedSourceHeaders,
+        sanitizedSourceResponseHeaders,
+        normalizedStreamType.orEmpty(),
+        useYoutubeChunkedPlayback,
+    )
     val playbackDiagnostics = remember(playerSourceKey) { PlaybackDiagnostics() }
     var subtitleDelayMs by remember(playerSourceKey) { mutableStateOf(0) }
     var selectedExternalSubtitleMimeType by remember(playerSourceKey) { mutableStateOf<String?>(null) }
@@ -359,32 +420,34 @@ private fun ExoPlayerSurface(
     }
 
     fun ExoPlayer.setPlaybackMediaItem(videoMediaItem: MediaItem, startPositionMs: Long? = null) {
-        if (!sourceAudioUrl.isNullOrBlank()) {
-            val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
+        // Build each source with the current stream's factory. The ExoPlayer itself is kept
+        // alive across ordinary source switches so a compatible audio output can be reused.
+        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
+        val mediaSource = if (!sourceAudioUrl.isNullOrBlank()) {
             val videoSource = mediaSourceFactory.createMediaSource(videoMediaItem)
             val audioSource = mediaSourceFactory.createMediaSource(playbackMediaItemFromUrl(sourceAudioUrl))
-            val mergedSource = MergingMediaSource(videoSource, audioSource)
-            if (startPositionMs != null) {
-                setMediaSource(mergedSource, startPositionMs.coerceAtLeast(0L))
-            } else {
-                setMediaSource(mergedSource)
-            }
-        } else if (startPositionMs != null) {
-            setMediaItem(videoMediaItem, startPositionMs.coerceAtLeast(0L))
+            MergingMediaSource(videoSource, audioSource)
         } else {
-            setMediaItem(videoMediaItem)
+            mediaSourceFactory.createMediaSource(videoMediaItem)
+        }
+        if (startPositionMs != null) {
+            setMediaSource(mediaSource, startPositionMs.coerceAtLeast(0L))
+        } else {
+            setMediaSource(mediaSource)
         }
     }
 
     val exoPlayer = remember(
-        sourceUrl,
-        sourceAudioUrl,
-        sanitizedSourceHeaders,
-        sanitizedSourceResponseHeaders,
-        normalizedStreamType,
-        useYoutubeChunkedPlayback,
+        // Stream URLs, per-stream headers, extractors and cache wrappers are handled by the
+        // per-source MediaSource built below. Do not recreate ExoPlayer/AudioTrack just because
+        // a user switches streams.
+        context,
         effectiveDecoderPriority,
-        initialPositionRequestKey,
+        useLibass,
+        libassRenderType,
+        playerSettings.libassRenderScale,
+        playerSettings.mapDV7ToHevc,
+        playerSettings.tunnelingEnabled,
         playerSettings.exoNativeMemoryEnabled,
         playerSettings.bufferEngineEnabled,
         playerSettings.minBufferMs,
@@ -416,7 +479,7 @@ private fun ExoPlayerSurface(
         )
             .setExtensionRendererMode(effectiveDecoderPriority)
             .setEnableDecoderFallback(true)
-            .setMapDV7ToHevc(playerSettings.mapDV7ToHevc)
+            .setMapDV7ToHevcCompat(playerSettings.mapDV7ToHevc)
 
         val trackSelector = DefaultTrackSelector(context).apply {
             var parameters = buildUponParameters()
@@ -535,7 +598,13 @@ private fun ExoPlayerSurface(
         )
     }
 
+    fun isCurrentExoPlayerSource(): Boolean =
+        exoPlayer.currentMediaItem?.mediaId == sourceUrl
+
     fun dispatchExoPlayerSnapshot() {
+        // The ExoPlayer instance is shared across source switches. Do not publish a queued
+        // snapshot from the previous media item under the new playback identity.
+        if (!isCurrentExoPlayerSource()) return
         val snapshot = exoPlayer.snapshot()
         latestOnSnapshot.value(snapshot)
         nowPlayingController.syncPlayback(snapshot)
@@ -545,15 +614,13 @@ private fun ExoPlayerSurface(
         onDispose { nowPlayingController.release() }
     }
 
-    LaunchedEffect(exoPlayer, resolvedMediaItem, initialPositionRequestKey) {
+    LaunchedEffect(exoPlayer, resolvedMediaItem, initialPositionRequestKey, dataSourceFactory, extractorsFactory, sourceAudioUrl) {
         val mediaItem = resolvedMediaItem
         val requestedStartPositionMs = fallbackStartPositionMs
             ?: initialPositionMs?.takeIf { it > 0L }
         playbackDiagnostics.attempt += 1
         playbackDiagnostics.prepareStartedAtMs = SystemClock.elapsedRealtime()
-        Log.i(
-            PLAYER_DIAGNOSTIC_TAG,
-            "prepare begin attempt=${playbackDiagnostics.attempt} " +
+        logPlayerDiagnosticInfo("prepare begin attempt=${playbackDiagnostics.attempt} " +
                 "source=${diagnosticPlaybackSource(sourceUrl)} audioSource=${!sourceAudioUrl.isNullOrBlank()} " +
                 "mime=${mediaItem.localConfiguration?.mimeType ?: "auto"} " +
                 "startPositionMs=${requestedStartPositionMs ?: 0L}",
@@ -570,9 +637,20 @@ private fun ExoPlayerSurface(
         exoPlayer.prepare()
     }
 
-    val pendingSubtitleTrackIndex = remember { mutableListOf<Int>() }
-    val pendingAudioTrackSelection = remember { mutableListOf<TrackSelectionSnapshot>() }
+    val pendingSubtitleTrackIndex = remember(playerTrackIdentityKey) { mutableListOf<Int>() }
+    val pendingAudioTrackSelection = remember(playerTrackIdentityKey) { mutableListOf<TrackSelectionSnapshot>() }
     var subtitleSelectionJob by remember { mutableStateOf<Job?>(null) }
+
+    // The same ExoPlayer now survives URL changes to preserve AudioTrack, so cancel stale
+    // subtitle reloads and track-restoration state when a different stream takes over.
+    DisposableEffect(playerTrackIdentityKey) {
+        onDispose {
+            subtitleSelectionJob?.cancel()
+            subtitleSelectionJob = null
+            pendingSubtitleTrackIndex.clear()
+            pendingAudioTrackSelection.clear()
+        }
+    }
     val isInPip = rememberIsInPictureInPicture()
     // Player size outside PiP, so PiP subtitles keep the full-screen size relative to the video.
     var playerSizeOutsidePip by remember { mutableStateOf(IntSize.Zero) }
@@ -614,7 +692,7 @@ private fun ExoPlayerSurface(
         Log.d(TAG, "$reason: preserving audio track index=${selection.index} id=${selection.id}")
     }
 
-    DisposableEffect(exoPlayer) {
+    DisposableEffect(exoPlayer, playerSourceKey, externalSubtitles) {
         PlayerPictureInPictureManager.registerPausePlaybackCallback {
             exoPlayer.pause()
         }
@@ -651,9 +729,7 @@ private fun ExoPlayerSurface(
         val listener = object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
                 syncPlayerViewKeepScreenOn()
-                Log.e(
-                    PLAYER_DIAGNOSTIC_TAG,
-                    "error attempt=${playbackDiagnostics.attempt} " +
+                logPlayerDiagnosticError("error attempt=${playbackDiagnostics.attempt} " +
                         "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)} " +
                         "code=${error.errorCodeName} cause=${error.cause?.javaClass?.simpleName ?: "none"} " +
                         "positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)} " +
@@ -699,9 +775,7 @@ private fun ExoPlayerSurface(
                     else -> "UNKNOWN($playbackState)"
                 }
                 Log.d(TAG, "onPlaybackStateChanged: $stateName")
-                Log.i(
-                    PLAYER_DIAGNOSTIC_TAG,
-                    "state=$stateName attempt=${playbackDiagnostics.attempt} " +
+                logPlayerDiagnosticInfo("state=$stateName attempt=${playbackDiagnostics.attempt} " +
                         "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)} " +
                         "positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)} " +
                         "bufferedMs=${exoPlayer.bufferedPosition.coerceAtLeast(0L)} " +
@@ -719,9 +793,7 @@ private fun ExoPlayerSurface(
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
-                Log.i(
-                    PLAYER_DIAGNOSTIC_TAG,
-                    "isPlaying=$isPlaying attempt=${playbackDiagnostics.attempt} " +
+                logPlayerDiagnosticInfo("isPlaying=$isPlaying attempt=${playbackDiagnostics.attempt} " +
                         "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)} " +
                         "positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)}",
                 )
@@ -730,19 +802,43 @@ private fun ExoPlayerSurface(
             }
 
             override fun onRenderedFirstFrame() {
-                Log.i(
-                    PLAYER_DIAGNOSTIC_TAG,
-                    "firstFrame attempt=${playbackDiagnostics.attempt} " +
+                logPlayerDiagnosticInfo("firstFrame attempt=${playbackDiagnostics.attempt} " +
                         "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)} " +
                         "positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)}",
                 )
             }
 
             override fun onPlaybackParametersChanged(playbackParameters: androidx.media3.common.PlaybackParameters) {
+                logPlayerDiagnosticInfo("PLAYBACK_PARAMETERS attempt=${playbackDiagnostics.attempt} " +
+                        "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)} " +
+                        "positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)} " +
+                        "speed=${playbackParameters.speed} pitch=${playbackParameters.pitch}",
+                )
                 dispatchExoPlayerSnapshot()
             }
 
+            override fun onPositionDiscontinuity(
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int,
+            ) {
+                val reasonName = when (reason) {
+                    Player.DISCONTINUITY_REASON_AUTO_TRANSITION -> "AUTO_TRANSITION"
+                    Player.DISCONTINUITY_REASON_SEEK -> "SEEK"
+                    Player.DISCONTINUITY_REASON_SEEK_ADJUSTMENT -> "SEEK_ADJUSTMENT"
+                    Player.DISCONTINUITY_REASON_SKIP -> "SKIP"
+                    Player.DISCONTINUITY_REASON_REMOVE -> "REMOVE"
+                    else -> "OTHER($reason)"
+                }
+                logPlayerDiagnosticInfo("POSITION_DISCONTINUITY reason=$reasonName attempt=${playbackDiagnostics.attempt} " +
+                        "oldMs=${oldPosition.positionMs} newMs=${newPosition.positionMs} " +
+                        "speed=${exoPlayer.playbackParameters.speed} " +
+                        "audioFormat=${exoPlayer.audioFormat?.let { "${it.sampleMimeType}/${it.sampleRate}Hz/${it.channelCount}ch" } ?: "unknown"}",
+                )
+            }
+
             override fun onVideoSizeChanged(videoSize: VideoSize) {
+                if (!isCurrentExoPlayerSource()) return
                 latestOnSnapshot.value(exoPlayer.snapshot())
                 if (videoSize.width > 0 && videoSize.height > 0) {
                     videoAspectRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
@@ -816,7 +912,125 @@ private fun ExoPlayerSurface(
 
         }
         exoPlayer.addListener(listener)
+        val audioDiagnosticsListener = object : AnalyticsListener {
+            override fun onAudioDecoderInitialized(
+                eventTime: AnalyticsListener.EventTime,
+                decoderName: String,
+                initializedTimestampMs: Long,
+                initializationDurationMs: Long,
+            ) {
+                logPlayerDiagnosticInfo(
+                    "AUDIO_DECODER_INITIALIZED decoder=$decoderName " +
+                        "initDurationMs=$initializationDurationMs " +
+                        "attempt=${playbackDiagnostics.attempt} " +
+                        "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)}",
+                )
+            }
+
+            override fun onAudioDecoderReleased(
+                eventTime: AnalyticsListener.EventTime,
+                decoderName: String,
+            ) {
+                logPlayerDiagnosticInfo(
+                    "AUDIO_DECODER_RELEASED decoder=$decoderName " +
+                        "attempt=${playbackDiagnostics.attempt} " +
+                        "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)}",
+                )
+            }
+
+            override fun onAudioInputFormatChanged(
+                eventTime: AnalyticsListener.EventTime,
+                format: Format,
+                decoderReuseEvaluation: androidx.media3.exoplayer.DecoderReuseEvaluation?,
+            ) {
+                logPlayerDiagnosticInfo(
+                    "AUDIO_INPUT_FORMAT_CHANGED mime=${format.sampleMimeType} " +
+                        "sampleRate=${format.sampleRate}Hz channels=${format.channelCount} " +
+                        "bitrate=${format.bitrate} decoderReuse=${decoderReuseEvaluation?.result ?: "unknown"} " +
+                        "attempt=${playbackDiagnostics.attempt} " +
+                        "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)}",
+                )
+            }
+
+            override fun onAudioPositionAdvancing(
+                eventTime: AnalyticsListener.EventTime,
+                playoutStartSystemTimeMs: Long,
+            ) {
+                logPlayerDiagnosticInfo(
+                    "AUDIO_POSITION_ADVANCING playoutStartSystemTimeMs=$playoutStartSystemTimeMs " +
+                        "attempt=${playbackDiagnostics.attempt} " +
+                        "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)} " +
+                        "positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)}",
+                )
+            }
+
+            override fun onAudioTrackInitialized(
+                eventTime: AnalyticsListener.EventTime,
+                audioTrackConfig: AudioSink.AudioTrackConfig,
+            ) {
+                logPlayerDiagnosticInfo(
+                    "AUDIO_TRACK_INITIALIZED config=$audioTrackConfig " +
+                        "attempt=${playbackDiagnostics.attempt} " +
+                        "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)}",
+                )
+            }
+
+            override fun onAudioTrackReleased(
+                eventTime: AnalyticsListener.EventTime,
+                audioTrackConfig: AudioSink.AudioTrackConfig,
+            ) {
+                logPlayerDiagnosticInfo(
+                    "AUDIO_TRACK_RELEASED config=$audioTrackConfig " +
+                        "attempt=${playbackDiagnostics.attempt} " +
+                        "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)}",
+                )
+            }
+
+            override fun onAudioCodecError(
+                eventTime: AnalyticsListener.EventTime,
+                audioCodecError: Exception,
+            ) {
+                logPlayerDiagnosticError(
+                    "AUDIO_CODEC_ERROR attempt=${playbackDiagnostics.attempt} " +
+                        "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)} " +
+                        "positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)} " +
+                        "error=${diagnosticThrowableChain(audioCodecError)}",
+                    audioCodecError,
+                )
+            }
+
+            override fun onAudioUnderrun(
+                eventTime: AnalyticsListener.EventTime,
+                bufferSize: Int,
+                bufferSizeMs: Long,
+                elapsedSinceLastFeedMs: Long,
+            ) {
+                logPlayerDiagnosticWarn("AUDIO_UNDERRUN attempt=${playbackDiagnostics.attempt} " +
+                        "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)} " +
+                        "positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)} " +
+                        "bufferSizeBytes=$bufferSize bufferSizeMs=$bufferSizeMs " +
+                        "elapsedSinceLastFeedMs=$elapsedSinceLastFeedMs " +
+                        "speed=${exoPlayer.playbackParameters.speed} " +
+                        "audioFormat=${exoPlayer.audioFormat?.let { "${it.sampleMimeType}/${it.sampleRate}Hz/${it.channelCount}ch" } ?: "unknown"}",
+                )
+            }
+
+            override fun onAudioSinkError(
+                eventTime: AnalyticsListener.EventTime,
+                audioSinkError: Exception,
+            ) {
+                logPlayerDiagnosticError("AUDIO_SINK_ERROR attempt=${playbackDiagnostics.attempt} " +
+                        "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)} " +
+                        "positionMs=${exoPlayer.currentPosition.coerceAtLeast(0L)} " +
+                        "speed=${exoPlayer.playbackParameters.speed} " +
+                        "error=${diagnosticThrowableChain(audioSinkError)}",
+                    audioSinkError,
+                )
+            }
+        }
+        exoPlayer.addAnalyticsListener(audioDiagnosticsListener)
         onDispose {
+            exoPlayer.removeAnalyticsListener(audioDiagnosticsListener)
             PlayerPictureInPictureManager.registerPausePlaybackCallback(null)
             PlayerPictureInPictureManager.registerTogglePlaybackCallback(null)
             exoPlayer.removeListener(listener)
@@ -1302,9 +1516,7 @@ private fun LibmpvPlayerSurface(
             }
             override fun eventProperty(property: String, value: Boolean) {
                 if (property == "eof-reached" && value) {
-                    Log.w(
-                        PLAYER_DIAGNOSTIC_TAG,
-                        "mpv_property=eof-reached value=true attempt=${playbackDiagnostics.attempt} " +
+                    logPlayerDiagnosticWarn("mpv_property=eof-reached value=true attempt=${playbackDiagnostics.attempt} " +
                             "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)}",
                     )
                 }
@@ -1333,9 +1545,7 @@ private fun LibmpvPlayerSurface(
             override fun event(eventId: Int, data: MPVNode) {
                 when (eventId) {
                     MPV.mpvEvent.MPV_EVENT_START_FILE -> {
-                        Log.i(
-                            PLAYER_DIAGNOSTIC_TAG,
-                            "mpv_event=START_FILE attempt=${playbackDiagnostics.attempt} " +
+                        logPlayerDiagnosticInfo("mpv_event=START_FILE attempt=${playbackDiagnostics.attempt} " +
                                 "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)}",
                         )
                         coroutineScope.launch(Dispatchers.Main.immediate) {
@@ -1351,9 +1561,7 @@ private fun LibmpvPlayerSurface(
                         coroutineScope.launch(Dispatchers.Main.immediate) {
                             latestOnError.value(null)
                             val snapshot = view.snapshot()
-                            Log.i(
-                                PLAYER_DIAGNOSTIC_TAG,
-                                "mpv_event=${if (eventId == MPV.mpvEvent.MPV_EVENT_FILE_LOADED) "FILE_LOADED" else "PLAYBACK_RESTART"} " +
+                            logPlayerDiagnosticInfo("mpv_event=${if (eventId == MPV.mpvEvent.MPV_EVENT_FILE_LOADED) "FILE_LOADED" else "PLAYBACK_RESTART"} " +
                                     "attempt=${playbackDiagnostics.attempt} " +
                                     "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)} " +
                                     "positionMs=${snapshot.positionMs} bufferedMs=${snapshot.bufferedPositionMs} " +
@@ -1366,9 +1574,7 @@ private fun LibmpvPlayerSurface(
                     MPV.mpvEvent.MPV_EVENT_END_FILE -> {
                         coroutineScope.launch(Dispatchers.Main.immediate) {
                             val snapshot = view.snapshot()
-                            Log.w(
-                                PLAYER_DIAGNOSTIC_TAG,
-                                "mpv_event=END_FILE attempt=${playbackDiagnostics.attempt} " +
+                            logPlayerDiagnosticWarn("mpv_event=END_FILE attempt=${playbackDiagnostics.attempt} " +
                                     "elapsedMs=${diagnosticElapsedSince(playbackDiagnostics.prepareStartedAtMs)} " +
                                     "positionMs=${snapshot.positionMs} bufferedMs=${snapshot.bufferedPositionMs} " +
                                     "durationMs=${snapshot.durationMs} eof=${snapshot.isEnded} " +
@@ -1384,11 +1590,30 @@ private fun LibmpvPlayerSurface(
         }
         val logObserver = object : MPV.LogObserver {
             override fun logMessage(prefix: String, level: Int, text: String) {
-                Log.w(
-                    PLAYER_DIAGNOSTIC_TAG,
-                    "mpv_log level=$level prefix=${diagnosticPlayerMessage(prefix)} " +
-                        "message=${diagnosticPlayerMessage(text)}",
-                )
+                val safePrefix = diagnosticPlayerMessage(prefix)
+                val safeMessage = diagnosticPlayerMessage(text)
+                val message = "mpv_log level=$level prefix=$safePrefix message=$safeMessage"
+                when {
+                    level <= 20 -> logPlayerDiagnosticError(message)
+                    level <= 30 -> logPlayerDiagnosticWarn(message)
+                    level <= 40 -> logPlayerDiagnosticInfo(message)
+                    Regex("(?i)audio|audiotrack|ao_|decoder|resampl|underrun|buffer|device").containsMatchIn(
+                        "$safePrefix $safeMessage",
+                    ) -> {
+                        // Keep audio-related verbose MPV output available in the in-app
+                        // export without allowing unrelated trace/debug noise to evict
+                        // the actual player transition and underrun records.
+                        Log.d(PLAYER_DIAGNOSTIC_TAG, message)
+                        val redactedMessage = safeMessage.replace(Regex("https?://[^\\s]+"), "[redacted-url]")
+                        InAppLogger.logMpv(
+                            platform = "Android",
+                            prefix = safePrefix,
+                            level = "debug",
+                            message = "level=$level $redactedMessage",
+                        )
+                    }
+                    else -> Unit
+                }
             }
         }
         view.mpv.addObserver(observer)
@@ -1428,9 +1653,7 @@ private fun LibmpvPlayerSurface(
         val view = playerViewRef ?: return@LaunchedEffect
         playbackDiagnostics.attempt += 1
         playbackDiagnostics.prepareStartedAtMs = SystemClock.elapsedRealtime()
-        Log.i(
-            PLAYER_DIAGNOSTIC_TAG,
-            "mpv_prepare_begin attempt=${playbackDiagnostics.attempt} " +
+        logPlayerDiagnosticInfo("mpv_prepare_begin attempt=${playbackDiagnostics.attempt} " +
                 "source=${diagnosticPlaybackSource(sourceUrl)} audioSource=${!sourceAudioUrl.isNullOrBlank()}",
         )
         val snapshot = PlayerPlaybackSnapshot()

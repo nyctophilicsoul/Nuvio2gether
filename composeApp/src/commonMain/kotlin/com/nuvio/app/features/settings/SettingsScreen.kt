@@ -66,7 +66,10 @@ import com.nuvio.app.features.addons.hasPendingEnabledManifests
 import com.nuvio.app.features.addons.isWaitingForFirstEnabledManifest
 import com.nuvio.app.features.debrid.DebridSettings
 import com.nuvio.app.features.debrid.DebridSettingsRepository
+import com.nuvio.app.features.home.HomeAddonLayoutItem
+import com.nuvio.app.features.home.HomeAddonRowOrderPolicy
 import com.nuvio.app.features.home.HomeCatalogSettingsItem
+import com.nuvio.app.features.home.HomeCatalogSettingsUiState
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.buildAddonCatalogRefreshSignature
 import com.nuvio.app.features.mdblist.MdbListSettings
@@ -410,8 +413,11 @@ fun SettingsScreen(
                         homescreenShowCatalogType = homescreenSettingsUiState.showCatalogType,
                         homescreenHideUnreleasedContent = homescreenSettingsUiState.hideUnreleasedContent,
                         homescreenItems = homescreenSettingsUiState.items,
+                        homescreenAddonGroups = homescreenSettingsUiState.addonGroups,
+                        homescreenAddonRowOrderPolicy = homescreenSettingsUiState.addonRowOrderPolicy,
                         homescreenCatalogLoading = addonManifestsLoading,
                         homescreenCatalogErrorMessage = addonManifestErrorMessage,
+                        homescreenSettingsUiState = homescreenSettingsUiState,
                         metaScreenSettingsUiState = metaScreenSettingsUiState,
                         continueWatchingPreferencesUiState = continueWatchingPreferencesUiState,
                         posterCardStyleUiState = posterCardStyleUiState,
@@ -454,8 +460,11 @@ fun SettingsScreen(
                         homescreenShowCatalogType = homescreenSettingsUiState.showCatalogType,
                         homescreenHideUnreleasedContent = homescreenSettingsUiState.hideUnreleasedContent,
                         homescreenItems = homescreenSettingsUiState.items,
+                        homescreenAddonGroups = homescreenSettingsUiState.addonGroups,
+                        homescreenAddonRowOrderPolicy = homescreenSettingsUiState.addonRowOrderPolicy,
                         homescreenCatalogLoading = addonManifestsLoading,
                         homescreenCatalogErrorMessage = addonManifestErrorMessage,
+                        homescreenSettingsUiState = homescreenSettingsUiState,
                         metaScreenSettingsUiState = metaScreenSettingsUiState,
                         continueWatchingPreferencesUiState = continueWatchingPreferencesUiState,
                         posterCardStyleUiState = posterCardStyleUiState,
@@ -510,8 +519,11 @@ private fun MobileSettingsScreen(
     homescreenShowCatalogType: Boolean,
     homescreenHideUnreleasedContent: Boolean,
     homescreenItems: List<HomeCatalogSettingsItem>,
+    homescreenAddonGroups: List<HomeAddonLayoutItem>,
+    homescreenAddonRowOrderPolicy: HomeAddonRowOrderPolicy,
     homescreenCatalogLoading: Boolean,
     homescreenCatalogErrorMessage: String?,
+    homescreenSettingsUiState: HomeCatalogSettingsUiState,
     metaScreenSettingsUiState: MetaScreenSettingsUiState,
     continueWatchingPreferencesUiState: ContinueWatchingPreferencesUiState,
     posterCardStyleUiState: PosterCardStyleUiState,
@@ -746,8 +758,15 @@ private fun MobileSettingsScreen(
                     showCatalogType = homescreenShowCatalogType,
                     hideUnreleasedContent = homescreenHideUnreleasedContent,
                     items = homescreenItems,
+                    addonGroups = homescreenAddonGroups,
+                    addonRowOrderPolicy = homescreenAddonRowOrderPolicy,
                     isCatalogLoading = homescreenCatalogLoading,
                     catalogErrorMessage = homescreenCatalogErrorMessage,
+                    onMergedRowsClick = { onPageChange(SettingsPage.MergedRows) },
+                )
+                SettingsPage.MergedRows -> mergedHomeRowsSettingsContent(
+                    isTablet = false,
+                    uiState = homescreenSettingsUiState,
                 )
                 SettingsPage.MetaScreen -> metaScreenSettingsContent(
                     isTablet = false,
@@ -858,8 +877,11 @@ private fun TabletSettingsScreen(
     homescreenShowCatalogType: Boolean,
     homescreenHideUnreleasedContent: Boolean,
     homescreenItems: List<HomeCatalogSettingsItem>,
+    homescreenAddonGroups: List<HomeAddonLayoutItem>,
+    homescreenAddonRowOrderPolicy: HomeAddonRowOrderPolicy,
     homescreenCatalogLoading: Boolean,
     homescreenCatalogErrorMessage: String?,
+    homescreenSettingsUiState: HomeCatalogSettingsUiState,
     metaScreenSettingsUiState: MetaScreenSettingsUiState,
     continueWatchingPreferencesUiState: ContinueWatchingPreferencesUiState,
     posterCardStyleUiState: PosterCardStyleUiState,
@@ -1147,8 +1169,15 @@ private fun TabletSettingsScreen(
                         showCatalogType = homescreenShowCatalogType,
                         hideUnreleasedContent = homescreenHideUnreleasedContent,
                         items = homescreenItems,
+                    addonGroups = homescreenAddonGroups,
+                        addonRowOrderPolicy = homescreenAddonRowOrderPolicy,
                         isCatalogLoading = homescreenCatalogLoading,
                         catalogErrorMessage = homescreenCatalogErrorMessage,
+                        onMergedRowsClick = { onPageChange(SettingsPage.MergedRows) },
+                    )
+                    SettingsPage.MergedRows -> mergedHomeRowsSettingsContent(
+                        isTablet = true,
+                        uiState = homescreenSettingsUiState,
                     )
                     SettingsPage.MetaScreen -> metaScreenSettingsContent(
                         isTablet = true,
