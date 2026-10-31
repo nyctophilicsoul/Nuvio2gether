@@ -243,7 +243,7 @@ private fun PlayerScreenRuntime.applyPartyPaused(paused: Boolean, force: Boolean
 }
 
 private fun PlayerScreenRuntime.handlePartyMediaChange(media: PartyMedia) {
-    if (media.key == partyKey || dismissedPartyMediaKey == media.key) return
+    if (media.key == partyKey) return
     val party = PartyRepository.state.value.party ?: return
     if (party.isHost || party.media.key != media.key) return
 
