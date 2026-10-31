@@ -282,7 +282,7 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         showEpisodesPanel = false
         showChaptersPanel = false
         chapters = emptyList()
-        chaptersLoadedForSourceUrl = null
+        chaptersLoadedForSourceKey = null
         clearChapterSkipState()
         episodeStreamsPanelState = EpisodeStreamsPanelState()
         PlayerStreamsRepository.clearEpisodeStreams()
@@ -460,11 +460,11 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         }
     }
 
-    LaunchedEffect(activeSourceUrl, playbackSnapshot.isLoading, playerController, playerControllerSourceUrl) {
-        // Chapter metadata belongs to the source, not merely to the episode. A source switch
-        // within the same episode must not leave skip intervals from the previous file active.
-        if (chaptersLoadedForSourceUrl != activeSourceUrl) {
-            chaptersLoadedForSourceUrl = null
+    LaunchedEffect(chapterSourceKey, playbackSnapshot.isLoading, playerController, playerControllerSourceUrl) {
+        // Chapter metadata is scoped to both the media item and the source. A URL may be reused
+        // for another episode/title, and a different source may be selected in the same episode.
+        if (chapterSourceKey == null || chaptersLoadedForSourceKey != chapterSourceKey) {
+            chaptersLoadedForSourceKey = null
             chapters = emptyList()
             clearChapterSkipState()
             recomputeMergedSkipIntervals()
@@ -758,9 +758,21 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
         activeVideoId, parentMetaId, parentMetaType, contentType, activeSeasonNumber, activeEpisodeNumber,
         playerSettingsUiState.skipIntroEnabled, networkCondition,
     ) {
+        val skipContentKey = listOf(
+            activeVideoId.orEmpty(),
+            parentMetaId,
+            parentMetaType,
+            contentType.orEmpty(),
+            activeSeasonNumber?.toString().orEmpty(),
+            activeEpisodeNumber?.toString().orEmpty(),
+        ).joinToString("\u001F")
+        if (chapterSkipContentKey != skipContentKey) {
+            chapterSkipContentKey = skipContentKey
+            clearChapterSkipState()
+        }
+
         skipIntervals = emptyList()
         apiSkipIntervals = emptyList()
-        clearChapterSkipState()
         autoSkippedIntervals.clear()
         lastManualSkipSeekPositions = null
         activeSkipInterval = null
@@ -773,6 +785,10 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
         val episode = activeEpisodeNumber
         val vid = activeVideoId
         if (!playerSettingsUiState.skipIntroEnabled) return@LaunchedEffect
+
+        // Reuse the chapter data already read for this content after a settings toggle.
+        recomputeChapterSkipIntervalsIfNeeded()
+        recomputeMergedSkipIntervals()
         if ((contentType ?: parentMetaType).equals("movie", ignoreCase = true)) {
             val api = SkipIntroRepository.getMovieSkipIntervals(parentMetaId, vid)
             apiSkipIntervals = api
