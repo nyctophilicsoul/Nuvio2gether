@@ -127,19 +127,18 @@ internal fun LazyListScope.homescreenSettingsContent(
     addonRowOrderPolicy: HomeAddonRowOrderPolicy,
     isCatalogLoading: Boolean,
     catalogErrorMessage: String?,
-    onMergedRowsClick: (() -> Unit)? = null,
+    onMergedRowsClick: () -> Unit,
 ) {
     val selectedHeroSourceCount = items.count { it.heroSourceEnabled }
     val enabledCatalogCount = items.count { it.isVisible }
 
-    if (onMergedRowsClick != null) {
-        item(key = "merged_rows_settings_entry") {
-            Button(
-                onClick = onMergedRowsClick,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = if (isTablet) 24.dp else 16.dp),
-            ) {
-                Text(stringResource(Res.string.settings_merged_rows_manage))
-            }
+    // Keep the merged-row editor entry visible at the top of Home Layout.
+    item(key = "merged_rows_settings_entry") {
+        Button(
+            onClick = onMergedRowsClick,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = if (isTablet) 24.dp else 16.dp),
+        ) {
+            Text(stringResource(Res.string.settings_merged_rows_manage))
         }
     }
     item {
