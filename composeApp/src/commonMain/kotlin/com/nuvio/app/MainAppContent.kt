@@ -1115,6 +1115,7 @@ internal fun MainAppContent(
                     is PartyEvent.MemberLeft -> getString(Res.string.party_member_left, event.name)
                     PartyEvent.Removed -> getString(Res.string.party_removed)
                     PartyEvent.Ended -> getString(Res.string.party_ended)
+                    PartyEvent.HostLeft -> "Host left the party"
                     is PartyEvent.MediaChanged -> getString(Res.string.party_media_changed, event.media.title)
                     is PartyEvent.ControlChanged -> getString(
                         if (event.hostOnly) Res.string.party_control_host_only else Res.string.party_control_everyone,
