@@ -239,7 +239,7 @@ internal class PlayerScreenRuntime(
     var showPartyChat by mutableStateOf(false)
     val isPanelOpen: Boolean
         get() = showAudioModal || showSubtitleModal || showVideoSettingsModal || showStreamInfo ||
-            showPartyPanel || showSourcesPanel || showEpisodesPanel || showSubmitIntroModal
+            showPartyPanel || showSourcesPanel || showEpisodesPanel || showChaptersPanel || showSubmitIntroModal
     var pendingPartyMediaChange by mutableStateOf<PartyMedia?>(null)
     var showPartyMediaChangePrompt by mutableStateOf(false)
     var dismissedPartyMediaKey by mutableStateOf<String?>(null)
