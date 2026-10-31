@@ -61,6 +61,11 @@ internal fun StreamAutoPlayModeDialog(
             Res.string.settings_playback_stream_selection_mode_regex,
             Res.string.settings_playback_stream_selection_mode_regex_description,
         ),
+        Triple(
+            StreamAutoPlayMode.SEMI_AUTOMATIC,
+            Res.string.settings_playback_stream_selection_mode_semi_automatic,
+            Res.string.settings_playback_stream_selection_mode_semi_automatic_description,
+        ),
     )
 
     DialogSurface(
