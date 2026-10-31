@@ -443,7 +443,7 @@ private fun ExoPlayerSurface(
         context,
         effectiveDecoderPriority,
         useLibass,
-        libassRenderType,
+        libassRenderMode,
         playerSettings.libassRenderScale,
         playerSettings.mapDV7ToHevc,
         playerSettings.tunnelingEnabled,
