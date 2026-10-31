@@ -116,7 +116,6 @@ internal fun decidePartyMediaChange(
     media: PartyMedia,
     sharingEnabled: Boolean,
     sharedStream: PartyStream?,
-    dismissedMediaKey: String? = null,
 ): PartyMediaChangeDecision {
     if (isHost || media.key == localMediaKey || media.key == dismissedMediaKey) {
         return PartyMediaChangeDecision.Ignore
