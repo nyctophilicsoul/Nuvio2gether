@@ -34,29 +34,42 @@ internal fun LazyListScope.playbackSettingsContent(
     onPageChange: (SettingsPage) -> Unit,
 ) {
     item {
-        PlaybackSettingsSection(
-            isTablet = isTablet,
-            showLoadingOverlay = showLoadingOverlay,
-            holdToSpeedEnabled = holdToSpeedEnabled,
-            holdToSpeedValue = holdToSpeedValue,
-            touchGesturesEnabled = touchGesturesEnabled,
-            preferredAudioLanguage = preferredAudioLanguage,
-            secondaryPreferredAudioLanguage = secondaryPreferredAudioLanguage,
-            preferredSubtitleLanguage = preferredSubtitleLanguage,
-            secondaryPreferredSubtitleLanguage = secondaryPreferredSubtitleLanguage,
-            streamReuseLastLinkEnabled = streamReuseLastLinkEnabled,
-            streamReuseLastLinkCacheHours = streamReuseLastLinkCacheHours,
-            androidPlaybackEngine = androidPlaybackEngine,
-            androidLibmpvVideoOutput = androidLibmpvVideoOutput,
-            androidLibmpvHardwareDecodingEnabled = androidLibmpvHardwareDecodingEnabled,
-            androidLibmpvYuv420pEnabled = androidLibmpvYuv420pEnabled,
-            decoderPriority = decoderPriority,
-            mapDV7ToHevc = mapDV7ToHevc,
-            tunnelingEnabled = tunnelingEnabled,
-            useLibass = useLibass,
-            libassRenderType = libassRenderType,
-            libassRenderScale = libassRenderScale,
-        )
+        val settings by remember {
+            PlayerSettingsRepository.ensureLoaded()
+            PlayerSettingsRepository.uiState
+        }.collectAsStateWithLifecycle()
+
+        when (page) {
+            SettingsPage.Playback -> {
+                val sections = visiblePlaybackSections(
+                    ios = isIos,
+                    engine = settings.androidPlaybackEngine,
+                    p2pVisible = P2pSettingsRepository.isVisible,
+                )
+                SettingsGroup(isTablet = isTablet) {
+                    sections.forEachIndexed { index, section ->
+                        if (index > 0) SettingsGroupDivider(isTablet = isTablet)
+                        SettingsNavigationRow(
+                            title = stringResource(section.page.titleRes),
+                            description = stringResource(section.descriptionRes),
+                            isTablet = isTablet,
+                            onClick = { onPageChange(section.page) },
+                        )
+                    }
+                }
+            }
+            SettingsPage.PlaybackPlayer -> PlaybackPlayerSettings(isTablet, settings)
+            SettingsPage.PlaybackStreamSelection -> PlaybackStreamSettings(isTablet, settings)
+            SettingsPage.PlaybackUpNext -> PlaybackUpNextSettings(isTablet, settings)
+            SettingsPage.PlaybackSkipSegments -> PlaybackSkipSettings(isTablet, settings)
+            SettingsPage.PlaybackInterface -> PlaybackInterfaceSettings(isTablet, settings)
+            SettingsPage.PlaybackAudio -> PlaybackAudioSettings(isTablet, settings)
+            SettingsPage.PlaybackSubtitles -> PlaybackSubtitleSettings(isTablet, settings)
+            SettingsPage.PlaybackVideo -> PlaybackVideoSettings(isTablet, settings)
+            SettingsPage.PlaybackBuffer -> if (!isIos) PlaybackBufferSettings(isTablet, settings)
+            SettingsPage.PlaybackP2p -> if (P2pSettingsRepository.isVisible) PlaybackP2pSettings(isTablet)
+            else -> Unit
+        }
     }
 }
 
@@ -2186,7 +2199,7 @@ private fun StreamAutoPlaySourceDialog(
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-private fun StreamAutoPlayProviderPriorityDialog(
+internal fun StreamAutoPlayProviderPriorityDialog(
     items: List<String>,
     currentOrder: List<String>,
     onOrderSaved: (List<String>) -> Unit,
