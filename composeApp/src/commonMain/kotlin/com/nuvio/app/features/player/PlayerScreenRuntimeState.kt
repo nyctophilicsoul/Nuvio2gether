@@ -195,7 +195,8 @@ internal class PlayerScreenRuntime(
     /** The file's chapters, sorted; empty when it has fewer than two. */
     var chapters by mutableStateOf<List<PlayerChapter>>(emptyList())
     /** The source whose chapters [chapters] holds, so a rebuffer does not read them again. */
-    var chaptersLoadedForSourceUrl: String? = null
+    var chaptersLoadedForSourceKey: String? = null
+    var chapterSkipContentKey: String? = null
     var showSubmitIntroModal by mutableStateOf(false)
     var showSwitchEngineConfirm by mutableStateOf(false)
     var submitIntroSegmentType by mutableStateOf("intro")
