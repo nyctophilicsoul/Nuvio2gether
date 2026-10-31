@@ -8,6 +8,10 @@ internal val PlayerScreenRuntime.chapterSourceKey: String?
     get() = activeSourceUrl?.let { sourceUrl ->
         listOf(
             sourceUrl,
+            activeSourceIdentityKey.orEmpty(),
+            activeTorrentInfoHash.orEmpty(),
+            activeTorrentFileIdx?.toString().orEmpty(),
+            activeTorrentFilename.orEmpty(),
             activeVideoId.orEmpty(),
             activeSeasonNumber?.toString().orEmpty(),
             activeEpisodeNumber?.toString().orEmpty(),
