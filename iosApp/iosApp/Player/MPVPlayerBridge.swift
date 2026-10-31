@@ -308,6 +308,7 @@ final class MPVPlayerViewController: UIViewController {
     private lazy var eventQueue = DispatchQueue(label: "mpv-events", qos: .userInitiated)
     private var recentPlaybackLogs: [String] = []
     private var activeRequestHeaders: [String: String] = [:]
+    private var defaultUserAgent: String?
     private var preferredAudioLanguages: [String] = []
 
     // Cached track lists
@@ -559,6 +560,8 @@ final class MPVPlayerViewController: UIViewController {
         checkError(mpv_set_option_string(mpv, "hdr-compute-peak", "yes"))
 
         checkError(mpv_initialize(mpv))
+        // Preserve mpv's default User-Agent so per-stream/subtitle overrides can be reverted.
+        defaultUserAgent = getString("user-agent")
         applyAudioLanguagePreferences(preferredAudioLanguages)
 
         // Observe properties
@@ -1438,12 +1441,21 @@ final class MPVPlayerViewController: UIViewController {
 
     private func applyRequestHeaders(_ headers: [String: String]) {
         guard mpv != nil else { return }
-        if headers.isEmpty {
-            checkError(mpv_set_property_string(mpv, "http-header-fields", ""))
-            return
+
+        // mpv exposes User-Agent as its own property. Putting it in http-header-fields
+        // does not reliably override the actual request User-Agent, and leaving a
+        // subtitle-specific value active would leak it into later video requests.
+        let userAgent = headers.first {
+            $0.key.caseInsensitiveCompare("User-Agent") == .orderedSame
+        }?.value
+        if let userAgent, !userAgent.isEmpty {
+            setStringProperty("user-agent", userAgent)
+        } else if let defaultUserAgent {
+            setStringProperty("user-agent", defaultUserAgent)
         }
 
         let serialized = headers
+            .filter { $0.key.caseInsensitiveCompare("User-Agent") != .orderedSame }
             .sorted { $0.key.localizedCaseInsensitiveCompare($1.key) == .orderedAscending }
             .map { key, value in
                 let escapedValue = value
