@@ -69,6 +69,8 @@ actual fun PlatformPlayerSurface(
     PlayerSettingsRepository.ensureLoaded()
     val playerSettings by PlayerSettingsRepository.uiState.collectAsStateWithLifecycle()
     val latestPlayerSettings = rememberUpdatedState(playerSettings)
+    var subtitleText by remember(sourceUrl) { mutableStateOf("") }
+    var subtitleStyle by remember { mutableStateOf(SubtitleStyleState.DEFAULT) }
 
     val bridge = remember {
         NuvioPlayerBridgeFactory.create()
@@ -238,7 +240,8 @@ actual fun PlatformPlayerSurface(
 
             override fun setSubtitleUri(url: String) {
                 Logger.d(TAG) { "setSubtitleUri: $url" }
-                bridge.setSubtitleUrl(url)
+                val subtitleHeaders = externalSubtitles.firstOrNull { it.url == url }?.headers.orEmpty()
+                bridge.setSubtitleUrl(url, encodePlaybackHeadersForBridge(subtitleHeaders))
             }
 
             override fun clearExternalSubtitle() {
@@ -276,6 +279,7 @@ actual fun PlatformPlayerSurface(
             }
 
             override fun applySubtitleStyle(style: SubtitleStyleState) {
+                subtitleStyle = style
                 bridge.applySubtitleStyle(
                     textColor = style.textColor.toMpvColorString(),
                     backgroundColor = style.backgroundColor.toMpvColorString(),
@@ -285,6 +289,7 @@ actual fun PlatformPlayerSurface(
                     fontSize = style.toMpvSubtitleFontSize(),
                     subPos = style.toMpvSubtitlePosition(),
                     stripSdh = style.stripSdh,
+                    styledOverlay = style.usesStyledOverlay,
                 )
             }
         }
@@ -355,7 +360,9 @@ actual fun PlatformPlayerSurface(
 
     // Cleanup
     DisposableEffect(bridge) {
+        bridge.setSubtitleTextHandler { subtitleText = it }
         onDispose {
+            bridge.setSubtitleTextHandler(null)
             bridge.destroy()
         }
     }
@@ -385,6 +392,7 @@ actual fun PlatformPlayerSurface(
             },
             interactive = false,
         )
+        StyledSubtitleOverlay(subtitleText, subtitleStyle)
         
         if (useNativeController) {
             var isPlayingLocal by remember { mutableStateOf(playWhenReady) }

@@ -509,6 +509,7 @@ kotlin {
                 implementation(libs.androidx.media3.ui)
                 implementation(libs.androidx.media3.database)
                 implementation("com.google.guava:guava:33.3.1-android")
+                implementation(libs.androidx.media3.effect)
                 implementation("androidx.annotation:annotation-experimental:1.3.1")
                 implementation(libs.mpv.android.lib)
                 // Keep Nuvio's custom decoder extensions and native streaming engine.
