@@ -127,6 +127,14 @@ internal fun decidePartyMediaChange(
     return PartyMediaChangeDecision.AutoSwitch
 }
 
+/** A newly opened host player must announce its content even when its runtime is new. */
+internal fun shouldPublishHostPartyMedia(
+    isHost: Boolean,
+    partyMediaKey: String,
+    localMediaKey: String,
+    playerReady: Boolean,
+): Boolean = isHost && playerReady && partyMediaKey != localMediaKey
+
 private val SHAREABLE_URL = Regex("^https?://(?!localhost|127\\.|0\\.0\\.0\\.0|\\[::1])[^\\s/]+", RegexOption.IGNORE_CASE)
 
 internal fun partyMediaKey(metaType: String, metaId: String, season: Int?, episode: Int?): String =
@@ -144,6 +152,29 @@ data class PartyPlayback(
     @SerialName("media_key") val mediaKey: String? = null,
     val waiting: Boolean = false,
 )
+
+/**
+ * Freeze the shared timeline at the last estimated playhead when the host leaves.
+ * Keep the sequence and originating member unchanged so a stale snapshot cannot
+ * overwrite this local pause; the host's next playback update has a newer sequence.
+ */
+internal fun pausePartyPlaybackForHostDeparture(
+    playback: PartyPlayback?,
+    at: Long,
+): PartyPlayback? {
+    playback ?: return null
+    val positionMs = if (playback.paused) {
+        playback.positionMs
+    } else {
+        PartySync.expectedPositionMs(playback, at)
+    }
+    return playback.copy(
+        paused = true,
+        positionMs = positionMs,
+        at = at,
+        waiting = false,
+    )
+}
 
 @Serializable
 data class PartyMember(
@@ -282,6 +313,7 @@ sealed interface PartyEvent {
     data class MemberLeft(val name: String) : PartyEvent
     data object Removed : PartyEvent
     data object Ended : PartyEvent
+    data object HostLeft : PartyEvent
     data class MediaChanged(val media: PartyMedia) : PartyEvent
     data class ControlChanged(val hostOnly: Boolean) : PartyEvent
 }
