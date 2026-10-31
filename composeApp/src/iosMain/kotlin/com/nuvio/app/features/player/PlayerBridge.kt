@@ -63,7 +63,7 @@ interface NuvioPlayerBridge {
     fun selectAudioTrack(trackId: Int)
     fun applyAudioLanguagePreferences(languages: List<String>)
     fun selectSubtitleTrack(trackId: Int)
-    fun setSubtitleUrl(url: String)
+    fun setSubtitleUrl(url: String, headersJson: String?)
     fun clearExternalSubtitle()
     fun clearExternalSubtitleAndSelect(trackId: Int)
     fun setSubtitleDelayMs(delayMs: Int)
