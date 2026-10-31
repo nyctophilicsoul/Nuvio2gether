@@ -457,4 +457,5 @@ internal val StreamAutoPlayMode.labelRes: StringResource
         StreamAutoPlayMode.MANUAL -> Res.string.settings_playback_stream_selection_mode_manual
         StreamAutoPlayMode.FIRST_STREAM -> Res.string.settings_playback_stream_selection_mode_first_stream
         StreamAutoPlayMode.REGEX_MATCH -> Res.string.settings_playback_stream_selection_mode_regex
+        StreamAutoPlayMode.SEMI_AUTOMATIC -> Res.string.settings_playback_stream_selection_mode_semi_automatic
     }
