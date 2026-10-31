@@ -169,7 +169,9 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
         ensurePlayerViewController().applyAudioLanguagePreferences(languages)
     }
     func selectSubtitleTrack(trackId: Int32) { playerVC?.selectSubtitle(Int(trackId)) }
-    func setSubtitleUrl(url: String) { playerVC?.addSubtitleUrl(url) }
+    func setSubtitleUrl(url: String, headersJson: String?) {
+        playerVC?.addSubtitleUrl(url, headers: parseRequestHeaders(headersJson))
+    }
     func clearExternalSubtitle() { playerVC?.removeExternalSubtitles() }
     func clearExternalSubtitleAndSelect(trackId: Int32) { playerVC?.removeExternalSubtitlesAndSelect(Int(trackId)) }
     func setSubtitleDelayMs(delayMs: Int32) { playerVC?.setSubtitleDelayMs(Int(delayMs)) }
@@ -859,9 +861,17 @@ final class MPVPlayerViewController: UIViewController {
         }
     }
 
-    func addSubtitleUrl(_ url: String) {
+    func addSubtitleUrl(_ url: String, headers: [String: String]) {
         guard mpv != nil else { return }
+        let subtitleHeaders = sanitizeRequestHeaders(headers)
+        let previousHeaders = activeRequestHeaders
+        if !subtitleHeaders.isEmpty {
+            applyRequestHeaders(mergingRequestHeaders(previousHeaders, overriding: subtitleHeaders))
+        }
         command("sub-add", args: [url, "select"])
+        if !subtitleHeaders.isEmpty {
+            applyRequestHeaders(previousHeaders)
+        }
     }
 
     private func addSubtitle(_ subtitle: PluginSubtitle, mode: String) {
