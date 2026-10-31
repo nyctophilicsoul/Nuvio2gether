@@ -813,6 +813,7 @@ class DeadLinkStartupMonitorTest {
             behaviorHints = StreamBehaviorHints(filename = "Movie.1080p.mkv"),
         )
         var discovered = listOf(selected)
+        var loading = true
         val fallbacks = mutableListOf<StreamItem>()
         val monitor = newMonitor(
             scope = backgroundScope,
@@ -826,7 +827,7 @@ class DeadLinkStartupMonitorTest {
                 )
             },
             onFallback = fallbacks::add,
-            sourceDiscoveryLoading = { true },
+            sourceDiscoveryLoading = { loading },
             preserveCandidateOrder = { true },
         )
 
@@ -846,8 +847,50 @@ class DeadLinkStartupMonitorTest {
         runCurrent()
         advanceTimeBy(5_000)
         runCurrent()
+        // The selected 1080p tier is exhausted, but lower quality is held
+        // until discovery finishes so a late 1080p result cannot be missed.
+        assertEquals(listOf(second1080), fallbacks)
+        loading = false
+        advanceTimeBy(300)
+        runCurrent()
         assertEquals(listOf(second1080, lower720), fallbacks)
         assertTrue(fallbacks.none { it == higher2160 || it == torrent1080 })
+        monitor.close()
+    }
+
+    @Test
+    fun semiAutomaticWaitsForLateSelectedTierBeforeUsingEarlierLowerTierResult() = runTest {
+        val selected1080 = stream("Selected 1080p", "addon:selected", "https://media.example/selected-1080.mp4")
+        val late1080 = stream("Late 1080p", "addon:late", "https://media.example/late-1080.mp4")
+        val early720 = stream("Early 720p", "plugin:early", "https://media.example/early-720.mp4")
+        var discovered = listOf(selected1080, early720)
+        val fallbacks = mutableListOf<StreamItem>()
+        val monitor = newMonitor(
+            scope = backgroundScope,
+            timeoutSeconds = { 5 },
+            candidates = {
+                QualityFirstAutoPlayPolicy.rankCandidatesWithFallback(
+                    streams = discovered,
+                    requestedQuality = StreamAutoPlayPreferredQuality.P1080,
+                    debridEnabled = true,
+                    p2pEnabled = true,
+                )
+            },
+            onFallback = fallbacks::add,
+            sourceDiscoveryLoading = { true },
+            preserveCandidateOrder = { true },
+        )
+
+        monitor.sourceSelected(selected1080)
+        runCurrent()
+        advanceTimeBy(5_000)
+        runCurrent()
+        assertTrue(fallbacks.isEmpty())
+
+        discovered = listOf(selected1080, early720, late1080)
+        advanceTimeBy(300)
+        runCurrent()
+        assertEquals(listOf(late1080), fallbacks)
         monitor.close()
     }
 
