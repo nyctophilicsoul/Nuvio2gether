@@ -1099,7 +1099,15 @@ private fun ExoPlayerSurface(
 
     val latestChapterSourceUrl = rememberUpdatedState(sourceUrl)
     val latestChapterSourceHeaders = rememberUpdatedState(sanitizedSourceHeaders)
-    LaunchedEffect(exoPlayer) {
+    LaunchedEffect(
+        exoPlayer,
+        autoSyncCoordinator,
+        playerSourceKey,
+        dataSourceFactory,
+        extractorsFactory,
+        sourceAudioUrl,
+        externalSubtitles,
+    ) {
         onControllerReady(
             autoSyncCoordinator.wrap(object : PlayerEngineController { // AutoSync hook
                 override val playbackEngine = AndroidPlaybackEngine.ExoPlayer
