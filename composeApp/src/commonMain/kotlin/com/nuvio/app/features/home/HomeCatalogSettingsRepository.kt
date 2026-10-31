@@ -975,6 +975,11 @@ object HomeCatalogSettingsRepository {
         publish()
     }
 
+    private fun shouldPreserveUnknownCatalogPreferences(): Boolean =
+        !hasSynchronizedCatalogDefinitions ||
+            !hasResolvedEnabledAddonManifest ||
+            hasUnresolvedEnabledAddonCatalogs
+
     private fun normalizePreferences() {
         val current = preferences
         data class UnifiedEntry(val key: String, val isCollection: Boolean, val isMergedRow: Boolean = false)
@@ -1001,10 +1006,7 @@ object HomeCatalogSettingsRepository {
         // Remote settings can arrive before every enabled add-on manifest has loaded.
         // Keep unknown catalog preferences during that window; the next complete catalog sync
         // will retain keys that still exist and prune genuinely stale ones.
-        val preserveUnknownCatalogPreferences =
-            !hasSynchronizedCatalogDefinitions ||
-                !hasResolvedEnabledAddonManifest ||
-                hasUnresolvedEnabledAddonCatalogs
+        val preserveUnknownCatalogPreferences = shouldPreserveUnknownCatalogPreferences()
         val normalized = if (preserveUnknownCatalogPreferences) {
             current.toMutableMap()
         } else {
@@ -1303,8 +1305,13 @@ object HomeCatalogSettingsRepository {
             }
             val remoteKeys = remotePreferences.keys
             val knownKeys = knownPreferenceKeys()
+            val preserveUnknownCatalogPreferences = shouldPreserveUnknownCatalogPreferences()
             val preservedPreferences = preferences.filterKeys { key ->
-                key !in remoteKeys && (key in knownKeys || key.requiresExplicitSyncKey())
+                key !in remoteKeys && (
+                    key in knownKeys ||
+                        key.requiresExplicitSyncKey() ||
+                        preserveUnknownCatalogPreferences
+                    )
             }
             preferences = preservedPreferences + remotePreferences
             normalizePreferences()
