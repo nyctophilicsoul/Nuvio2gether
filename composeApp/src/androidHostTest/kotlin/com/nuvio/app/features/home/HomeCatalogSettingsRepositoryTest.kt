@@ -614,6 +614,142 @@ class HomeCatalogSettingsRepositoryTest {
         )
     }
 
+    @Test
+    fun mergedRowsSupportCrudVisibilityAndLocalPersistence() {
+        val addons = listOf(addon(listOf("popular", "latest", "trending")))
+        HomeCatalogSettingsRepository.syncCatalogs(addons)
+
+        val id = assertNotNull(
+            HomeCatalogSettingsRepository.createMergedRow(
+                title = "Latest Mix",
+                sourceKeys = listOf("test:movie:popular", "test:movie:latest", "test:movie:trending"),
+                displayMode = MergedHomeRowDisplayMode.SOURCE_TABS,
+                deduplicate = true,
+            ),
+        )
+        val key = mergedHomeRowKey(id)
+
+        val createdItem = assertNotNull(HomeCatalogSettingsRepository.uiState.value.items.singleOrNull { it.key == key })
+        assertTrue(createdItem.isMergedRow)
+        assertTrue(createdItem.enabled)
+        assertEquals(id, createdItem.mergedRowId)
+        assertEquals(3, assertNotNull(HomeCatalogSettingsRepository.resolveMergedHomeRow(id)).sources.size)
+
+        HomeCatalogSettingsRepository.setEnabled(key, false)
+        assertFalse(HomeCatalogSettingsRepository.uiState.value.items.single { it.key == key }.enabled)
+
+        assertTrue(
+            HomeCatalogSettingsRepository.updateMergedRow(
+                id = id,
+                title = "Updated Mix",
+                sourceKeys = listOf("test:movie:popular", "test:movie:latest"),
+                displayMode = MergedHomeRowDisplayMode.UNIFIED_CAROUSEL,
+                deduplicate = false,
+            ),
+        )
+        val updated = HomeCatalogSettingsRepository.uiState.value.mergedRows.single { it.id == id }
+        assertEquals("Updated Mix", updated.title)
+        assertEquals(MergedHomeRowDisplayMode.UNIFIED_CAROUSEL, updated.resolvedDisplayMode())
+        assertFalse(updated.deduplicate)
+        assertFalse(HomeCatalogSettingsRepository.mergedRowEnabled(id))
+
+        val duplicateId = assertNotNull(HomeCatalogSettingsRepository.duplicateMergedRow(id))
+        val duplicate = HomeCatalogSettingsRepository.uiState.value.mergedRows.single { it.id == duplicateId }
+        assertEquals("Updated Mix (copy)", duplicate.title)
+        assertEquals(updated.sourceKeys, duplicate.sourceKeys)
+        assertEquals(updated.displayMode, duplicate.displayMode)
+        assertFalse(HomeCatalogSettingsRepository.mergedRowEnabled(duplicateId))
+
+        HomeCatalogSettingsRepository.deleteMergedRow(duplicateId)
+        assertTrue(HomeCatalogSettingsRepository.uiState.value.mergedRows.none { it.id == duplicateId })
+
+        HomeCatalogSettingsRepository.clearLocalState()
+        HomeCatalogSettingsRepository.syncCatalogs(addons)
+
+        val restored = HomeCatalogSettingsRepository.uiState.value.mergedRows.single { it.id == id }
+        assertEquals("Updated Mix", restored.title)
+        assertEquals(MergedHomeRowDisplayMode.UNIFIED_CAROUSEL, restored.resolvedDisplayMode())
+        assertFalse(restored.deduplicate)
+        assertFalse(HomeCatalogSettingsRepository.mergedRowEnabled(id))
+        assertEquals(2, assertNotNull(HomeCatalogSettingsRepository.resolveMergedHomeRow(id)).sources.size)
+
+        HomeCatalogSettingsRepository.deleteMergedRow(id)
+        assertTrue(HomeCatalogSettingsRepository.uiState.value.mergedRows.none { it.id == id })
+        assertTrue(HomeCatalogSettingsRepository.uiState.value.items.none { it.key == key })
+    }
+
+    @Test
+    fun remoteMergedRowPreferencesSurvivePullBeforeAnyAddonManifestLoads() {
+        val row = MergedHomeRowDefinition(
+            id = "remote-row",
+            title = "Remote Mix",
+            sourceKeys = listOf("test:movie:popular", "test:movie:latest"),
+            displayMode = MergedHomeRowDisplayMode.SOURCE_TABS.storageValue,
+        )
+        val payload = SyncHomeCatalogPayload(
+            items = listOf(
+                SyncCatalogItem(
+                    addonId = "test",
+                    type = "movie",
+                    catalogId = "popular",
+                    enabled = false,
+                    customTitle = "Remote Popular",
+                    key = "test:movie:popular",
+                ),
+            ),
+            mergedRows = listOf(row),
+        )
+
+        // This is the startup ordering where remote settings arrive before manifests.
+        HomeCatalogSettingsRepository.syncCatalogs(emptyList())
+        HomeCatalogSettingsRepository.applyFromRemote(payload)
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(addon(listOf("popular", "latest"))))
+
+        val source = HomeCatalogSettingsRepository.uiState.value.items.single { it.key == "test:movie:popular" }
+        assertFalse(source.enabled)
+        assertEquals("Remote Popular", source.customTitle)
+        assertEquals(row.id, HomeCatalogSettingsRepository.uiState.value.mergedRows.single().id)
+        assertEquals(2, assertNotNull(HomeCatalogSettingsRepository.resolveMergedHomeRow(row.id)).sources.size)
+    }
+
+    @Test
+    fun remoteMergedRowPreferencesSurvivePartialAddonManifestLoading() {
+        val readyAddon = addon(listOf("popular"), addonId = "ready", addonName = "Ready")
+        val pendingAddon = addon(listOf("latest"), addonId = "pending", addonName = "Pending")
+            .copy(manifest = null, isRefreshing = true)
+        val row = MergedHomeRowDefinition(
+            id = "partial-row",
+            title = "Partial Mix",
+            sourceKeys = listOf("ready:movie:popular", "pending:movie:latest"),
+        )
+        val payload = SyncHomeCatalogPayload(
+            items = listOf(
+                SyncCatalogItem(
+                    addonId = "pending",
+                    type = "movie",
+                    catalogId = "latest",
+                    enabled = false,
+                    customTitle = "Pending Latest",
+                    key = "pending:movie:latest",
+                ),
+            ),
+            mergedRows = listOf(row),
+        )
+
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(readyAddon, pendingAddon))
+        HomeCatalogSettingsRepository.applyFromRemote(payload)
+        HomeCatalogSettingsRepository.syncCatalogs(
+            listOf(readyAddon, addon(listOf("latest"), addonId = "pending", addonName = "Pending")),
+        )
+
+        val source = HomeCatalogSettingsRepository.uiState.value.items.single {
+            it.key == "pending:movie:latest"
+        }
+        assertFalse(source.enabled)
+        assertEquals("Pending Latest", source.customTitle)
+        assertEquals(2, assertNotNull(HomeCatalogSettingsRepository.resolveMergedHomeRow(row.id)).sources.size)
+    }
+
     private fun addon(
         catalogIds: List<String> = listOf("popular"),
         addonId: String = "test",
