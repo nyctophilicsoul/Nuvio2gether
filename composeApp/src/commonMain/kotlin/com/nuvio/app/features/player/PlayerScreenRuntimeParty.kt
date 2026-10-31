@@ -547,7 +547,7 @@ internal fun PlayerScreenRuntime.BindPartyEffects() {
                 media = pendingMedia,
                 sharingEnabled = hostSharingEnabled,
                 sharedStream = remoteSharedStream,
-                dismissedMediaKey = dismissedPartyMediaKey,
+
             )
         ) {
             PartyMediaChangeDecision.Ignore -> {
