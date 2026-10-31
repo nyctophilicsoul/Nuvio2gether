@@ -39,12 +39,13 @@ private fun inferPlaybackMimeType(
         ?: inferMimeTypeFromPath(url)
 
 /**
- * Local files can carry a misleading extension (downloads keep the extension derived from the
- * source URL), so the container is detected from the actual payload instead of the file name.
- * Falls back to the extension based derivation whenever the content cannot be inspected.
+ * Local file paths can carry a misleading extension (downloads keep the extension derived from
+ * the source URL), so their container is detected from the actual payload instead of the file name.
+ * Content URIs are not synchronously inspected here because a document provider may be cloud-backed;
+ * Media3's extractors can sniff those streams without blocking Compose composition.
  */
 private fun inferMimeTypeFromLocalContent(url: String): String? {
-    if (!isLocalUri(url)) return null
+    if (!isFileUri(url)) return null
     localMimeTypeCache[url]?.let { return it }
     val detected = runOnBackgroundDispatcherIfNeeded { sniffLocalMimeType(url) } ?: return null
     if (localMimeTypeCache.size >= LOCAL_MIME_TYPE_CACHE_LIMIT) localMimeTypeCache.clear()
@@ -52,10 +53,8 @@ private fun inferMimeTypeFromLocalContent(url: String): String? {
     return detected
 }
 
-private fun isLocalUri(url: String): Boolean {
-    val scheme = url.substringBefore(':', missingDelimiterValue = "").lowercase(Locale.US)
-    return scheme == "file" || scheme == "content"
-}
+private fun isFileUri(url: String): Boolean =
+    url.substringBefore(':', missingDelimiterValue = "").equals("file", ignoreCase = true)
 
 private fun sniffLocalMimeType(url: String): String? {
     val header = readLocalHeaderBytes(url) ?: return null
@@ -67,10 +66,6 @@ private fun readLocalHeaderBytes(url: String): ByteArray? = runCatching {
     when (uri.scheme?.lowercase(Locale.US)) {
         "file" -> uri.path?.let { path ->
             FileInputStream(File(path)).use { it.readHeaderBytes() }
-        }
-        "content" -> {
-            val context = PlayerSettingsStorage.applicationContext() ?: return@runCatching null
-            context.contentResolver.openInputStream(uri)?.use { it.readHeaderBytes() }
         }
         else -> null
     }
