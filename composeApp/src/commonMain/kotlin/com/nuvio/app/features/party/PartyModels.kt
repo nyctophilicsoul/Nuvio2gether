@@ -117,7 +117,7 @@ internal fun decidePartyMediaChange(
     sharingEnabled: Boolean,
     sharedStream: PartyStream?,
 ): PartyMediaChangeDecision {
-    if (isHost || media.key == localMediaKey || media.key == dismissedMediaKey) {
+    if (isHost || media.key == localMediaKey) {
         return PartyMediaChangeDecision.Ignore
     }
     // A guest follows the host's media selection automatically. If stream sharing is
