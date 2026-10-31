@@ -216,6 +216,7 @@ object HomeCatalogSettingsRepository {
     private var preservedOrderRowKeys: Set<String> = emptySet()
     private var hasPendingRowOrderChanges = false
     private var hasSynchronizedCatalogDefinitions = false
+    private var hasResolvedEnabledAddonManifest = false
     private var hasUnresolvedEnabledAddonCatalogs = false
     private var mergedRows: List<MergedHomeRowDefinition> = emptyList()
 
@@ -237,6 +238,7 @@ object HomeCatalogSettingsRepository {
         preservedOrderRowKeys = emptySet()
         hasPendingRowOrderChanges = false
         hasSynchronizedCatalogDefinitions = false
+        hasResolvedEnabledAddonManifest = false
         hasUnresolvedEnabledAddonCatalogs = false
         mergedRows = emptyList()
         _uiState.value = HomeCatalogSettingsUiState()
@@ -245,6 +247,7 @@ object HomeCatalogSettingsRepository {
     fun syncCatalogs(addons: List<ManagedAddon>) {
         ensureLoaded()
         hasSynchronizedCatalogDefinitions = true
+        hasResolvedEnabledAddonManifest = addons.any { it.enabled && it.manifest != null }
         hasUnresolvedEnabledAddonCatalogs = addons.any { it.enabled && it.manifest == null }
         val collections = CollectionRepository.collections.value
         val syncInput = CatalogSyncInput(addons, collections, Locale.current.toLanguageTag(), ServerRepository.uiState.value.revision)
@@ -999,7 +1002,9 @@ object HomeCatalogSettingsRepository {
         // Keep unknown catalog preferences during that window; the next complete catalog sync
         // will retain keys that still exist and prune genuinely stale ones.
         val preserveUnknownCatalogPreferences =
-            !hasSynchronizedCatalogDefinitions || hasUnresolvedEnabledAddonCatalogs || definitions.isEmpty()
+            !hasSynchronizedCatalogDefinitions ||
+                !hasResolvedEnabledAddonManifest ||
+                hasUnresolvedEnabledAddonCatalogs
         val normalized = if (preserveUnknownCatalogPreferences) {
             current.toMutableMap()
         } else {
