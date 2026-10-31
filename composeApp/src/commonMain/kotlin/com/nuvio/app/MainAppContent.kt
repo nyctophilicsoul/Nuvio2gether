@@ -154,6 +154,7 @@ import com.nuvio.app.features.settings.HomescreenSettingsScreen
 import com.nuvio.app.features.settings.LicensesAttributionsSettingsScreen
 import com.nuvio.app.features.settings.MetaScreenSettingsScreen
 import com.nuvio.app.features.settings.PluginsSettingsScreen
+import com.nuvio.app.features.settings.SettingsPage
 import com.nuvio.app.features.settings.SupportersContributorsSettingsScreen
 import com.nuvio.app.features.settings.ThemeSettingsRepository
 import com.nuvio.app.features.streams.BingeGroupCacheRepository
@@ -362,6 +363,7 @@ internal fun MainAppContent(
     val nativeSwitchProfileTitle = stringResource(Res.string.compose_settings_root_switch_profile_title)
     val nativeAddProfileTitle = stringResource(Res.string.compose_profile_add_profile)
     val homescreenSettingsTitle = stringResource(Res.string.compose_settings_page_homescreen)
+    val mergedRowsSettingsTitle = stringResource(Res.string.settings_merged_rows_title)
     val metaScreenSettingsTitle = stringResource(Res.string.compose_settings_page_meta_screen)
     val continueWatchingSettingsTitle = stringResource(Res.string.compose_settings_page_continue_watching)
     val debridSettingsTitle = stringResource(Res.string.compose_settings_page_debrid)
@@ -1593,7 +1595,17 @@ internal fun MainAppContent(
                 }
                 entry<HomescreenSettingsRoute> { route ->
                     SettingsDestination(route, navController) { onBack ->
-                        HomescreenSettingsScreen(onBack = onBack)
+                        HomescreenSettingsScreen(
+                            onBack = onBack,
+                            onMergedRowsClick = {
+                                navController.navigate(
+                                    SettingsPageRoute(
+                                        pageName = SettingsPage.MergedRows.name,
+                                        title = mergedRowsSettingsTitle,
+                                    ),
+                                )
+                            },
+                        )
                     }
                 }
                 entry<MetaScreenSettingsRoute> { route ->
