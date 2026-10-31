@@ -460,7 +460,15 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         }
     }
 
-    LaunchedEffect(playbackSnapshot.isLoading, playerController, playerControllerSourceUrl, activeSourceUrl) {
+    LaunchedEffect(activeSourceUrl, playbackSnapshot.isLoading, playerController, playerControllerSourceUrl) {
+        // Chapter metadata belongs to the source, not merely to the episode. A source switch
+        // within the same episode must not leave skip intervals from the previous file active.
+        if (chaptersLoadedForSourceUrl != activeSourceUrl) {
+            chaptersLoadedForSourceUrl = null
+            chapters = emptyList()
+            clearChapterSkipState()
+            recomputeMergedSkipIntervals()
+        }
         if (!playbackSnapshot.isLoading) loadChaptersIfNeeded()
     }
 
