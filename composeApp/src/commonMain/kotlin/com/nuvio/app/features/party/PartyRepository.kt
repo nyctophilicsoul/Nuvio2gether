@@ -448,9 +448,11 @@ object PartyRepository {
             return
         }
         val name = party.member(memberId)?.displayName
-        if (memberId == party.hostMemberId) {
+        val hostDeparted = memberId == party.hostMemberId
+        if (hostDeparted) {
             _sharedStream.value = null
             _hostSharingEnabled.value = false
+            _playback.value = pausePartyPlaybackForHostDeparture(_playback.value, clock.nowMs())
         }
         updateParty { current ->
             current.copy(
@@ -460,6 +462,7 @@ object PartyRepository {
             )
         }
         ignoredWaiting.remove(memberId)
+        if (hostDeparted) _events.tryEmit(PartyEvent.HostLeft)
         if (name != null) _events.tryEmit(PartyEvent.MemberLeft(name))
     }
 
