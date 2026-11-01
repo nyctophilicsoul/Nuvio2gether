@@ -155,6 +155,8 @@ data class CloudStreamFileHash(
     }
 }
 
+internal fun CloudStreamFileHash?.verifies(bytes: ByteArray): Boolean = this?.matches(bytes) == true
+
 enum class CloudStreamRuntimeKind {
     PrecompiledCrossPlatformAdapter,
     AndroidDex,
