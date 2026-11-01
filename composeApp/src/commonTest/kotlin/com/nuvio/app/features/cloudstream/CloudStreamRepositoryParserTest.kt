@@ -46,6 +46,26 @@ class CloudStreamRepositoryParserTest {
     }
 
     @Test
+    fun preservesRequestedRepositoryIdentityWhenFallbackManifestLoads() {
+        val requestedUrl = "https://raw.githubusercontent.com/example/repository/main/repo.json"
+        val resolvedManifest = CloudStreamRepositoryParser.parseRepository(
+            rawUrl = "https://raw.githubusercontent.com/example/repository/master/repo.json",
+            payload = """{"name":"Repository","pluginLists":["plugins.json"]}""",
+        )
+
+        val stableManifest = retainCloudStreamRepositoryIdentity(
+            requestedManifestUrl = requestedUrl,
+            resolvedManifest = resolvedManifest,
+        )
+
+        assertEquals(requestedUrl, stableManifest.sourceUrl)
+        assertEquals(
+            "https://raw.githubusercontent.com/example/repository/master/plugins.json",
+            stableManifest.pluginListUrls.single(),
+        )
+    }
+
+    @Test
     fun resolvesAbsoluteRootAndRelativeUrls() {
         val base = "https://example.com/a/b/repo.json"
         assertEquals("https://cdn.example/plugin.cs3", resolveCloudStreamUrl(base, "https://cdn.example/plugin.cs3"))
