@@ -11,8 +11,12 @@ enum class CustomPosterSourceMode(val storageValue: String) {
 
     companion object {
         fun fromStorage(value: String?, hasPattern: Boolean): CustomPosterSourceMode =
-            entries.firstOrNull { it.storageValue == value }
-                ?: if (hasPattern) POSTERS_AND_TAGS else OFF
+            when (value) {
+                OFF.storageValue -> OFF
+                TAGS_ONLY.storageValue -> TAGS_ONLY
+                POSTERS_AND_TAGS.storageValue -> if (hasPattern) POSTERS_AND_TAGS else OFF
+                else -> if (hasPattern) POSTERS_AND_TAGS else OFF
+            }
     }
 }
 
