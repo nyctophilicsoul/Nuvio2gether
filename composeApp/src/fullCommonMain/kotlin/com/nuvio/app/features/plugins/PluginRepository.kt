@@ -396,7 +396,7 @@ actual object PluginRepository {
             // Cancellation is control flow (search stopped/profile changed), not
             // a provider failure. Never turn it into an ordinary empty result.
             throw cancelled
-        } catch (error: Throwable) {
+        } catch (error: Exception) {
             log.w(error) { "Plugin provider ${scraper.name} failed for $mediaType:$tmdbId" }
             Result.failure(error)
         }
