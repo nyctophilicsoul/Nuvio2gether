@@ -73,6 +73,37 @@ class MergedHomeRowsTest {
         assertEquals("Series", cleanMergedSourceTabTitle("Series"))
     }
 
+    @Test
+    fun sourceTabsAndUnifiedRowsUseTheSavedContentFilter() {
+        val moviesOnly = MergedHomeRowDefinition(
+            id = "movies",
+            title = "Movies",
+            sourceKeys = listOf("a", "b"),
+            displayMode = MergedHomeRowDisplayMode.SOURCE_TABS.storageValue,
+            contentType = MergedHomeRowContentType.MOVIES.storageValue,
+        )
+        val seriesOnly = moviesOnly.copy(
+            displayMode = MergedHomeRowDisplayMode.UNIFIED_CAROUSEL.storageValue,
+            contentType = MergedHomeRowContentType.SERIES.storageValue,
+        )
+
+        assertEquals(MergedHomeRowContentType.MOVIES, moviesOnly.contentTypeForDisplay())
+        assertEquals(MergedHomeRowContentType.SERIES, seriesOnly.contentTypeForDisplay())
+    }
+
+    @Test
+    fun typeTabsAlwaysExposeAllThreeCategoriesInsteadOfApplyingARowFilter() {
+        val row = MergedHomeRowDefinition(
+            id = "types",
+            title = "Types",
+            sourceKeys = listOf("a", "b"),
+            displayMode = MergedHomeRowDisplayMode.TYPE_TABS.storageValue,
+            contentType = MergedHomeRowContentType.MOVIES.storageValue,
+        )
+
+        assertEquals(MergedHomeRowContentType.ALL, row.contentTypeForDisplay())
+    }
+
     private fun item(id: String, type: String = "movie", name: String = id) =
         MetaPreview(id = id, type = type, name = name)
 
