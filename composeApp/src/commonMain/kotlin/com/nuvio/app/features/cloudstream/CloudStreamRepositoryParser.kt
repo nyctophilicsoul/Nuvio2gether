@@ -137,7 +137,7 @@ fun normalizeCloudStreamRepositoryUrl(rawUrl: String): String {
         value = when {
             parts.size >= 5 && parts[2] == "blob" ->
                 "https://raw.githubusercontent.com/$owner/$repository/${parts[3]}/${parts.drop(4).joinToString("/")}" 
-            parts.size >= 5 && parts[2] == "raw" ->
+            parts.size >= 5 && parts[2] in setOf("raw", "tree") ->
                 "https://raw.githubusercontent.com/$owner/$repository/${parts[3]}/${parts.drop(4).joinToString("/")}" 
             parts.size == 2 -> "https://raw.githubusercontent.com/$owner/$repository/master/repo.json"
             else -> value
