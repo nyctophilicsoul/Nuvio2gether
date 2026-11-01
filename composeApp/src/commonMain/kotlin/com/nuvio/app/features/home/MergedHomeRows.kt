@@ -103,6 +103,17 @@ enum class MergedHomeRowSortMode(val storageValue: String) {
 /** Keep merged row keys in their own namespace so they cannot collide with addon or collection keys. */
 fun mergedHomeRowKey(id: String): String = "merged_home_row:$id"
 
+/**
+ * Type-tab rows already expose All, Movies and Series as separate tabs. Other
+ * display modes use the row-level content-type filter.
+ */
+internal fun MergedHomeRowDefinition.contentTypeForDisplay(): MergedHomeRowContentType =
+    if (resolvedDisplayMode() == MergedHomeRowDisplayMode.TYPE_TABS) {
+        MergedHomeRowContentType.ALL
+    } else {
+        resolvedContentType()
+    }
+
 internal fun MetaPreview.matchesMergedContentType(type: MergedHomeRowContentType): Boolean =
     when (type) {
         MergedHomeRowContentType.ALL -> true
