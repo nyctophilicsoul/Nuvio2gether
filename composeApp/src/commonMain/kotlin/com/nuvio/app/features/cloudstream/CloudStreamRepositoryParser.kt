@@ -77,6 +77,11 @@ object CloudStreamRepositoryParser {
         val normalizedTvTypes = tvTypes.orEmpty()
             .map(String::trim)
             .filter(String::isNotBlank)
+        // A missing hash is allowed by older repositories, but a declared hash must
+        // be understood and validated. Treating malformed metadata as "no hash"
+        // would silently disable package integrity verification.
+        val normalizedHash = fileHash?.trim()?.takeIf(String::isNotBlank)
+        val parsedHash = normalizedHash?.let { CloudStreamFileHash.parse(it) ?: return null }
         return CloudStreamPluginMetadata(
             id = CloudStreamPluginId(repositoryManifestUrl, internalName),
             repositoryManifestUrl = repositoryManifestUrl,
@@ -94,7 +99,7 @@ object CloudStreamRepositoryParser {
             rawTvTypes = normalizedTvTypes,
             iconUrl = iconUrl?.trim()?.takeIf(String::isNotBlank)?.let { resolveCloudStreamUrl(pluginListUrl, it) },
             apiVersion = apiVersion?.takeIf { it > 0 } ?: 1,
-            fileHash = CloudStreamFileHash.parse(fileHash),
+            fileHash = parsedHash,
         )
     }
 }
