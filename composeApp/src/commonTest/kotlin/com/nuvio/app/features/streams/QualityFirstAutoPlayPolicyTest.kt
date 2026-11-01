@@ -202,6 +202,36 @@ class QualityFirstAutoPlayPolicyTest {
         )
     }
 
+    @Test
+    fun `refreshing fallback keeps current stream and appends only untried new identities`() {
+        val current = stream("current", "https://a/current", "Movie 1080p")
+        val failed = stream("failed", "https://b/failed", "Movie 1080p")
+        val discovered = stream("new", "https://c/new", "Movie 720p")
+        val duplicateUrl = stream("duplicate", "https://c/new", "Movie 720p")
+
+        val refreshed = QualityFirstAutoPlayPolicy.refreshedFallbackCandidates(
+            current = current,
+            discovered = listOf(current, failed, discovered, duplicateUrl),
+            attemptedKeys = setOf(QualityFirstAutoPlayPolicy.candidateIdentityKey(failed)),
+        )
+
+        assertEquals(listOf("current", "new"), refreshed.map { it.addonName })
+    }
+
+    @Test
+    fun `newly discovered candidate can restart an exhausted pending queue`() {
+        val failed = stream("failed", "https://a/failed", "Movie 1080p")
+        val discovered = stream("late", "https://b/late", "Movie 720p")
+
+        val refreshed = QualityFirstAutoPlayPolicy.refreshedFallbackCandidates(
+            current = null,
+            discovered = listOf(failed, discovered),
+            attemptedKeys = setOf(QualityFirstAutoPlayPolicy.candidateIdentityKey(failed)),
+        )
+
+        assertEquals(listOf("late"), refreshed.map { it.addonName })
+    }
+
     private fun stream(addon: String, url: String?, name: String) = StreamItem(
         name = name,
         url = url,
