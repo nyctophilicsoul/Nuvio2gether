@@ -6,6 +6,7 @@ import com.nuvio.app.features.addons.httpGetText
 import com.nuvio.app.features.addons.httpRequestRaw
 import com.nuvio.app.features.plugins.currentEpochMillis
 import com.nuvio.app.features.profiles.ProfileRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -377,6 +378,7 @@ actual object CloudStreamRepository {
         }.fold(
             onSuccess = { CloudStreamInstallResult.Success(it) },
             onFailure = { error ->
+                if (error is CancellationException) throw error
                 log.w(error) { "CloudStream plugin installation failed id=$pluginId" }
                 markInstalling(pluginId, false, error.message ?: "Plugin installation failed")
                 CloudStreamInstallResult.Error(error.message ?: "Plugin installation failed")
@@ -595,15 +597,19 @@ actual object CloudStreamRepository {
         if (providerId !in runnableProviderIds()) {
             return Result.failure(IllegalStateException("CloudStream provider is disabled or incompatible"))
         }
-        return runCatching {
+        return try {
             val plugin = _uiState.value.plugins.firstOrNull { it.metadata.id.value == providerId }
                 ?: error("CloudStream plugin was not found")
             val provider = CloudStreamProviderRegistry.find(providerId)
                 ?: CloudStreamPlatformRuntime.provider(plugin)
                 ?: error("CloudStream provider adapter was not found")
-            provider.block()
+            Result.success(provider.block())
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            log.w(error) { "CloudStream provider request failed id=$providerId" }
+            Result.failure(error)
         }
-            .onFailure { log.w(it) { "CloudStream provider request failed id=$providerId" } }
     }
 
     private suspend fun resolveCloudStreamRepositoryInput(rawUrl: String): String {
