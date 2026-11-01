@@ -412,7 +412,7 @@ actual object PluginRepository {
                                             onSuccess = { (repo, scrapers) ->
                                                 val updatedRepos = state.repositories.map { existing ->
                                                     if (existing.manifestUrl == manifestUrl) {
-                                                        repo.copy(isRefreshing = false, errorMessage = null)
+                                                        repo.copy(isRefreshing = false, errorMessage = repo.errorMessage)
                                                     } else {
                                                         existing
                                                     }
@@ -697,7 +697,11 @@ actual object PluginRepository {
                 scraperCount = supportedScrapers.size,
                 lastUpdated = currentEpochMillis(),
                 isRefreshing = false,
-                errorMessage = null,
+                errorMessage = if (scrapers.size < supportedScrapers.size) {
+                    getString(Res.string.plugins_repository_refresh_failed)
+                } else {
+                    null
+                },
             )
             repo to scrapers
         }
