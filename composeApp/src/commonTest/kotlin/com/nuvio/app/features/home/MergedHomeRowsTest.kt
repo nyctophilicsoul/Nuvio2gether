@@ -67,6 +67,10 @@ class MergedHomeRowsTest {
         assertEquals("Anime Mix", cleanMergedSourceTabTitle("Anime - Mixed"))
         assertEquals("Global Releases", cleanMergedSourceTabTitle("Latest Releases Global - Mixed"))
         assertEquals("Indian Releases", cleanMergedSourceTabTitle("New Indian Releases - Mixed"))
+        assertEquals("AI Recommendations", cleanMergedSourceTabTitle("AI Recommendations (movie/aicat_list_125836)"))
+        assertEquals("All", cleanMergedSourceTabTitle("All"))
+        assertEquals("Movies", cleanMergedSourceTabTitle("Movies"))
+        assertEquals("Series", cleanMergedSourceTabTitle("Series"))
     }
 
     private fun item(id: String, type: String = "movie", name: String = id) =
