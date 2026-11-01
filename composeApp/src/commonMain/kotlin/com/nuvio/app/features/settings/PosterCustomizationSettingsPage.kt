@@ -267,8 +267,7 @@ internal fun LazyListScope.posterCustomizationSettingsContent(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             RadioButton(
                                 selected = currentMode == mode,
-                                enabled = mode != CustomPosterSourceMode.POSTERS_AND_TAGS ||
-                                    (isActive && editingPattern.isNotBlank()),
+                                enabled = mode != CustomPosterSourceMode.POSTERS_AND_TAGS || isActive,
                                 onClick = { CustomPosterUrlRepository.setMode(mode) },
                             )
                             Column(modifier = Modifier.weight(1f)) {
