@@ -1,7 +1,6 @@
 package com.nuvio.app.features.cloudstream
 
 import co.touchlab.kermit.Logger
-import com.nuvio.app.features.addons.httpGetBytesWithHeaders
 import com.nuvio.app.features.addons.httpGetText
 import com.nuvio.app.features.addons.httpRequestRaw
 import com.nuvio.app.features.plugins.currentEpochMillis
@@ -357,10 +356,20 @@ actual object CloudStreamRepository {
         }
         markInstalling(pluginId, true, null)
         return runCatching {
-            val bytes = httpGetBytesWithHeaders(
-                item.metadata.packageUrl,
+            val response = httpRequestRaw(
+                method = "GET",
+                url = item.metadata.packageUrl,
                 headers = mapOf("Accept" to "application/zip, application/octet-stream"),
+                body = "",
+                maxResponseBodyBytes = 50 * 1024 * 1024,
             )
+            require(response.status in 200..299) {
+                "CloudStream package download failed with HTTP ${response.status}"
+            }
+            require(!response.body.endsWith("\n...[truncated]")) {
+                "CloudStream package exceeds the 50 MB download limit"
+            }
+            val bytes = response.bodyBytes
             require(bytes.isNotEmpty()) { "Downloaded .cs3 package is empty" }
             item.metadata.fileSize?.let { expectedSize ->
                 if (bytes.size.toLong() != expectedSize) {
