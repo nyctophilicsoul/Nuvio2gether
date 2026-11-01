@@ -18,6 +18,7 @@ data class CloudStreamPackageInspection(
 
 object CloudStreamPackageInspector {
     private const val centralDirectorySignature = 0x02014b50
+    private const val localFileHeaderSignature = 0x04034b50
     private const val endOfCentralDirectorySignature = 0x06054b50
     private const val maxEntries = 256
     private const val maxTotalUncompressedBytes = 50L * 1024L * 1024L
@@ -49,6 +50,7 @@ object CloudStreamPackageInspector {
 
         val entries = ArrayList<CloudStreamPackageEntry>(entryCount)
         val entryNames = mutableSetOf<String>()
+        val localEntryRanges = mutableListOf<Pair<Long, Long>>()
         var cursor = centralDirectoryOffset.toInt()
         var totalUncompressed = 0L
         repeat(entryCount) {
@@ -56,10 +58,18 @@ object CloudStreamPackageInspector {
                 "Truncated .cs3 central directory entry"
             }
             require(bytes.readInt32Le(cursor) == centralDirectorySignature) { "Invalid .cs3 central directory entry" }
+            val flags = bytes.readUInt16Le(cursor + 8)
+            val compressionMethod = bytes.readUInt16Le(cursor + 10)
+            val crc32 = bytes.readUInt32Le(cursor + 16)
             val compressedSize = bytes.readUInt32Le(cursor + 20)
             val uncompressedSize = bytes.readUInt32Le(cursor + 24)
             val diskNumberStart = bytes.readUInt16Le(cursor + 34)
+            val localHeaderOffset = bytes.readUInt32Le(cursor + 42)
             require(diskNumberStart == 0) { "Multi-disk .cs3 entries are not supported" }
+            require(flags and 0x0001 == 0) { "Encrypted .cs3 entries are not supported" }
+            require(compressionMethod == 0 || compressionMethod == 8) {
+                "Unsupported .cs3 compression method"
+            }
             val nameLength = bytes.readUInt16Le(cursor + 28)
             val extraLength = bytes.readUInt16Le(cursor + 30)
             val commentLength = bytes.readUInt16Le(cursor + 32)
@@ -77,6 +87,18 @@ object CloudStreamPackageInspector {
             val name = bytes.copyOfRange(nameStart, nameEnd).decodeToString()
             validateEntryName(name)
             require(entryNames.add(name)) { ".cs3 archive contains duplicate entry paths" }
+            val localEntryEnd = validateLocalEntry(
+                bytes = bytes,
+                localHeaderOffset = localHeaderOffset,
+                centralDirectoryOffset = centralDirectoryOffset,
+                expectedName = name,
+                expectedFlags = flags,
+                expectedCompressionMethod = compressionMethod,
+                expectedCrc32 = crc32,
+                expectedCompressedSize = compressedSize,
+                expectedUncompressedSize = uncompressedSize,
+            )
+            localEntryRanges += localHeaderOffset to localEntryEnd
             totalUncompressed += uncompressedSize
             require(totalUncompressed <= maxTotalUncompressedBytes) { ".cs3 archive is too large when extracted" }
             entries += CloudStreamPackageEntry(
@@ -87,10 +109,78 @@ object CloudStreamPackageInspector {
             cursor = entryEndLong.toInt()
         }
 
+        var previousLocalEntryEnd = 0L
+        localEntryRanges.sortedBy { it.first }.forEach { (start, end) ->
+            require(start >= previousLocalEntryEnd) { ".cs3 local ZIP entries overlap" }
+            previousLocalEntryEnd = end
+        }
+
         return CloudStreamPackageInspection(entries).also { inspection ->
             require(inspection.containsManifest) { ".cs3 package is missing manifest.json" }
             require(inspection.containsDex) { ".cs3 package is missing classes.dex" }
         }
+    }
+
+    private fun validateLocalEntry(
+        bytes: ByteArray,
+        localHeaderOffset: Long,
+        centralDirectoryOffset: Long,
+        expectedName: String,
+        expectedFlags: Int,
+        expectedCompressionMethod: Int,
+        expectedCrc32: Long,
+        expectedCompressedSize: Long,
+        expectedUncompressedSize: Long,
+    ): Long {
+        require(localHeaderOffset + 30L <= centralDirectoryOffset) {
+            "Invalid .cs3 local file header offset"
+        }
+        require(localHeaderOffset + 30L <= bytes.size.toLong()) {
+            "Truncated .cs3 local file header"
+        }
+        val offset = localHeaderOffset.toInt()
+        require(bytes.readInt32Le(offset) == localFileHeaderSignature) {
+            "Invalid .cs3 local file header"
+        }
+        val localFlags = bytes.readUInt16Le(offset + 6)
+        val localCompressionMethod = bytes.readUInt16Le(offset + 8)
+        val localCrc32 = bytes.readUInt32Le(offset + 14)
+        val localCompressedSize = bytes.readUInt32Le(offset + 18)
+        val localUncompressedSize = bytes.readUInt32Le(offset + 22)
+        val localNameLength = bytes.readUInt16Le(offset + 26)
+        val localExtraLength = bytes.readUInt16Le(offset + 28)
+        require(localFlags == expectedFlags && localCompressionMethod == expectedCompressionMethod) {
+            ".cs3 local and central ZIP headers disagree"
+        }
+
+        val localNameStart = offset + 30L
+        val localNameEnd = localNameStart + localNameLength
+        val dataStart = localNameEnd + localExtraLength
+        val dataEnd = dataStart + expectedCompressedSize
+        require(
+            localNameEnd <= centralDirectoryOffset &&
+                dataStart <= centralDirectoryOffset &&
+                dataEnd <= centralDirectoryOffset &&
+                dataEnd <= bytes.size.toLong()
+        ) {
+            "Invalid .cs3 local entry length"
+        }
+        val localName = bytes.copyOfRange(localNameStart.toInt(), localNameEnd.toInt()).decodeToString()
+        require(localName == expectedName) { ".cs3 local and central entry names disagree" }
+
+        // When a data descriptor is not used, the local header must agree with the
+        // central directory on CRC and sizes. With bit 3 set, those values may be
+        // deferred until after the compressed data and the central values are authoritative.
+        if (expectedFlags and 0x0008 == 0) {
+            require(
+                localCrc32 == expectedCrc32 &&
+                    localCompressedSize == expectedCompressedSize &&
+                    localUncompressedSize == expectedUncompressedSize
+            ) {
+                ".cs3 local and central entry sizes disagree"
+            }
+        }
+        return dataEnd
     }
 
     private fun findEndOfCentralDirectory(bytes: ByteArray): Int {
