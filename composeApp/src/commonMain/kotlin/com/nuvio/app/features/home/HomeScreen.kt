@@ -1,4 +1,9 @@
 package com.nuvio.app.features.home
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
+import com.nuvio.app.features.settings.ThemeSettingsRepository
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
@@ -146,6 +151,10 @@ fun HomeScreen(
     val homeSettingsUiState by remember {
         HomeCatalogSettingsRepository.snapshot()
         HomeCatalogSettingsRepository.uiState
+    }.collectAsStateWithLifecycle()
+    val homeBackgroundUrl by remember {
+        ThemeSettingsRepository.ensureLoaded()
+        ThemeSettingsRepository.homeBackgroundUrl
     }.collectAsStateWithLifecycle()
     val homeListState = rememberLazyListState()
     val continueWatchingListState = rememberLazyListState()
@@ -992,6 +1001,21 @@ fun HomeScreen(
             horizontalPadding = 0.dp,
             topPadding = if (showHeroSlot) 0.dp else null,
             listState = homeListState,
+            backgroundContent = homeBackgroundUrl.takeIf { it.isNotBlank() }?.let { backgroundUrl ->
+                {
+                    AsyncImage(
+                        model = backgroundUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.56f)),
+                    )
+                }
+            },
         ) {
             if (showHeroSlot) {
                 item(key = "home_hero", contentType = "hero") {
