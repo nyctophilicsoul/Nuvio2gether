@@ -242,6 +242,7 @@ internal data class StoredCloudStreamPlugin(
     val iconUrl: String? = null,
     val apiVersion: Int = 1,
     val fileHash: String? = null,
+    val installedFileHash: String? = null,
     val enabled: Boolean = false,
     val verified: Boolean = false,
     val installedAtEpochMs: Long = 0L,
