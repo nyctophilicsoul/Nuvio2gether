@@ -27,7 +27,7 @@ data class CloudStreamPluginItem(
         get() = installedVersion != null && metadata.version > installedVersion
 
     val isRunnable: Boolean
-        get() = isInstalled && enabled && verified && compatibility.isRunnable
+        get() = isInstalled && enabled && verified && compatibility.isRunnable && metadata.status.canInstall
 }
 
 data class CloudStreamUiState(
