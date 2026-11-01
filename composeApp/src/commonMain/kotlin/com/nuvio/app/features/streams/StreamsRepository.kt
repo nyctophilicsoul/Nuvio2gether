@@ -196,7 +196,7 @@ object StreamsRepository {
             type = type, videoId = videoId, parentMetaId = parentMetaId, parentMetaType = null,
             season = season, episode = episode, searchTitle = null,
         )
-        val cloudStreamProviderGroups = if (AppFeaturePolicy.pluginsEnabled && !isNativeServerRequest) {
+        val cloudStreamProviderGroups = if (AppFeaturePolicy.pluginsEnabled && !isNativeServerRequest && cloudStreamSearchRequest != null) {
             cloudStreamProviderGroupsForRequest(type, cloudStreamSearchRequest)
         } else emptyList()
 
