@@ -24,6 +24,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
@@ -90,6 +92,10 @@ actual object PluginRepository {
     private val profileLock = SynchronizedObject()
     private val activeRefreshJobs = mutableMapOf<String, Job>()
     private val activeRefreshJobsLock = SynchronizedObject()
+    private val serverPushLock = SynchronizedObject()
+    private val latestServerPushRevisionByProfile = mutableMapOf<Int, Long>()
+    private val serverPushMutex = Mutex()
+    private val serverPushRevision = atomic(0L)
     private val persistenceGeneration = atomic(0L)
     private val persistenceRevision = atomic(0L)
     private val persistenceLock = SynchronizedObject()
@@ -728,15 +734,25 @@ actual object PluginRepository {
     }
 
     private fun pushToServer(snapshot: Pair<Int, List<PluginPushItem>>) {
+        val revision = serverPushRevision.incrementAndGet()
+        synchronized(serverPushLock) {
+            latestServerPushRevisionByProfile[snapshot.first] = revision
+        }
         scope.launch {
-            runCatching {
-                val params = buildJsonObject {
-                    put("p_profile_id", snapshot.first)
-                    put("p_plugins", json.encodeToJsonElement(snapshot.second))
+            serverPushMutex.withLock {
+                val isLatest = synchronized(serverPushLock) {
+                    latestServerPushRevisionByProfile[snapshot.first] == revision
                 }
-                SupabaseProvider.client.postgrest.rpc("sync_push_plugins", params)
-            }.onFailure { error ->
-                log.e(error) { "pushToServer failed" }
+                if (!isLatest) return@withLock
+                runCatching {
+                    val params = buildJsonObject {
+                        put("p_profile_id", snapshot.first)
+                        put("p_plugins", json.encodeToJsonElement(snapshot.second))
+                    }
+                    SupabaseProvider.client.postgrest.rpc("sync_push_plugins", params)
+                }.onFailure { error ->
+                    log.e(error) { "pushToServer failed profile=${snapshot.first}" }
+                }
             }
         }
     }
