@@ -95,8 +95,6 @@ object StreamsRepository {
             qualitySelectionMode = qualitySelectionMode,
         )
         val requestKey = "$requestToken::pluginsGrouped=${pluginUiState.groupStreamsByRepository}"
-        val requestKey = "$requestToken::pluginsGrouped=${pluginUiState.groupStreamsByRepository}" +
-            "::cloudstream=${cloudStreamState?.registryRevision ?: 0L}"
         val currentState = _uiState.value
         if (
             !forceRefresh &&
@@ -224,22 +222,25 @@ object StreamsRepository {
 
         // Initialise loading placeholders
         val installedAddonOrder = streamAddons.map { it.addonName }
-        val initialGroups = StreamAutoPlaySelector.orderAddonStreams(streamAddons.map { addon ->
-            AddonStreamGroup(
-                addonName = addon.addonName,
-                addonId = addon.addonId,
-                streams = emptyList(),
-                isLoading = true,
-            )
-        } + pluginProviderGroups.map { providerGroup ->
-            AddonStreamGroup(
-                addonName = providerGroup.addonName,
-                addonId = providerGroup.addonId,
-                streams = emptyList(),
-                isLoading = true,
-            )
-        } + serverSources.map { it.loadingGroup() }, installedAddonOrder, preferredGroupIds)
-        } + serverSources.map { it.loadingGroup() }, installedAddonOrder, preferredGroupIds)
+        val initialGroups = StreamAutoPlaySelector.orderAddonStreams(
+            groups = streamAddons.map { addon ->
+                AddonStreamGroup(
+                    addonName = addon.addonName,
+                    addonId = addon.addonId,
+                    streams = emptyList(),
+                    isLoading = true,
+                )
+            } + pluginProviderGroups.map { providerGroup ->
+                AddonStreamGroup(
+                    addonName = providerGroup.addonName,
+                    addonId = providerGroup.addonId,
+                    streams = emptyList(),
+                    isLoading = true,
+                )
+            } + serverSources.map { it.loadingGroup() },
+            installedOrder = installedAddonOrder,
+            preferredGroupIds = preferredGroupIds,
+        )
         val isInitiallyLoading = initialGroups.any { it.isLoading }
         _uiState.value = StreamsUiState(
             requestToken = requestToken,
