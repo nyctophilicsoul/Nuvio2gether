@@ -24,6 +24,35 @@ class MergedHomeRowsTest {
         )
     }
 
+    @Test
+    fun typeTabsConsolidateAllMoviesAndSeriesAcrossEveryProvider() {
+        val sources = listOf(
+            listOf(item("movie-a", "movie"), item("series-a", "series")),
+            listOf(item("movie-b", "movie"), item("series-b", "tv")),
+        )
+        val all = mergeHomeRowItems(
+            sourceItems = sources,
+            deduplicate = true,
+            blendMode = MergedHomeRowBlendMode.INTERLEAVE,
+        )
+
+        val tabs = buildMergedHomeTypeTabs(
+            sourceItems = sources,
+            allItems = all,
+            deduplicate = true,
+            blendMode = MergedHomeRowBlendMode.INTERLEAVE,
+            sortMode = MergedHomeRowSortMode.OFF,
+            hideTitlesWithoutPosters = false,
+            hasMore = true,
+        )
+
+        assertEquals(listOf("all", "movies", "series"), tabs.map { it.key })
+        assertEquals(listOf("movie-a", "series-a", "movie-b", "series-b"), tabs[0].items.map { it.id })
+        assertEquals(listOf("movie-a", "movie-b"), tabs[1].items.map { it.id })
+        assertEquals(listOf("series-a", "series-b"), tabs[2].items.map { it.id })
+        assertTrue(tabs.all { it.hasMore })
+    }
+
     private fun item(id: String, type: String = "movie", name: String = id) =
         MetaPreview(id = id, type = type, name = name)
 
