@@ -104,6 +104,13 @@ object CloudStreamRepositoryParser {
     }
 }
 
+internal fun retainCloudStreamRepositoryIdentity(
+    requestedManifestUrl: String,
+    resolvedManifest: CloudStreamRepositoryManifest,
+): CloudStreamRepositoryManifest = resolvedManifest.copy(
+    sourceUrl = normalizeCloudStreamRepositoryUrl(requestedManifestUrl),
+)
+
 fun normalizeCloudStreamRepositoryUrl(rawUrl: String): String {
     var value = rawUrl.trim()
     require(value.isNotBlank()) { "CloudStream repository URL is required" }
