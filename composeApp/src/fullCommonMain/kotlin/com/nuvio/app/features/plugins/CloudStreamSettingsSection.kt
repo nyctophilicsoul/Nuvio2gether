@@ -18,7 +18,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -59,8 +58,6 @@ import com.nuvio.app.features.cloudstream.CloudStreamPluginItem
 import com.nuvio.app.features.cloudstream.CloudStreamRepository
 import com.nuvio.app.features.settings.AppLanguage
 import com.nuvio.app.features.settings.ThemeSettingsRepository
-import com.nuvio.app.features.streams.StreamSourcePreferencesRepository
-import com.nuvio.app.features.streams.cloudStreamAddonId
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -72,10 +69,6 @@ internal fun CloudStreamSettingsSection() {
     }
     val state by CloudStreamRepository.uiState.collectAsStateWithLifecycle()
     val selectedAppLanguage by ThemeSettingsRepository.selectedAppLanguage.collectAsStateWithLifecycle()
-    val sourcePreferences by remember {
-        StreamSourcePreferencesRepository.ensureLoaded()
-        StreamSourcePreferencesRepository.uiState
-    }.collectAsStateWithLifecycle()
     val copy = remember(selectedAppLanguage) { CloudStreamSettingsCopy.forLanguage(selectedAppLanguage) }
     val scope = rememberCoroutineScope()
     var repositoryUrl by rememberSaveable { mutableStateOf("") }
@@ -114,9 +107,6 @@ internal fun CloudStreamSettingsSection() {
                 item.compatibility.isRunnable &&
                 (!item.isRunnable || item.hasUpdate || !item.isInstalled || !item.verified)
         }
-    }
-    val pinnedSourceIds = remember(sourcePreferences.pinnedSources) {
-        sourcePreferences.pinnedSources.map { it.id }.toSet()
     }
 
     NuvioSectionLabel(copy.sectionTitle)
@@ -334,7 +324,6 @@ internal fun CloudStreamSettingsSection() {
         CloudStreamPluginCard(
             plugin = plugin,
             securityWarningAccepted = state.securityWarningAccepted,
-            pinnedSourceIds = pinnedSourceIds,
             copy = copy,
             onMessage = { message = it },
         )
@@ -364,13 +353,10 @@ private fun CloudStreamBulkInstallResult.toUserMessage(copy: CloudStreamSettings
 private fun CloudStreamPluginCard(
     plugin: CloudStreamPluginItem,
     securityWarningAccepted: Boolean,
-    pinnedSourceIds: Set<String>,
     copy: CloudStreamSettingsCopy,
     onMessage: (String) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    val sourceId = remember(plugin.metadata.id.value) { cloudStreamAddonId(plugin.metadata.id.value) }
-    val isPinnedSource = sourceId in pinnedSourceIds
     NuvioSurfaceCard {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             AsyncImage(
@@ -389,22 +375,6 @@ private fun CloudStreamPluginCard(
                 )
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                NuvioIconActionButton(
-                    icon = Icons.Rounded.PushPin,
-                    contentDescription = if (isPinnedSource) copy.unpinSource else copy.pinSource,
-                    tint = if (isPinnedSource) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    onClick = {
-                        if (isPinnedSource) {
-                            StreamSourcePreferencesRepository.unpinSource(sourceId)
-                        } else {
-                            StreamSourcePreferencesRepository.pinSource(sourceId, plugin.metadata.name)
-                        }
-                    },
-                )
                 Switch(
                     checked = plugin.enabled,
                     enabled = plugin.isInstalled && plugin.verified && plugin.compatibility.isRunnable,
