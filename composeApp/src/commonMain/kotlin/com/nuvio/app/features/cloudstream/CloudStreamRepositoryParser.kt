@@ -136,9 +136,12 @@ fun normalizeCloudStreamRepositoryUrl(rawUrl: String): String {
         val repository = parts[1].removeSuffix(".git")
         value = when {
             parts.size >= 5 && parts[2] == "blob" ->
-                "https://raw.githubusercontent.com/$owner/$repository/${parts[3]}/${parts.drop(4).joinToString("/")}" 
-            parts.size >= 5 && parts[2] in setOf("raw", "tree") ->
-                "https://raw.githubusercontent.com/$owner/$repository/${parts[3]}/${parts.drop(4).joinToString("/")}" 
+                "https://raw.githubusercontent.com/$owner/$repository/${parts[3]}/${parts.drop(4).joinToString("/")}"
+            parts.size >= 5 && parts[2] == "raw" ->
+                "https://raw.githubusercontent.com/$owner/$repository/${parts[3]}/${parts.drop(4).joinToString("/")}"
+            parts.size >= 4 && parts[2] == "tree" ->
+                "https://raw.githubusercontent.com/$owner/$repository/${parts[3]}/" +
+                    parts.drop(4).ifEmpty { listOf("repo.json") }.joinToString("/")
             parts.size == 2 -> "https://raw.githubusercontent.com/$owner/$repository/master/repo.json"
             else -> value
         }
