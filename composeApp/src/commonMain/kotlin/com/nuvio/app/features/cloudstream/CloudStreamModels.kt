@@ -75,7 +75,7 @@ enum class CloudStreamPluginStatus {
     ;
 
     val canInstall: Boolean
-        get() = this != Down
+        get() = this == Ok || this == Slow || this == BetaOnly
 
     companion object {
         fun fromWireValue(value: Int?): CloudStreamPluginStatus = when (value) {
