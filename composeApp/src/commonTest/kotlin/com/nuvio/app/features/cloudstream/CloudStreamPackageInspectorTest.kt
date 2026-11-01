@@ -58,6 +58,35 @@ class CloudStreamPackageInspectorTest {
     }
 
     @Test
+    fun rejectsTrailingBytesAfterZipEndRecord() {
+        val archive = fakeZip("manifest.json", "classes.dex") + byteArrayOf(0x01)
+
+        assertFailsWith<IllegalArgumentException> {
+            CloudStreamPackageInspector.inspect(archive)
+        }
+    }
+
+    @Test
+    fun rejectsDuplicateEntryPaths() {
+        val archive = fakeZip("manifest.json", "classes.dex", "manifest.json")
+
+        assertFailsWith<IllegalArgumentException> {
+            CloudStreamPackageInspector.inspect(archive)
+        }
+    }
+
+    @Test
+    fun rejectsEntryAssignedToAnotherDisk() {
+        val archive = fakeZip("manifest.json", "classes.dex")
+        // The first central-directory entry starts immediately after its 46-byte header.
+        archive[34] = 1
+
+        assertFailsWith<IllegalArgumentException> {
+            CloudStreamPackageInspector.inspect(archive)
+        }
+    }
+
+    @Test
     fun rejectsPackageWithoutDex() {
         assertFailsWith<IllegalArgumentException> {
             CloudStreamPackageInspector.inspect(fakeZip("manifest.json"))
