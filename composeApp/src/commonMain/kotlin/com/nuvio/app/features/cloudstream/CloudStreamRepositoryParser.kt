@@ -42,13 +42,16 @@ object CloudStreamRepositoryParser {
     ): List<CloudStreamPluginMetadata> {
         val normalizedRepositoryUrl = normalizeCloudStreamRepositoryUrl(repositoryManifestUrl)
         val normalizedPluginListUrl = resolveCloudStreamUrl(normalizedRepositoryUrl, pluginListUrl)
-        return json.parseToJsonElement(payload)
-            .jsonArray
-            .mapNotNull { element ->
-                runCatching { json.decodeFromJsonElement<CloudStreamPluginMetadataDto>(element) }
-                    .getOrNull()
-                    ?.toDomainOrNull(normalizedRepositoryUrl, normalizedPluginListUrl)
-            }
+        val elements = json.parseToJsonElement(payload).jsonArray
+        val plugins = elements.mapNotNull { element ->
+            runCatching { json.decodeFromJsonElement<CloudStreamPluginMetadataDto>(element) }
+                .getOrNull()
+                ?.toDomainOrNull(normalizedRepositoryUrl, normalizedPluginListUrl)
+        }
+        require(elements.isEmpty() || plugins.isNotEmpty()) {
+            "CloudStream plugin list contains entries, but none are valid"
+        }
+        return plugins
     }
 
     fun mergePluginLists(lists: List<List<CloudStreamPluginMetadata>>): List<CloudStreamPluginMetadata> {
