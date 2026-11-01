@@ -307,6 +307,10 @@ object CatalogRepository {
             sourceItems = session.sources.map { it.items },
             deduplicate = session.definition.deduplicate,
             maxItems = Int.MAX_VALUE,
+            blendMode = session.definition.resolvedBlendMode(),
+            sortMode = session.definition.resolvedSortMode(),
+            contentType = session.definition.resolvedContentType(),
+            hideTitlesWithoutPosters = session.definition.hideTitlesWithoutPosters,
         )
         val hasMore = session.sources.any { it.nextSkip != null }
         val failedSourceKeys = session.sources
@@ -318,9 +322,17 @@ object CatalogRepository {
                 add(
                     HomeCatalogTab(
                         key = source.source.definition.key,
-                        title = source.source.title,
-                        items = source.items,
-                        availableItemCount = source.items.size,
+                        title = com.nuvio.app.features.home.cleanMergedSourceTabTitle(source.source.title),
+                        items = com.nuvio.app.features.home.filterMergedHomeItems(
+                            items = source.items,
+                            contentType = session.definition.resolvedContentType(),
+                            hideTitlesWithoutPosters = session.definition.hideTitlesWithoutPosters,
+                        ),
+                        availableItemCount = com.nuvio.app.features.home.filterMergedHomeItems(
+                            items = source.items,
+                            contentType = session.definition.resolvedContentType(),
+                            hideTitlesWithoutPosters = session.definition.hideTitlesWithoutPosters,
+                        ).size,
                         hasMore = source.nextSkip != null,
                     ),
                 )
