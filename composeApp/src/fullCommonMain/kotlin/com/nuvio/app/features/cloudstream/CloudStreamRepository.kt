@@ -308,7 +308,11 @@ actual object CloudStreamRepository {
     ): List<Result<List<CloudStreamSearchItem>>> {
         initialize()
         val activeIds = runnableProviderIds().filter { providerId == null || it == providerId }
-        return activeIds.map { id -> providerResult(id) { search(query.trim()) } }
+        return activeIds.map { id ->
+            providerResult(id) {
+                search(query.trim()).also { items -> CloudStreamSearchRouteIndex.remember(id, query, items) }
+            }
+        }
     }
 
     actual suspend fun load(providerId: String, data: String): Result<CloudStreamLoadItem> =
