@@ -236,17 +236,26 @@ object HomeRepository {
                 if (preferences[rowKey]?.enabled == false) return@mapNotNull null
                 val sourceSections = mergedRow.sourceKeys.mapNotNull(sourceSectionsByKey::get)
                 if (sourceSections.isEmpty()) return@mapNotNull null
+                val displayMode = mergedRow.resolvedDisplayMode()
+                // The All / Movies / Series display mode owns its three category tabs.
+                // For source tabs and a unified carousel, apply the saved row-level content filter.
+                val contentType = if (displayMode == MergedHomeRowDisplayMode.TYPE_TABS) {
+                    MergedHomeRowContentType.ALL
+                } else {
+                    mergedRow.resolvedContentType()
+                }
                 val mergedItems = mergeHomeRowItems(
                     sourceItems = sourceSections.map(HomeCatalogSection::items),
                     deduplicate = mergedRow.deduplicate,
                     maxItems = HOME_MERGED_ROW_ITEM_LIMIT,
                     blendMode = mergedRow.resolvedBlendMode(),
                     sortMode = mergedRow.resolvedSortMode(),
+                    contentType = contentType,
                     hideTitlesWithoutPosters = mergedRow.hideTitlesWithoutPosters,
                 )
                 if (mergedItems.isEmpty()) return@mapNotNull null
 
-                val sourceTabs = when (mergedRow.resolvedDisplayMode()) {
+                val sourceTabs = when (displayMode) {
                     MergedHomeRowDisplayMode.SOURCE_TABS -> buildList {
                         add(
                             HomeCatalogTab(
@@ -260,7 +269,7 @@ object HomeRepository {
                         sourceSections.forEach { source ->
                             val sourceItems = filterMergedHomeItems(
                                 items = source.items,
-                                contentType = MergedHomeRowContentType.ALL,
+                                contentType = contentType,
                                 hideTitlesWithoutPosters = mergedRow.hideTitlesWithoutPosters,
                             )
                             add(
