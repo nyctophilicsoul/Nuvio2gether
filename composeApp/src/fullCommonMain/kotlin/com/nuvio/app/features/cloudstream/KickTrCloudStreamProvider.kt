@@ -1,6 +1,7 @@
 package com.nuvio.app.features.cloudstream
 
 import com.nuvio.app.features.addons.httpGetTextWithHeaders
+import com.nuvio.app.features.streams.runCatchingUnlessCancelled
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -32,7 +33,7 @@ internal object KickTrCloudStreamProvider : CloudStreamProvider {
             "Türkçe FPS yayınları" to "/api/v1/livestreams?sort=featured&language=tr&tag=fps&limit=96",
         )
         return categories.mapNotNull { (title, path) ->
-            runCatching { title to parseLivestreamItems(fetchApi(path)) }
+            runCatchingUnlessCancelled { title to parseLivestreamItems(fetchApi(path)) }
                 .getOrNull()
                 ?.takeIf { it.second.isNotEmpty() }
         }
@@ -86,7 +87,7 @@ internal object KickTrCloudStreamProvider : CloudStreamProvider {
             "source",
             "url",
         )?.takeIf(String::isPlayableKickUrl)
-            ?: runCatching {
+            ?: runCatchingUnlessCancelled {
                 fetchApi("/api/v1/stream/${slug.percentEncode()}").findFirstString(
                     "playback_url",
                     "playbackUrl",
@@ -115,10 +116,10 @@ internal object KickTrCloudStreamProvider : CloudStreamProvider {
         var lastError: Throwable? = null
         for (origin in apiOrigins) {
             val url = if (path.startsWith("http")) path else origin + path
-            val payload = runCatching { httpGetTextWithHeaders(url, requestHeaders) }
+            val payload = runCatchingUnlessCancelled { httpGetTextWithHeaders(url, requestHeaders) }
                 .onFailure { lastError = it }
                 .getOrNull() ?: continue
-            val parsed = runCatching { json.parseToJsonElement(payload) }
+            val parsed = runCatchingUnlessCancelled { json.parseToJsonElement(payload) }
                 .onFailure { lastError = it }
                 .getOrNull() ?: continue
             if (parsed.findFirstString("error")?.contains("blocked", ignoreCase = true) == true) {
