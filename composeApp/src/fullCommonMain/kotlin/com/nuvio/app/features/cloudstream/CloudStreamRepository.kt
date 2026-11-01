@@ -575,8 +575,9 @@ actual object CloudStreamRepository {
         // Keep the repository identity tied to the URL the user added. The fetched
         // manifest may have come from the main/master fallback candidate; persisting
         // that fallback URL would fail to match the existing repository during refresh.
-        val stableManifest = manifest.copy(
-            sourceUrl = normalizeCloudStreamRepositoryUrl(manifestUrl),
+        val stableManifest = retainCloudStreamRepositoryIdentity(
+            requestedManifestUrl = manifestUrl,
+            resolvedManifest = manifest,
         )
         return stableManifest to CloudStreamRepositoryParser.mergePluginLists(lists)
     }
