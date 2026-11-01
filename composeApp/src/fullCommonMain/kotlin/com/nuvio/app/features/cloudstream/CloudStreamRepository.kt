@@ -561,7 +561,11 @@ actual object CloudStreamRepository {
         val lists = manifest.pluginListUrls.map { pluginListUrl ->
             try {
                 val listPayload = httpGetText(pluginListUrl)
-                CloudStreamRepositoryParser.parsePluginList(manifest.sourceUrl, pluginListUrl, listPayload)
+                CloudStreamRepositoryParser.parsePluginList(
+                    repositoryManifestUrl = normalizeCloudStreamRepositoryUrl(manifestUrl),
+                    pluginListUrl = pluginListUrl,
+                    payload = listPayload,
+                )
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
