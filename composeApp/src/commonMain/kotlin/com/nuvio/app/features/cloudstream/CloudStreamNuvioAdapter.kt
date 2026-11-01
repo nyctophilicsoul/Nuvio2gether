@@ -51,7 +51,7 @@ fun CloudStreamLoadItem.toMetaDetails(): MetaDetails {
         listOf(
             MetaVideo(
                 id = routeId,
-                title = if (type == CloudStreamTvType.Live) "Canlı yayın" else name,
+                title = name,
                 available = true,
                 thumbnail = backgroundUrl ?: posterUrl,
             ),
