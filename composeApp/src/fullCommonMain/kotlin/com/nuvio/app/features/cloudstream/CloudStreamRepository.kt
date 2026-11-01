@@ -401,8 +401,7 @@ actual object CloudStreamRepository {
             var changed = false
             val plugins = current.plugins.map { item ->
                 if (item.metadata.id.value != pluginId) return@map item
-                val nextEnabled = enabled && item.isInstalled && item.verified && item.compatibility.isRunnable &&
-                    item.metadata.status.canInstall
+                val nextEnabled = enabled && item.canEnableProvider
                 changed = item.enabled != nextEnabled
                 item.copy(enabled = nextEnabled, errorMessage = null)
             }
@@ -495,9 +494,9 @@ actual object CloudStreamRepository {
         if (!item.metadata.status.canInstall) {
             return CloudStreamInstallResult.Error("This CloudStream plugin is marked as down")
         }
-        if (!item.compatibility.isRunnable) {
-            return CloudStreamInstallResult.Error(item.compatibility.reason)
-        }
+        // Downloading a .cs3 artifact does not make its DEX executable. Unsupported
+        // packages may be retained and hash-verified for inspection/compatibility
+        // tracking, but canEnableProvider remains false until a reviewed adapter exists.
         // Never replace a locally verified package with an unverified update. The
         // installed artifact may remain usable while the repository's new version
         // is missing its checksum, but overwriting it would discard that guarantee.

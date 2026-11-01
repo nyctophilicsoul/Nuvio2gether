@@ -106,11 +106,13 @@ internal fun CloudStreamSettingsSection() {
     }
     val bulkActionPlugins = remember(visiblePlugins) {
         visiblePlugins.filter { item ->
-            !item.isInstalling &&
-                item.metadata.status.canInstall &&
+            item.canDownloadPackage &&
                 item.compatibility.isRunnable &&
                 (!item.isRunnable || item.hasUpdate || !item.isInstalled || !item.verified)
         }
+    }
+    val hasUnsupportedProviders = remember(visiblePlugins) {
+        visiblePlugins.any { !it.compatibility.isRunnable }
     }
 
     NuvioSectionLabel(copy.sectionTitle)
@@ -318,8 +320,9 @@ internal fun CloudStreamSettingsSection() {
                 Text(
                     text = when {
                         isBulkInstalling -> copy.bulkInstalling
-                        bulkActionPlugins.isEmpty() -> copy.allInstalledAndActive
-                        else -> copy.installAndEnableAll(bulkActionPlugins.size)
+                        bulkActionPlugins.isNotEmpty() -> copy.installAndEnableAll(bulkActionPlugins.size)
+                        hasUnsupportedProviders -> copy.noCompatibleProviders
+                        else -> copy.allInstalledAndActive
                     },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
@@ -391,7 +394,7 @@ private fun CloudStreamPluginCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Switch(
                     checked = plugin.enabled,
-                    enabled = plugin.isInstalled && plugin.verified && plugin.compatibility.isRunnable && plugin.metadata.status.canInstall,
+                    enabled = plugin.canEnableProvider,
                     onCheckedChange = { CloudStreamRepository.setPluginEnabled(plugin.metadata.id.value, it) },
                 )
             }
@@ -437,7 +440,7 @@ private fun CloudStreamPluginCard(
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(
                 modifier = Modifier.weight(1f),
-                enabled = securityWarningAccepted && !plugin.isInstalling && plugin.compatibility.isRunnable && plugin.metadata.status.canInstall,
+                enabled = securityWarningAccepted && plugin.canDownloadPackage,
                 onClick = {
                     scope.launch {
                         val result = if (plugin.hasUpdate) {
@@ -457,6 +460,9 @@ private fun CloudStreamPluginCard(
                 Text(
                     when {
                         plugin.isInstalling -> copy.downloading
+                        !plugin.compatibility.isRunnable && plugin.hasUpdate -> copy.downloadUpdatePackage
+                        !plugin.compatibility.isRunnable && plugin.isInstalled -> copy.downloadAgainPackage
+                        !plugin.compatibility.isRunnable -> copy.downloadPackage
                         plugin.hasUpdate -> copy.update
                         plugin.isInstalled -> copy.reinstall
                         else -> copy.install
@@ -561,6 +567,14 @@ private class CloudStreamSettingsCopy private constructor(
         if (turkish) "Runtime uyumsuz" else "Runtime incompatible"
     val downloading: String =
         if (turkish) "İndiriliyor…" else "Downloading..."
+    val downloadPackage: String =
+        if (turkish) "Paketi indir" else "Download package"
+    val downloadUpdatePackage: String =
+        if (turkish) "Paketi güncelle" else "Download update"
+    val downloadAgainPackage: String =
+        if (turkish) "Paketi yeniden indir" else "Download again"
+    val noCompatibleProviders: String =
+        if (turkish) "Bu filtrede çalıştırılabilir yerleşik provider bulunamadı." else "No runnable built-in providers are available for this filter."
     val update: String =
         if (turkish) "Güncelle" else "Update"
     val reinstall: String =
@@ -671,6 +685,16 @@ private class CloudStreamSettingsCopy private constructor(
         }
 
     fun pluginInstalled(plugin: CloudStreamPluginItem): String = when {
+        !plugin.compatibility.isRunnable && plugin.verified -> if (turkish) {
+            "${plugin.metadata.name} paketi SHA-256 ile doğrulandı ve indirildi. Bu provider için henüz incelenmiş bir Nuvio adaptörü bulunmuyor; DEX kodu çalıştırılmayacak."
+        } else {
+            "${plugin.metadata.name} package was SHA-256 verified and downloaded. No reviewed Nuvio adapter is available for this provider; its DEX will not be executed."
+        }
+        !plugin.compatibility.isRunnable -> if (turkish) {
+            "${plugin.metadata.name} paketi indirildi ancak SHA-256 doğrulanamadı. Provider uyumsuz ve DEX kodu çalıştırılmayacak."
+        } else {
+            "${plugin.metadata.name} package was downloaded but could not be SHA-256 verified. The provider is unsupported and its DEX will not be executed."
+        }
         plugin.verified -> if (turkish) {
             "${plugin.metadata.name} paketi SHA-256 ile doğrulandı ve indirildi."
         } else {

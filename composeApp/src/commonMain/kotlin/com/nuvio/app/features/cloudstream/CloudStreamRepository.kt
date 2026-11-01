@@ -26,8 +26,20 @@ data class CloudStreamPluginItem(
     val hasUpdate: Boolean
         get() = installedVersion != null && metadata.version > installedVersion
 
+    /**
+     * Whether the repository currently permits downloading this .cs3 artifact.
+     * Downloadability is deliberately separate from runtime compatibility: Nuvio
+     * may retain and hash-verify an unsupported DEX package without executing it.
+     */
+    val canDownloadPackage: Boolean
+        get() = metadata.status.canInstall && !isInstalling
+
+    /** Only a verified package with a reviewed, supported runtime may be enabled. */
+    val canEnableProvider: Boolean
+        get() = isInstalled && verified && compatibility.isRunnable && metadata.status.canInstall
+
     val isRunnable: Boolean
-        get() = isInstalled && enabled && verified && compatibility.isRunnable && metadata.status.canInstall
+        get() = enabled && canEnableProvider
 }
 
 data class CloudStreamUiState(
