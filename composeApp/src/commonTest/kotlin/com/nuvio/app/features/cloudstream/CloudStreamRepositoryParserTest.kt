@@ -115,7 +115,7 @@ class CloudStreamRepositoryParserTest {
             """.trimIndent(),
         )
 
-        assertEquals(listOf("GoodHash", "NoHash"), plugins.map { it.internalName })
+        assertEquals(listOf("NoHash", "GoodHash"), plugins.map { it.internalName })
         assertTrue(plugins.first { it.internalName == "GoodHash" }.fileHash != null)
         assertNull(plugins.first { it.internalName == "NoHash" }.fileHash)
     }
