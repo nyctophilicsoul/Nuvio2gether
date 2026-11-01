@@ -468,17 +468,26 @@ actual object CloudStreamRepository {
         val activeIds = runnableProviderIds().filter { providerId == null || it == providerId }
         return activeIds.map { id ->
             val result = providerResult(id) { search(query.trim()) }
-            when {
-                !isProfileGenerationCurrent(expectedProfileGeneration) ->
-                    Result.failure<List<CloudStreamSearchItem>>(
+            if (result.isFailure) {
+                result
+            } else {
+                var providerStillRunnable = false
+                val cacheCommitted = commitForProfile(expectedProfileGeneration) {
+                    providerStillRunnable = id in runnableProviderIds()
+                    if (providerStillRunnable) {
+                        result.getOrThrow().let { items ->
+                            CloudStreamSearchRouteIndex.remember(id, query, items)
+                        }
+                    }
+                }
+                when {
+                    !cacheCommitted -> Result.failure<List<CloudStreamSearchItem>>(
                         IllegalStateException("Active profile changed while searching CloudStream providers"),
                     )
-                id !in runnableProviderIds() ->
-                    Result.failure<List<CloudStreamSearchItem>>(
+                    !providerStillRunnable -> Result.failure<List<CloudStreamSearchItem>>(
                         IllegalStateException("CloudStream provider was disabled while its search was running"),
                     )
-                else -> result.onSuccess { items ->
-                    CloudStreamSearchRouteIndex.remember(id, query, items)
+                    else -> result
                 }
             }
         }
@@ -890,6 +899,7 @@ actual object CloudStreamRepository {
         block: suspend CloudStreamProvider.() -> T,
     ): Result<T> {
         initialize()
+        val expectedProfileGeneration = profileGenerationSnapshot()
         if (providerId !in runnableProviderIds()) {
             return Result.failure(IllegalStateException("CloudStream provider is disabled or incompatible"))
         }
@@ -899,7 +909,14 @@ actual object CloudStreamRepository {
             val provider = CloudStreamProviderRegistry.find(providerId)
                 ?: CloudStreamPlatformRuntime.provider(plugin)
                 ?: error("CloudStream provider adapter was not found")
-            Result.success(provider.block())
+            val value = provider.block()
+            when {
+                !isProfileGenerationCurrent(expectedProfileGeneration) ->
+                    Result.failure(IllegalStateException("Active profile changed while the CloudStream provider request was running"))
+                providerId !in runnableProviderIds() ->
+                    Result.failure(IllegalStateException("CloudStream provider was disabled while the request was running"))
+                else -> Result.success(value)
+            }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
