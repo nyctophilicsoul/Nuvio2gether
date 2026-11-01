@@ -503,9 +503,9 @@ private class CloudStreamSettingsCopy private constructor(
         if (turkish) "CS3 providerları" else "CS3 providers"
     val sectionDescription: String =
         if (turkish) {
-            "Standart .cs3 paketleri indirilen üçüncü taraf kodudur. Android full sürümü bu paketleri CloudStream çalışma zamanı ile çalıştırabilir; iOS yalnızca uygulamaya derlenmiş uyumluluk adaptörlerini kullanabilir. Yalnızca güvendiğiniz depoları ve eklentileri kurun."
+            "Standart .cs3 paketleri indirilen üçüncü taraf kodudur. Bu derleme şu anda yalnızca Nuvio içine derlenmiş ve incelenmiş adaptörleri çalıştırır; rastgele .cs3 DEX kodu çalıştırılmaz. Yalnızca güvendiğiniz depoları ve paketleri kurun."
         } else {
-            "Standard .cs3 packages are downloaded third-party code. Android full builds can run them with the embedded CloudStream runtime; iOS can only use compatibility adapters compiled into the app. Only install repositories and plugins you trust."
+            "Standard .cs3 packages are downloaded third-party code. This build currently runs only reviewed adapters compiled into Nuvio; arbitrary .cs3 DEX execution is not enabled. Only install repositories and packages you trust."
         }
     val securityWarningTitle: String =
         if (turkish) "Üçüncü taraf kod güvenlik uyarısı" else "Third-party code security warning"
@@ -654,9 +654,9 @@ private class CloudStreamSettingsCopy private constructor(
             }
             CloudStreamPlatformSupport.AndroidOnly -> {
                 if (turkish) {
-                    "Android full sürümü bu standart CloudStream .cs3 paketini gömülü CloudStream çalışma zamanı ile çalıştırır."
+                    "Bu standart CloudStream .cs3 paketi Android DEX kodu içerir. İndirme ve doğrulama desteklenir, ancak bu derlemede rastgele DEX kodu çalıştırılmaz."
                 } else {
-                    "Android full builds execute this standard CloudStream .cs3 package with the embedded CloudStream runtime."
+                    "This standard CloudStream .cs3 package contains Android DEX code. Downloading and verifying it is supported, but executing arbitrary DEX is not enabled in this build."
                 }
             }
             CloudStreamPlatformSupport.Unsupported -> {
