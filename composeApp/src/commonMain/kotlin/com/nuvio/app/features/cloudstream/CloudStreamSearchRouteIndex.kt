@@ -19,6 +19,14 @@ internal object CloudStreamSearchRouteIndex {
 
     private val entries = MutableStateFlow<List<Entry>>(emptyList())
 
+    fun clear() {
+        entries.value = emptyList()
+    }
+
+    fun clearProvider(providerId: String) {
+        entries.update { current -> current.filterNot { it.providerId == providerId } }
+    }
+
     fun remember(
         providerId: String,
         query: String,

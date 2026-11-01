@@ -82,6 +82,7 @@ actual object CloudStreamRepository {
                 CloudStreamPlatformRuntime.clear()
                 currentProfileId = profileId.coerceAtLeast(1)
                 CloudStreamPlatformStorage.setActiveProfile(currentProfileId)
+                CloudStreamSearchRouteIndex.clear()
                 initialized = false
                 _uiState.value = CloudStreamUiState()
             }
@@ -96,6 +97,7 @@ actual object CloudStreamRepository {
                 refreshJobs.clear()
                 initialized = false
                 currentProfileId = 1
+                CloudStreamSearchRouteIndex.clear()
                 _uiState.value = CloudStreamUiState()
                 CloudStreamPlatformRuntime.clear()
                 CloudStreamPlatformStorage.setActiveProfile(1)
@@ -263,6 +265,7 @@ actual object CloudStreamRepository {
             val removedPlugins = _uiState.value.plugins
                 .filter { it.metadata.repositoryManifestUrl == normalizedUrl }
             removedPlugins.forEach {
+                CloudStreamSearchRouteIndex.clearProvider(it.metadata.id.value)
                 CloudStreamPlatformRuntime.unload(it.metadata.id.value)
                 CloudStreamPlatformStorage.deletePackage(it.metadata.id.storageKey)
             }
@@ -410,7 +413,10 @@ actual object CloudStreamRepository {
                 registryRevision = current.registryRevision + if (changed) 1 else 0,
             )
         }
-        if (!enabled) CloudStreamPlatformRuntime.unload(pluginId)
+        if (!enabled) {
+            CloudStreamSearchRouteIndex.clearProvider(pluginId)
+            CloudStreamPlatformRuntime.unload(pluginId)
+        }
         persist()
     }
 
@@ -420,6 +426,7 @@ actual object CloudStreamRepository {
         commitForProfile(expectedProfileGeneration) {
             val plugin = _uiState.value.plugins.firstOrNull { it.metadata.id.value == pluginId }
                 ?: return@commitForProfile
+            CloudStreamSearchRouteIndex.clearProvider(pluginId)
             CloudStreamPlatformRuntime.unload(pluginId)
             CloudStreamPlatformStorage.deletePackage(plugin.metadata.id.storageKey)
             _uiState.update { current ->
@@ -662,6 +669,7 @@ actual object CloudStreamRepository {
         previous
             .filterNot { it.metadata.id.value in refreshedIds }
             .forEach { removed ->
+                CloudStreamSearchRouteIndex.clearProvider(removed.metadata.id.value)
                 CloudStreamPlatformRuntime.unload(removed.metadata.id.value)
                 CloudStreamPlatformStorage.deletePackage(removed.metadata.id.storageKey)
             }
@@ -704,7 +712,10 @@ actual object CloudStreamRepository {
 
         _uiState.value.plugins
             .filter { it.metadata.repositoryManifestUrl == repository.sourceUrl && !it.isRunnable }
-            .forEach { item -> CloudStreamPlatformRuntime.unload(item.metadata.id.value) }
+            .forEach { item ->
+                CloudStreamSearchRouteIndex.clearProvider(item.metadata.id.value)
+                CloudStreamPlatformRuntime.unload(item.metadata.id.value)
+            }
     }
 
     private fun newPluginItem(metadata: CloudStreamPluginMetadata): CloudStreamPluginItem =

@@ -76,6 +76,50 @@ class CloudStreamSearchRouteIndexTest {
     }
 
     @Test
+    fun clearingOneProviderDoesNotRemoveOtherProviderRoutes() {
+        CloudStreamSearchRouteIndex.remember(
+            providerId = "provider-one",
+            query = "Movie",
+            items = listOf(
+                CloudStreamSearchItem(
+                    providerId = "provider-one",
+                    data = "one-route",
+                    name = "Movie",
+                    type = CloudStreamTvType.Movie,
+                ),
+            ),
+        )
+        CloudStreamSearchRouteIndex.remember(
+            providerId = "provider-two",
+            query = "Movie",
+            items = listOf(
+                CloudStreamSearchItem(
+                    providerId = "provider-two",
+                    data = "two-route",
+                    name = "Movie",
+                    type = CloudStreamTvType.Movie,
+                ),
+            ),
+        )
+
+        CloudStreamSearchRouteIndex.clearProvider("provider-one")
+
+        assertEquals(
+            emptyList(),
+            CloudStreamSearchRouteIndex.find("provider-one", listOf("Movie"), "movie", null),
+        )
+        assertEquals(
+            listOf("two-route"),
+            CloudStreamSearchRouteIndex.find("provider-two", listOf("Movie"), "movie", null).map { it.data },
+        )
+        CloudStreamSearchRouteIndex.clear()
+        assertEquals(
+            emptyList(),
+            CloudStreamSearchRouteIndex.find("provider-two", listOf("Movie"), "movie", null),
+        )
+    }
+
+    @Test
     fun cachedRoutesNormalizeArticlesAndTrailingYears() {
         val providerId = "route-index-canonical-test"
         CloudStreamSearchRouteIndex.remember(
