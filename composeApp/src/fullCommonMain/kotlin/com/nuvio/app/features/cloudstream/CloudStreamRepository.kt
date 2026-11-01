@@ -111,8 +111,14 @@ actual object CloudStreamRepository {
 
     actual suspend fun addRepository(rawUrl: String): AddCloudStreamRepositoryResult {
         initialize()
+        val expectedProfileGeneration = profileGenerationSnapshot()
         val manifestUrl = runCatching { resolveCloudStreamRepositoryInput(rawUrl) }
             .getOrElse { return AddCloudStreamRepositoryResult.Error(it.message ?: "Invalid repository URL") }
+        if (!commitForProfile(expectedProfileGeneration) {
+                // A profile switch invalidates this request before any state mutation.
+            }) {
+            return AddCloudStreamRepositoryResult.Error("Active profile changed while resolving the repository link")
+        }
         if (_uiState.value.repositories.any { it.manifest.sourceUrl == manifestUrl }) {
             return AddCloudStreamRepositoryResult.Error("CloudStream repository is already added")
         }
@@ -120,16 +126,26 @@ actual object CloudStreamRepository {
         return runCatching { fetchRepository(manifestUrl) }
             .fold(
                 onSuccess = { (repository, plugins) ->
-                    _uiState.update { current ->
-                        current.copy(
-                            repositories = current.repositories + CloudStreamRepositoryItem(repository),
-                            plugins = (current.plugins + plugins.map(::newPluginItem))
-                                .distinctBy { it.metadata.id.value }
-                                .sortedBy { it.metadata.name.lowercase() },
-                        )
+                    var duplicate = false
+                    val committed = commitForProfile(expectedProfileGeneration) {
+                        duplicate = _uiState.value.repositories.any { it.manifest.sourceUrl == manifestUrl }
+                        if (!duplicate) {
+                            _uiState.update { current ->
+                                current.copy(
+                                    repositories = current.repositories + CloudStreamRepositoryItem(repository),
+                                    plugins = (current.plugins + plugins.map(::newPluginItem))
+                                        .distinctBy { it.metadata.id.value }
+                                        .sortedBy { it.metadata.name.lowercase() },
+                                )
+                            }
+                            persist()
+                        }
                     }
-                    persist()
-                    AddCloudStreamRepositoryResult.Success(repository)
+                    when {
+                        !committed -> AddCloudStreamRepositoryResult.Error("Active profile changed before the repository could be added")
+                        duplicate -> AddCloudStreamRepositoryResult.Error("CloudStream repository is already added")
+                        else -> AddCloudStreamRepositoryResult.Success(repository)
+                    }
                 },
                 onFailure = { error ->
                     if (error is CancellationException) throw error
