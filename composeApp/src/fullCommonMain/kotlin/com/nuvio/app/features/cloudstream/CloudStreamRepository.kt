@@ -63,6 +63,7 @@ actual object CloudStreamRepository {
                     profileGeneration += 1
                     jobsToCancel += refreshJobs.values
                     refreshJobs.clear()
+                    CloudStreamSearchRouteIndex.clear()
                     CloudStreamPlatformRuntime.clear()
                 }
                 currentProfileId = profileId
@@ -562,6 +563,7 @@ actual object CloudStreamRepository {
                 check(currentItem.metadata == item.metadata && currentItem.isInstalling) {
                     "CloudStream plugin was removed, changed, or its installation was cancelled"
                 }
+                CloudStreamSearchRouteIndex.clearProvider(pluginId)
                 CloudStreamPlatformRuntime.unload(pluginId)
                 CloudStreamPlatformStorage.savePackageAtomically(item.metadata.id.storageKey, bytes)
                 installed = currentItem.copy(
@@ -678,6 +680,9 @@ actual object CloudStreamRepository {
             val previousById = current.plugins.associateBy { it.metadata.id.value }
             val refreshed = plugins.map { metadata ->
                 val previousItem = previousById[metadata.id.value]
+                if (previousItem != null && previousItem.metadata != metadata) {
+                    CloudStreamSearchRouteIndex.clearProvider(metadata.id.value)
+                }
                 val compatibility = resolveCompatibility(metadata)
                 previousItem?.let { previous ->
                     val installedPackageMatchesCurrentMetadata = previous.installedVersion != metadata.version ||
