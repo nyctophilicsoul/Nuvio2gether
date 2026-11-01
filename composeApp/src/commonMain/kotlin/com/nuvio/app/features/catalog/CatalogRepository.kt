@@ -10,6 +10,8 @@ import com.nuvio.app.features.servers.ServerCatalog
 import com.nuvio.app.features.servers.serverMessage
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.HomeCatalogTab
+import com.nuvio.app.features.home.MergedHomeRowDisplayMode
+import com.nuvio.app.features.home.MergedHomeRowContentType
 import com.nuvio.app.features.home.ResolvedMergedHomeRowSource
 import com.nuvio.app.features.home.filterReleasedItems
 import com.nuvio.app.features.home.mergeHomeRowItems
@@ -309,34 +311,51 @@ object CatalogRepository {
             maxItems = Int.MAX_VALUE,
             blendMode = session.definition.resolvedBlendMode(),
             sortMode = session.definition.resolvedSortMode(),
-            contentType = session.definition.resolvedContentType(),
             hideTitlesWithoutPosters = session.definition.hideTitlesWithoutPosters,
         )
         val hasMore = session.sources.any { it.nextSkip != null }
         val failedSourceKeys = session.sources
             .filter { it.retrySkip != null }
             .mapTo(linkedSetOf()) { it.source.definition.key }
-        val sourceTabs = buildList {
-            add(HomeCatalogTab("all", "All", mergedItems, mergedItems.size, hasMore))
-            session.sources.forEach { source ->
-                add(
-                    HomeCatalogTab(
-                        key = source.source.definition.key,
-                        title = com.nuvio.app.features.home.cleanMergedSourceTabTitle(source.source.title),
-                        items = com.nuvio.app.features.home.filterMergedHomeItems(
-                            items = source.items,
-                            contentType = session.definition.resolvedContentType(),
-                            hideTitlesWithoutPosters = session.definition.hideTitlesWithoutPosters,
+        val sourceTabs = when (session.definition.resolvedDisplayMode()) {
+            MergedHomeRowDisplayMode.SOURCE_TABS -> buildList {
+                add(HomeCatalogTab("all", "All", mergedItems, mergedItems.size, hasMore))
+                session.sources.forEach { source ->
+                    val items = com.nuvio.app.features.home.filterMergedHomeItems(
+                        items = source.items,
+                        contentType = MergedHomeRowContentType.ALL,
+                        hideTitlesWithoutPosters = session.definition.hideTitlesWithoutPosters,
+                    )
+                    add(
+                        HomeCatalogTab(
+                            key = source.source.definition.key,
+                            title = com.nuvio.app.features.home.cleanMergedSourceTabTitle(source.source.title),
+                            items = items,
+                            availableItemCount = items.size,
+                            hasMore = source.nextSkip != null,
                         ),
-                        availableItemCount = com.nuvio.app.features.home.filterMergedHomeItems(
-                            items = source.items,
-                            contentType = session.definition.resolvedContentType(),
-                            hideTitlesWithoutPosters = session.definition.hideTitlesWithoutPosters,
-                        ).size,
-                        hasMore = source.nextSkip != null,
-                    ),
-                )
+                    )
+                }
             }
+            MergedHomeRowDisplayMode.TYPE_TABS -> buildList {
+                add(HomeCatalogTab("all", "All", mergedItems, mergedItems.size, hasMore))
+                listOf(
+                    MergedHomeRowContentType.MOVIES to "Movies",
+                    MergedHomeRowContentType.SERIES to "Series",
+                ).forEach { (type, title) ->
+                    val items = mergeHomeRowItems(
+                        sourceItems = session.sources.map { it.items },
+                        deduplicate = session.definition.deduplicate,
+                        maxItems = Int.MAX_VALUE,
+                        blendMode = session.definition.resolvedBlendMode(),
+                        sortMode = session.definition.resolvedSortMode(),
+                        contentType = type,
+                        hideTitlesWithoutPosters = session.definition.hideTitlesWithoutPosters,
+                    )
+                    add(HomeCatalogTab(type.storageValue, title, items, items.size, hasMore))
+                }
+            }
+            MergedHomeRowDisplayMode.UNIFIED_CAROUSEL -> emptyList()
         }
         val errorMessage = when {
             failedSourceKeys.isNotEmpty() -> "Some source catalogs could not be loaded. You can retry them."
