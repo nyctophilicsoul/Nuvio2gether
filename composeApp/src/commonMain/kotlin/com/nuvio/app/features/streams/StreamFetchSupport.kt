@@ -15,8 +15,6 @@ import com.nuvio.app.features.cloudstream.sha256Hex
 import com.nuvio.app.features.cloudstream.sortCloudStreamEpisodes
 import com.nuvio.app.features.cloudstream.toStreamItem
 import com.nuvio.app.features.details.MetaDetailsRepository
-import com.nuvio.app.features.player.PlayerQualityResolver
-import com.nuvio.app.features.player.PlayerQualityVariant
 import com.nuvio.app.features.plugins.PluginRepositoryItem
 import com.nuvio.app.features.plugins.PluginRuntimeResult
 import com.nuvio.app.features.plugins.PluginScraper
@@ -270,7 +268,6 @@ internal suspend fun cloudStreamSourcesToStreamItems(
                 providerName = providerName,
             )
         }
-        .flatMap { stream -> stream.expandCloudStreamHlsVariants() }
         .distinctBy { stream ->
             listOf(
                 stream.addonId,
@@ -280,40 +277,6 @@ internal suspend fun cloudStreamSourcesToStreamItems(
             )
         }
 
-private suspend fun StreamItem.expandCloudStreamHlsVariants(): List<StreamItem> {
-    val sourceUrl = playableDirectUrl?.takeIf { it.isNotBlank() } ?: return listOf(this)
-    val normalizedType = normalizeStreamType(streamType)
-    val shouldInspectHls = normalizedType == "hls" || sourceUrl.contains(".m3u8", ignoreCase = true)
-    if (!shouldInspectHls) return listOf(this)
-
-    val resolved = runCatchingUnlessCancelled {
-        PlayerQualityResolver.resolve(
-            sourceUrl = sourceUrl,
-            requestHeaders = behaviorHints.proxyHeaders?.request.orEmpty(),
-            forceHls = normalizedType == "hls",
-        )
-    }.getOrNull()
-
-    val variants = resolved
-        ?.variants
-        .orEmpty()
-        .distinctBy { variant -> variant.qualityName to variant.absoluteUri }
-    if (variants.size <= 1) return listOf(this)
-
-    return variants
-        .sortedWith(compareByDescending<PlayerQualityVariant> { it.sortHeight }.thenByDescending { it.bandwidth ?: 0L })
-        .map { variant ->
-            copy(
-                name = listOfNotNull(
-                    sourceName?.takeIf { it.isNotBlank() } ?: name?.substringBefore(" · ")?.takeIf { it.isNotBlank() },
-                    variant.qualityName.takeIf { it.isNotBlank() },
-                ).joinToString(" · "),
-                title = title,
-                url = variant.playbackUrl,
-                streamType = "hls",
-            )
-        }
-}
 
 internal fun List<PluginScraper>.toPluginProviderGroups(
     repositories: List<PluginRepositoryItem>,
@@ -368,7 +331,7 @@ internal fun buildCloudStreamSearchRequest(
     val title = searchTitle?.trim()?.takeIf { it.isNotBlank() }
         ?: meta?.name?.trim()?.takeIf { it.isNotBlank() }
         ?: return null
-    val aliases = (listOfNotNull(meta?.name, searchTitle) + meta?.aliases.orEmpty())
+    val aliases = listOfNotNull(meta?.name, searchTitle)
         .cleanCloudStreamRequestAliases(primaryTitle = title)
     val year = meta?.releaseInfo.cloudStreamReleaseYear()
         ?: title.cloudStreamReleaseYear()
