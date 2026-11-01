@@ -139,7 +139,11 @@ private fun MergedHomeRowsEditor(
         draftTitle = row.title
         draftSourceKeys = row.sourceKeys.toSet()
         draftMode = row.resolvedDisplayMode()
-        draftContentType = row.resolvedContentType()
+        draftContentType = if (row.resolvedDisplayMode() == MergedHomeRowDisplayMode.TYPE_TABS) {
+            MergedHomeRowContentType.ALL
+        } else {
+            row.resolvedContentType()
+        }
         draftBlendMode = row.resolvedBlendMode()
         draftSortMode = row.resolvedSortMode()
         draftHideIncludedRows = row.hideIncludedRows
