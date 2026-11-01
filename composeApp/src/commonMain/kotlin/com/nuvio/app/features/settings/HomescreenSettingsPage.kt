@@ -125,7 +125,6 @@ import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
 
-@Composable
 internal fun LazyListScope.homescreenSettingsContent(
     isTablet: Boolean,
     heroEnabled: Boolean,
