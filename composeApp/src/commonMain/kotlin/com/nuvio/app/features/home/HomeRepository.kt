@@ -237,13 +237,7 @@ object HomeRepository {
                 val sourceSections = mergedRow.sourceKeys.mapNotNull(sourceSectionsByKey::get)
                 if (sourceSections.isEmpty()) return@mapNotNull null
                 val displayMode = mergedRow.resolvedDisplayMode()
-                // The All / Movies / Series display mode owns its three category tabs.
-                // For source tabs and a unified carousel, apply the saved row-level content filter.
-                val contentType = if (displayMode == MergedHomeRowDisplayMode.TYPE_TABS) {
-                    MergedHomeRowContentType.ALL
-                } else {
-                    mergedRow.resolvedContentType()
-                }
+                val contentType = mergedRow.contentTypeForDisplay()
                 val mergedItems = mergeHomeRowItems(
                     sourceItems = sourceSections.map(HomeCatalogSection::items),
                     deduplicate = mergedRow.deduplicate,
