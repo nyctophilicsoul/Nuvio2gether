@@ -12,6 +12,7 @@ import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.HomeCatalogTab
 import com.nuvio.app.features.home.MergedHomeRowDisplayMode
 import com.nuvio.app.features.home.MergedHomeRowContentType
+import com.nuvio.app.features.home.buildMergedHomeTypeTabs
 import com.nuvio.app.features.home.ResolvedMergedHomeRowSource
 import com.nuvio.app.features.home.filterReleasedItems
 import com.nuvio.app.features.home.mergeHomeRowItems
@@ -337,24 +338,16 @@ object CatalogRepository {
                     )
                 }
             }
-            MergedHomeRowDisplayMode.TYPE_TABS -> buildList {
-                add(HomeCatalogTab("all", "All", mergedItems, mergedItems.size, hasMore))
-                listOf(
-                    MergedHomeRowContentType.MOVIES to "Movies",
-                    MergedHomeRowContentType.SERIES to "Series",
-                ).forEach { (type, title) ->
-                    val items = mergeHomeRowItems(
-                        sourceItems = session.sources.map { it.items },
-                        deduplicate = session.definition.deduplicate,
-                        maxItems = Int.MAX_VALUE,
-                        blendMode = session.definition.resolvedBlendMode(),
-                        sortMode = session.definition.resolvedSortMode(),
-                        contentType = type,
-                        hideTitlesWithoutPosters = session.definition.hideTitlesWithoutPosters,
-                    )
-                    add(HomeCatalogTab(type.storageValue, title, items, items.size, hasMore))
-                }
-            }
+            MergedHomeRowDisplayMode.TYPE_TABS -> buildMergedHomeTypeTabs(
+                sourceItems = session.sources.map { it.items },
+                allItems = mergedItems,
+                deduplicate = session.definition.deduplicate,
+                blendMode = session.definition.resolvedBlendMode(),
+                sortMode = session.definition.resolvedSortMode(),
+                hideTitlesWithoutPosters = session.definition.hideTitlesWithoutPosters,
+                hasMore = hasMore,
+                maxItems = Int.MAX_VALUE,
+            )
             MergedHomeRowDisplayMode.UNIFIED_CAROUSEL -> emptyList()
         }
         val errorMessage = when {
