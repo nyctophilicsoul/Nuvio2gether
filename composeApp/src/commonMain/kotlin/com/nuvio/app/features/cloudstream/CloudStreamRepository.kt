@@ -13,6 +13,8 @@ data class CloudStreamPluginItem(
     val compatibility: CloudStreamCompatibility,
     val installedVersion: Int? = null,
     val installedAtEpochMs: Long = 0L,
+    /** Hash verified against the bytes currently installed, not the latest repository metadata. */
+    val installedFileHash: String? = null,
     val enabled: Boolean = false,
     val verified: Boolean = false,
     val isInstalling: Boolean = false,
