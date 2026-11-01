@@ -12,6 +12,8 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.TestExecutable
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
+import java.net.URL
+import java.security.MessageDigest
 import java.util.Properties
 
 abstract class GenerateRuntimeConfigsTask : DefaultTask() {
@@ -287,16 +289,16 @@ val downloadCloudStreamRuntime = tasks.register("downloadCloudStreamRuntime") {
         val destination = cloudStreamRuntimeAar.asFile
         val expectedSha256 = "b67a4384bea1f4072123b86c5f164471422d9c6c12845d5067f12db44674d427"
         val url = "https://raw.githubusercontent.com/yesnt10/NuvioMobile-Enhanced/894499115fb1a69cd4bb34d6969a74832f0e5636/composeApp/libs/cloudstream-runtime-api-4.8.0-3496e5f.aar"
-        if (!destination.isFile || java.security.MessageDigest.getInstance("SHA-256")
+        if (!destination.isFile || MessageDigest.getInstance("SHA-256")
                 .digest(destination.readBytes()).joinToString("") { "%02x".format(it.toInt() and 0xff) } != expectedSha256
         ) {
             destination.parentFile.mkdirs()
             val temporary = destination.resolveSibling(destination.name + ".download")
             try {
-                java.net.URL(url).openStream().use { input ->
+                URL(url).openStream().use { input ->
                     temporary.outputStream().use { output -> input.copyTo(output) }
                 }
-                val actualSha256 = java.security.MessageDigest.getInstance("SHA-256")
+                val actualSha256 = MessageDigest.getInstance("SHA-256")
                     .digest(temporary.readBytes()).joinToString("") { "%02x".format(it.toInt() and 0xff) }
                 check(actualSha256 == expectedSha256) {
                     "CloudStream runtime AAR SHA-256 mismatch: $actualSha256"
