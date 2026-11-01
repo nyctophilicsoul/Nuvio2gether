@@ -232,6 +232,30 @@ class CloudStreamMatchTest {
     }
 
     @Test
+    fun doesNotUseEpisodeTitleToCrossAnExplicitSeasonBoundary() {
+        val loaded = CloudStreamLoadItem(
+            providerId = "provider",
+            data = "show",
+            name = "Show",
+            type = CloudStreamTvType.TvSeries,
+            episodes = listOf(
+                CloudStreamEpisode(data = "s1e1", name = "Pilot", season = 1, episode = 1),
+                CloudStreamEpisode(data = "s2e2", name = "Another Episode", season = 2, episode = 2),
+            ),
+        )
+        val request = CloudStreamSearchRequest(
+            title = "Show",
+            type = "series",
+            year = null,
+            season = 2,
+            episode = 1,
+            episodeTitle = "Pilot",
+        )
+
+        assertNull(loaded.linkDataForCloudStreamRequest(request))
+    }
+
+    @Test
     fun selectsUnknownSeasonEpisodeOnlyForFirstSeasonFallback() {
         val loaded = CloudStreamLoadItem(
             providerId = "provider",
