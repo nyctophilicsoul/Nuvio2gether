@@ -427,19 +427,25 @@ actual object CloudStreamRepository {
                 log.w(error) { "CloudStream repository manifest failed url=$candidate" }
             }.getOrNull()
         } ?: throw lastManifestError ?: IllegalStateException("CloudStream repository manifest could not be loaded")
-        var loadedListCount = 0
-        val lists = manifest.pluginListUrls.mapNotNull { pluginListUrl ->
-            runCatching {
+        // A repository may publish multiple plugin lists. Applying only the lists
+        // that happened to load would make a transient CDN failure look like an
+        // intentional removal and silently drop installed plugins from persisted state.
+        // Treat the refresh as atomic: keep the previous snapshot unless every declared
+        // list was fetched and parsed successfully.
+        val lists = manifest.pluginListUrls.map { pluginListUrl ->
+            try {
                 val listPayload = httpGetText(pluginListUrl)
                 CloudStreamRepositoryParser.parsePluginList(manifest.sourceUrl, pluginListUrl, listPayload)
-            }.onSuccess {
-                loadedListCount += 1
-            }.onFailure { error ->
-                if (error is CancellationException) throw error
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
                 log.w(error) { "CloudStream plugin list failed url=$pluginListUrl" }
-            }.getOrNull()
+                throw IllegalStateException(
+                    "CloudStream repository plugin list could not be loaded: $pluginListUrl",
+                    error,
+                )
+            }
         }
-        require(loadedListCount > 0) { "CloudStream repository plugin lists could not be loaded" }
         return manifest to CloudStreamRepositoryParser.mergePluginLists(lists)
     }
 
@@ -457,13 +463,22 @@ actual object CloudStreamRepository {
         repository: CloudStreamRepositoryManifest,
         plugins: List<CloudStreamPluginMetadata>,
     ) {
+        val previous = _uiState.value.plugins
+            .filter { it.metadata.repositoryManifestUrl == repository.sourceUrl }
+        val refreshedIds = plugins.mapTo(mutableSetOf()) { it.id.value }
+        // Stop removed providers and do not leave a stale checked/enabled state when
+        // a repository changes a plugin's status or runtime compatibility.
+        (previous.map { it.metadata.id.value } - refreshedIds).forEach(CloudStreamPlatformRuntime::unload)
+
         _uiState.update { current ->
             val previousById = current.plugins.associateBy { it.metadata.id.value }
             val refreshed = plugins.map { metadata ->
-                previousById[metadata.id.value]?.copy(
+                val previousItem = previousById[metadata.id.value]
+                val compatibility = resolveCompatibility(metadata)
+                previousItem?.copy(
                     metadata = metadata,
-                    compatibility = resolveCompatibility(metadata),
-                    enabled = previousById[metadata.id.value]?.enabled == true && metadata.status.canInstall,
+                    compatibility = compatibility,
+                    enabled = previousItem.enabled && metadata.status.canInstall && compatibility.isRunnable,
                     errorMessage = null,
                 ) ?: newPluginItem(metadata)
             }
@@ -478,6 +493,10 @@ actual object CloudStreamRepository {
                 registryRevision = current.registryRevision + 1,
             )
         }
+
+        _uiState.value.plugins
+            .filter { it.metadata.repositoryManifestUrl == repository.sourceUrl && !it.isRunnable }
+            .forEach { item -> CloudStreamPlatformRuntime.unload(item.metadata.id.value) }
     }
 
     private fun newPluginItem(metadata: CloudStreamPluginMetadata): CloudStreamPluginItem =
