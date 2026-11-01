@@ -30,16 +30,19 @@ object TmdbService {
             .trim()
 
         if (normalized.isBlank()) return null
-        if (normalized.all(Char::isDigit)) return normalized
-        if (normalized.startsWith("tt", ignoreCase = true)) {
-            return imdbToTmdb(imdbId = normalized, mediaType = mediaType, apiKey = apiKey)
+        if (normalized.all { it in '0'..'9' }) {
+            return normalized.takeIf { it.toLongOrNull()?.let { id -> id > 0 } == true }
+        }
+        if (normalized.isValidImdbId()) {
+            return imdbToTmdb(imdbId = normalized.lowercase(), mediaType = mediaType, apiKey = apiKey)
         }
 
         // Fallback: use the IMDB ID supplied by the addon's meta response
         val normalizedFallback = fallbackImdbId
             ?.trim()
             ?.substringBefore(':')
-            ?.takeIf { it.startsWith("tt", ignoreCase = true) }
+            ?.takeIf(String::isValidImdbId)
+            ?.lowercase()
         if (normalizedFallback != null) {
             return imdbToTmdb(imdbId = normalizedFallback, mediaType = mediaType, apiKey = apiKey)
         }
@@ -118,7 +121,9 @@ object TmdbService {
         } catch (cancelled: CancellationException) {
             cacheMutex.withLock {
                 imdbToTmdbInFlight.remove(cacheKey)
-                lookup.cancel(cancelled)
+                // The owner's cancellation should not cancel independent waiters.
+                // They receive a cache miss; their own coroutine cancellation still propagates.
+                lookup.complete(null)
             }
             throw cancelled
         } catch (error: Exception) {
@@ -155,6 +160,27 @@ object TmdbService {
         }
 }
 
+private val QUERY_COMPONENT_HEX = "0123456789ABCDEF"
+
+private fun encodeTmdbQueryComponent(value: String): String = buildString(value.length) {
+    value.encodeToByteArray().forEach { byte ->
+        val code = byte.toInt() and 0xff
+        val unreserved = code in 0x41..0x5a || code in 0x61..0x7a ||
+            code in 0x30..0x39 || code == 0x2d || code == 0x2e ||
+            code == 0x5f || code == 0x7e
+        if (unreserved) {
+            append(code.toChar())
+        } else {
+            append('%')
+            append(QUERY_COMPONENT_HEX[code ushr 4])
+            append(QUERY_COMPONENT_HEX[code and 0x0f])
+        }
+    }
+}
+
+private fun String.isValidImdbId(): Boolean =
+    length >= 7 && startsWith("tt", ignoreCase = true) && drop(2).all { it in '0'..'9' }
+
 internal fun buildTmdbUrl(
     endpoint: String,
     apiKey: String,
@@ -171,7 +197,9 @@ internal fun buildTmdbUrl(
         append(endpoint.removePrefix("/"))
         if (params.isNotEmpty()) {
             append("?")
-            append(params.entries.joinToString("&") { (key, value) -> "$key=$value" })
+            append(params.entries.joinToString("&") { (key, value) ->
+                "${encodeTmdbQueryComponent(key)}=${encodeTmdbQueryComponent(value)}"
+            })
         }
     }
 }
