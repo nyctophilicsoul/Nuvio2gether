@@ -563,7 +563,7 @@ kotlin {
                 )
                 if (androidDistribution == "full") {
                     implementation(files("libs/quickjs-kt-android-1.0.5-nuvio.aar"))
-                    implementation(files(cloudStreamRuntimeAar))
+                    implementation(files(cloudStreamRuntimeAar).builtBy(downloadCloudStreamRuntime))
                     implementation(libs.ksoup)
                     implementation("androidx.annotation:annotation:1.10.0")
                     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.1")
