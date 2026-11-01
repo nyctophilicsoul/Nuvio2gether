@@ -237,25 +237,52 @@ private fun smartFreshnessPopularityMerge(
         candidate to score
     }
 
-    val providerUsage = IntArray(sourceItems.size)
-    val remaining = ranked.toMutableList()
+    // Assign each candidate to the least-populated provider queue. This avoids repeatedly
+    // rescanning every remaining title (which becomes expensive in the full catalog screen).
+    val sourceCandidateCounts = IntArray(sourceItems.size)
+    candidates.forEach { candidate ->
+        candidate.sourceIndexes.forEach { sourceIndex ->
+            if (sourceIndex in sourceCandidateCounts.indices) sourceCandidateCounts[sourceIndex]++
+        }
+    }
+    val providerQueues = Array(sourceItems.size) { mutableListOf<Pair<SmartCandidate, Double>>() }
+    ranked.forEach { entry ->
+        val candidate = entry.first
+        val primaryProvider = candidate.sourceIndexes.minWithOrNull(
+            compareBy<Int> { sourceCandidateCounts.getOrElse(it) { Int.MAX_VALUE } }.thenBy { it },
+        ) ?: return@forEach
+        providerQueues[primaryProvider] += entry
+    }
+    providerQueues.forEach { queue ->
+        queue.sortWith(
+            compareByDescending<Pair<SmartCandidate, Double>> { it.second }
+                .thenBy { it.first.originalOrder },
+        )
+    }
+
+    val providerPositions = IntArray(providerQueues.size)
+    val providerUsage = IntArray(providerQueues.size)
     val result = ArrayList<MetaPreview>(minOf(maxItems, candidates.size))
-    while (remaining.isNotEmpty() && result.size < maxItems) {
-        var bestIndex = 0
-        var bestAdjustedScore = Double.NEGATIVE_INFINITY
-        remaining.forEachIndexed { index, (candidate, baseScore) ->
-            val leastUsedProvider = candidate.sourceIndexes.minOfOrNull { providerUsage.getOrElse(it) { 0 } } ?: 0
-            val diversityPenalty = (leastUsedProvider * 0.035).coerceAtMost(0.18)
-            val adjusted = baseScore - diversityPenalty
-            if (adjusted > bestAdjustedScore) {
-                bestAdjustedScore = adjusted
-                bestIndex = index
+    while (result.size < maxItems) {
+        var selectedProvider = -1
+        var selectedAdjustedScore = Double.NEGATIVE_INFINITY
+        var selectedEntry: Pair<SmartCandidate, Double>? = null
+        providerQueues.indices.forEach { providerIndex ->
+            val entry = providerQueues[providerIndex].getOrNull(providerPositions[providerIndex])
+                ?: return@forEach
+            val diversityPenalty = (providerUsage[providerIndex] * 0.035).coerceAtMost(0.18)
+            val adjustedScore = entry.second - diversityPenalty
+            if (adjustedScore > selectedAdjustedScore) {
+                selectedProvider = providerIndex
+                selectedAdjustedScore = adjustedScore
+                selectedEntry = entry
             }
         }
-        val selected = remaining.removeAt(bestIndex).first
-        val provider = selected.sourceIndexes.minByOrNull { providerUsage.getOrElse(it) { 0 } }
-        if (provider != null && provider in providerUsage.indices) providerUsage[provider]++
-        result += selected.item
+        if (selectedProvider < 0) break
+        val selected = selectedEntry ?: break
+        providerPositions[selectedProvider]++
+        providerUsage[selectedProvider]++
+        result += selected.first.item
     }
     return result
 }
