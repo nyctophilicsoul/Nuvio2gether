@@ -243,6 +243,7 @@ actual object PluginRepository {
         return try {
             val (repo, scrapers) = fetchRepositoryData(
                 manifestUrl = manifestUrl,
+                profileId = expectedProfile.first,
                 previousScrapers = previousById,
             )
             var duplicate = false
@@ -355,7 +356,7 @@ actual object PluginRepository {
                     refreshJob = scope.launch(start = CoroutineStart.LAZY) {
                         try {
                             val result = try {
-                                Result.success(fetchRepositoryData(manifestUrl, snapshot.previousScrapers))
+                                Result.success(fetchRepositoryData(manifestUrl, snapshot.profileId, snapshot.previousScrapers))
                             } catch (cancelled: CancellationException) {
                                 throw cancelled
                             } catch (error: Throwable) {
@@ -554,9 +555,9 @@ actual object PluginRepository {
 
     private suspend fun fetchRepositoryData(
         manifestUrl: String,
+        profileId: Int,
         previousScrapers: Map<String, PluginScraper>,
     ): Pair<PluginRepositoryItem, List<PluginScraper>> {
-        val storageProfileId = currentProfileId
         return withContext(Dispatchers.Default) {
             val payload = httpGetText(manifestUrl)
             val manifest = PluginManifestParser.parse(payload)
@@ -570,11 +571,11 @@ actual object PluginRepository {
                     } else {
                         "$baseUrl/${info.filename.trimStart('/')}"
                     }
-                    runCatching {
+                    try {
                         val code = httpGetText(codeUrl)
                         val scraperId = "${manifestUrl.lowercase()}:${info.id}"
                         val cached = PluginStorage.saveScraperCode(
-                            profileId = storageProfileId,
+                            profileId = profileId,
                             scraperId = scraperId,
                             code = code,
                             overwrite = true,
@@ -605,7 +606,12 @@ actual object PluginRepository {
                             formats = info.formats ?: info.supportedFormats,
                             code = code,
                         )
-                    }.getOrNull()
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        log.w(error) { "Failed to download plugin scraper ${info.id} from $manifestUrl" }
+                        null
+                    }
                 }
 
             val repo = PluginRepositoryItem(
