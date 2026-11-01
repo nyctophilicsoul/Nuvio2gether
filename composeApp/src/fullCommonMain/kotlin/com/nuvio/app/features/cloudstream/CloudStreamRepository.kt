@@ -681,7 +681,7 @@ actual object CloudStreamRepository {
             body = "",
             followRedirects = false,
         )
-        val location = response.headers["location"]?.substringBefore(',')?.trim()
+        val location = response.headers.entries.firstOrNull { (name, _) -> name.equals("location", ignoreCase = true) }?.value?.trim()
         require(!location.isNullOrBlank()) { "CloudStream short repository link did not redirect" }
         require(!location.startsWith("https://py.md/404") && !location.startsWith("https://cutt.ly/404")) {
             "CloudStream short repository link was not found"
