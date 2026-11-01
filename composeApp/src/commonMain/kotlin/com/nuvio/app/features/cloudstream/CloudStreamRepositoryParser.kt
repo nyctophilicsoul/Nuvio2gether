@@ -48,8 +48,8 @@ object CloudStreamRepositoryParser {
                 .getOrNull()
                 ?.toDomainOrNull(normalizedRepositoryUrl, normalizedPluginListUrl)
         }
-        require(elements.isEmpty() || plugins.isNotEmpty()) {
-            "CloudStream plugin list contains entries, but none are valid"
+        require(plugins.size == elements.size) {
+            "CloudStream plugin list contains invalid entries; refusing a partial refresh"
         }
         return plugins
     }
