@@ -59,7 +59,6 @@ import com.nuvio.app.features.details.MetaScreenSettingsRepository
 import com.nuvio.app.features.details.MetaScreenSettingsUiState
 import com.nuvio.app.core.ui.PosterCardStyleRepository
 import com.nuvio.app.core.ui.PosterCardStyleUiState
-import com.nuvio.app.features.cloudstream.CloudStreamPlatformRuntime
 import com.nuvio.app.features.collection.CollectionRepository
 import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.addons.firstEnabledManifestError
@@ -117,7 +116,7 @@ private fun watchPartyRow(onClick: () -> Unit): (() -> Unit)? {
 private fun SettingsPage.isEnabledByPolicy(): Boolean =
     when (this) {
         SettingsPage.SupportersContributors -> AppFeaturePolicy.supportersContributorsPageEnabled
-        SettingsPage.CloudStream -> AppFeaturePolicy.pluginsEnabled && CloudStreamPlatformRuntime.supportsAndroidDex
+        SettingsPage.CloudStream -> AppFeaturePolicy.pluginsEnabled
         SettingsPage.PlaybackP2p -> P2pSettingsRepository.isVisible
         SettingsPage.PlaybackBuffer -> !isIos
         else -> true
@@ -593,7 +592,7 @@ private fun MobileSettingsScreen(
                         }
                     }
                     SettingsPage.CloudStream -> {
-                        if (AppFeaturePolicy.pluginsEnabled && CloudStreamPlatformRuntime.supportsAndroidDex) {
+                        if (AppFeaturePolicy.pluginsEnabled) {
                             onCloudStreamClick()
                         }
                     }
@@ -753,7 +752,7 @@ private fun MobileSettingsScreen(
                 SettingsPage.ContentDiscovery -> contentDiscoveryContent(
                     isTablet = false,
                     showPluginsEntry = AppFeaturePolicy.pluginsEnabled,
-                    showCloudStreamEntry = AppFeaturePolicy.pluginsEnabled && CloudStreamPlatformRuntime.supportsAndroidDex,
+                    showCloudStreamEntry = AppFeaturePolicy.pluginsEnabled,
                     onAddonsClick = onAddonsClick,
                     onPluginsClick = onPluginsClick,
                     onCloudStreamClick = onCloudStreamClick,
@@ -770,7 +769,7 @@ private fun MobileSettingsScreen(
                 )
                 SettingsPage.Plugins -> if (AppFeaturePolicy.pluginsEnabled) pluginsSettingsContent() else addonsSettingsContent()
                 SettingsPage.CloudStream -> if (
-                    AppFeaturePolicy.pluginsEnabled && CloudStreamPlatformRuntime.supportsAndroidDex
+                    AppFeaturePolicy.pluginsEnabled
                 ) cloudStreamSettingsContent() else addonsSettingsContent()
                 SettingsPage.Homescreen -> homescreenSettingsContent(
                     isTablet = false,
@@ -1169,7 +1168,7 @@ private fun TabletSettingsScreen(
                     SettingsPage.ContentDiscovery -> contentDiscoveryContent(
                         isTablet = true,
                         showPluginsEntry = AppFeaturePolicy.pluginsEnabled,
-                        showCloudStreamEntry = AppFeaturePolicy.pluginsEnabled && CloudStreamPlatformRuntime.supportsAndroidDex,
+                        showCloudStreamEntry = AppFeaturePolicy.pluginsEnabled,
                         onAddonsClick = { openInlinePage(SettingsPage.Addons) },
                         onPluginsClick = { openInlinePage(SettingsPage.Plugins) },
                         onCloudStreamClick = { openInlinePage(SettingsPage.CloudStream) },
@@ -1186,7 +1185,7 @@ private fun TabletSettingsScreen(
                     )
                     SettingsPage.Plugins -> if (AppFeaturePolicy.pluginsEnabled) pluginsSettingsContent() else addonsSettingsContent()
                     SettingsPage.CloudStream -> if (
-                        AppFeaturePolicy.pluginsEnabled && CloudStreamPlatformRuntime.supportsAndroidDex
+                        AppFeaturePolicy.pluginsEnabled
                     ) cloudStreamSettingsContent() else addonsSettingsContent()
                     SettingsPage.Homescreen -> homescreenSettingsContent(
                         isTablet = true,
