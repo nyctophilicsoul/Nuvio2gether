@@ -6,6 +6,7 @@ import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.buildAddonResourceUrl
 import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.addons.fetchAddonResponseText
+import com.nuvio.app.features.cloudstream.CloudStreamRepository
 import com.nuvio.app.features.debrid.DebridSettingsRepository
 import com.nuvio.app.features.debrid.DebridStreamPresentation
 import com.nuvio.app.features.debrid.DirectDebridStreamPreparer
@@ -20,6 +21,9 @@ import com.nuvio.app.features.streams.InstalledStreamAddonTarget
 import com.nuvio.app.features.streams.StreamAutoPlaySelector
 import com.nuvio.app.features.streams.StreamBadgePresentation
 import com.nuvio.app.features.streams.StreamBadgeSettingsRepository
+import com.nuvio.app.features.streams.buildCloudStreamSearchRequest
+import com.nuvio.app.features.streams.cloudStreamProviderGroupsForRequest
+import com.nuvio.app.features.streams.resolveCloudStreamProviderStreams
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamLoadCompletion
 import com.nuvio.app.features.streams.StreamParser
@@ -320,8 +324,27 @@ object PlayerStreamsRepository {
             repositories = pluginUiState.repositories,
             groupByRepository = pluginUiState.groupStreamsByRepository,
         )
+        val cloudStreamSearchRequest = buildCloudStreamSearchRequest(
+            type = type,
+            videoId = videoId,
+            parentMetaId = null,
+            parentMetaType = null,
+            season = season,
+            episode = episode,
+            searchTitle = null,
+        )
+        val cloudStreamProviderGroups = if (AppFeaturePolicy.pluginsEnabled && !isNativeServerRequest) {
+            cloudStreamProviderGroupsForRequest(type, cloudStreamSearchRequest)
+        } else {
+            emptyList()
+        }
 
-        if (installedAddons.isEmpty() && pluginProviderGroups.isEmpty() && serverSources.isEmpty()) {
+        if (
+            installedAddons.isEmpty() &&
+            pluginProviderGroups.isEmpty() &&
+            cloudStreamProviderGroups.isEmpty() &&
+            serverSources.isEmpty()
+        ) {
             stateFlow.value = StreamsUiState(
                 isAnyLoading = false,
                 emptyStateReason = com.nuvio.app.features.streams.StreamsEmptyStateReason.NoAddonsInstalled,
@@ -341,7 +364,12 @@ object PlayerStreamsRepository {
                 )
             }
 
-        if (streamAddons.isEmpty() && pluginProviderGroups.isEmpty() && serverSources.isEmpty()) {
+        if (
+            streamAddons.isEmpty() &&
+            pluginProviderGroups.isEmpty() &&
+            cloudStreamProviderGroups.isEmpty() &&
+            serverSources.isEmpty()
+        ) {
             stateFlow.value = StreamsUiState(
                 isAnyLoading = false,
                 emptyStateReason = com.nuvio.app.features.streams.StreamsEmptyStateReason.NoCompatibleAddons,
@@ -364,6 +392,13 @@ object PlayerStreamsRepository {
                 streams = emptyList(),
                 isLoading = true,
             )
+        } + cloudStreamProviderGroups.map { providerGroup ->
+            AddonStreamGroup(
+                addonName = providerGroup.addonName,
+                addonId = providerGroup.addonId,
+                streams = emptyList(),
+                isLoading = true,
+            )
         } + serverSources.map { it.loadingGroup() }, installedAddonOrder, preferredGroupIds)
         val isInitiallyLoading = initialGroups.any { it.isLoading }
         stateFlow.value = StreamsUiState(
@@ -379,7 +414,7 @@ object PlayerStreamsRepository {
                 .associate { it.addonId to it.scrapers.size }
                 .toMutableMap()
             val pluginFirstErrorByAddonId = mutableMapOf<String, String>()
-            val totalTasks = streamAddons.size + pluginProviderGroups.sumOf { it.scrapers.size } + serverSources.size
+            val totalTasks = streamAddons.size + pluginProviderGroups.sumOf { it.scrapers.size } + cloudStreamProviderGroups.size + serverSources.size
             val completions = Channel<StreamLoadCompletion>(capacity = Channel.BUFFERED)
             val debridAvailabilityJobs = mutableListOf<Job>()
 
@@ -488,6 +523,16 @@ object PlayerStreamsRepository {
 
             serverSources.forEach { source ->
                 launch { publishCompletion(StreamLoadCompletion.Addon(source.load())) }
+            }
+
+            cloudStreamProviderGroups.forEach { providerGroup ->
+                launch {
+                    val group = resolveCloudStreamProviderStreams(
+                        providerGroup = providerGroup,
+                        request = cloudStreamSearchRequest,
+                    )
+                    publishCompletion(StreamLoadCompletion.Addon(group))
+                }
             }
 
             pluginProviderGroups.forEach { providerGroup ->
