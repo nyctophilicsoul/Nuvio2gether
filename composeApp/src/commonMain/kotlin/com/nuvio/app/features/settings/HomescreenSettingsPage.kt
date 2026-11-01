@@ -97,6 +97,12 @@ import nuvio.composeapp.generated.resources.settings_homescreen_show_hero
 import nuvio.composeapp.generated.resources.settings_homescreen_show_hero_description
 import nuvio.composeapp.generated.resources.settings_homescreen_summary
 import nuvio.composeapp.generated.resources.settings_homescreen_summary_hint
+import nuvio.composeapp.generated.resources.settings_homescreen_background_save
+import nuvio.composeapp.generated.resources.settings_homescreen_background_clear
+import nuvio.composeapp.generated.resources.settings_homescreen_background_invalid_url
+import nuvio.composeapp.generated.resources.settings_homescreen_background_url
+import nuvio.composeapp.generated.resources.settings_homescreen_background_description
+import nuvio.composeapp.generated.resources.settings_homescreen_background_title
 import nuvio.composeapp.generated.resources.settings_homescreen_addon_row_order
 import nuvio.composeapp.generated.resources.settings_homescreen_addon_row_order_description
 import nuvio.composeapp.generated.resources.settings_homescreen_addon_order_edit
@@ -119,6 +125,7 @@ import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
 
+@Composable
 internal fun LazyListScope.homescreenSettingsContent(
     isTablet: Boolean,
     heroEnabled: Boolean,
