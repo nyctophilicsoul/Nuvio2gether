@@ -337,6 +337,19 @@ internal fun CloudStreamSettingsSection() {
         }
     }
 
+    if (state.repositories.isNotEmpty() && state.plugins.isEmpty()) {
+        NuvioSectionLabel(copy.providersSectionTitle)
+        NuvioSurfaceCard {
+            Text(copy.noProvidersFoundTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                copy.noProvidersFoundDescription,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+
     visiblePlugins.forEach { plugin ->
         CloudStreamPluginCard(
             plugin = plugin,
@@ -553,6 +566,14 @@ private class CloudStreamSettingsCopy private constructor(
         if (turkish) "Yazar belirtilmemiş" else "Author not specified"
     val noDescription: String =
         if (turkish) "Açıklama yok." else "No description."
+    val noProvidersFoundTitle: String =
+        if (turkish) "Repository içinde provider bulunamadı" else "No providers found in these repositories"
+    val noProvidersFoundDescription: String =
+        if (turkish) {
+            "Eklenen repository henüz herhangi bir CloudStream provider listelemiyor. Repository adresini ve yenileme durumunu kontrol edin."
+        } else {
+            "The added repositories have not listed any CloudStream providers yet. Check the repository URL and its refresh status."
+        }
     val sha256Verified: String =
         if (turkish) "SHA-256 doğrulandı" else "SHA-256 verified"
     val hashUnverified: String =
