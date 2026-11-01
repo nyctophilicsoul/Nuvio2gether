@@ -35,7 +35,6 @@ import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.HomeCatalogSettingsUiState
 import com.nuvio.app.features.home.MergedHomeRowDefinition
 import com.nuvio.app.features.home.MergedHomeRowDisplayMode
-import com.nuvio.app.features.home.MergedHomeRowContentType
 import com.nuvio.app.features.home.MergedHomeRowBlendMode
 import com.nuvio.app.features.home.MergedHomeRowSortMode
 import com.nuvio.app.features.home.mergedHomeRowKey
@@ -54,6 +53,7 @@ import nuvio.composeapp.generated.resources.settings_merged_rows_edit
 import nuvio.composeapp.generated.resources.settings_merged_rows_edit_title
 import nuvio.composeapp.generated.resources.settings_merged_rows_empty
 import nuvio.composeapp.generated.resources.settings_merged_rows_mode_tabs
+import nuvio.composeapp.generated.resources.settings_merged_rows_mode_type_tabs
 import nuvio.composeapp.generated.resources.settings_merged_rows_mode_unified
 import nuvio.composeapp.generated.resources.settings_merged_rows_name
 import nuvio.composeapp.generated.resources.settings_merged_rows_save
@@ -61,10 +61,6 @@ import nuvio.composeapp.generated.resources.settings_merged_rows_select_sources
 import nuvio.composeapp.generated.resources.settings_merged_rows_source_limit
 import nuvio.composeapp.generated.resources.settings_merged_rows_title
 import nuvio.composeapp.generated.resources.settings_merged_rows_unavailable_source
-import nuvio.composeapp.generated.resources.settings_merged_rows_type
-import nuvio.composeapp.generated.resources.settings_merged_rows_type_all
-import nuvio.composeapp.generated.resources.settings_merged_rows_type_movies
-import nuvio.composeapp.generated.resources.settings_merged_rows_type_series
 import nuvio.composeapp.generated.resources.settings_merged_rows_blend
 import nuvio.composeapp.generated.resources.settings_merged_rows_blend_interleave
 import nuvio.composeapp.generated.resources.settings_merged_rows_blend_smart
@@ -110,7 +106,6 @@ private fun MergedHomeRowsEditor(
     var draftTitle by remember { mutableStateOf("") }
     var draftSourceKeys by remember { mutableStateOf(setOf<String>()) }
     var draftMode by remember { mutableStateOf(MergedHomeRowDisplayMode.SOURCE_TABS) }
-    var draftContentType by remember { mutableStateOf(MergedHomeRowContentType.ALL) }
     var draftBlendMode by remember { mutableStateOf(MergedHomeRowBlendMode.SMART_FRESHNESS_POPULARITY) }
     var draftSortMode by remember { mutableStateOf(MergedHomeRowSortMode.OFF) }
     var draftHideIncludedRows by remember { mutableStateOf(false) }
@@ -123,7 +118,6 @@ private fun MergedHomeRowsEditor(
         draftTitle = ""
         draftSourceKeys = emptySet()
         draftMode = MergedHomeRowDisplayMode.SOURCE_TABS
-        draftContentType = MergedHomeRowContentType.ALL
         draftBlendMode = MergedHomeRowBlendMode.SMART_FRESHNESS_POPULARITY
         draftSortMode = MergedHomeRowSortMode.OFF
         draftHideIncludedRows = false
@@ -137,7 +131,6 @@ private fun MergedHomeRowsEditor(
         draftTitle = row.title
         draftSourceKeys = row.sourceKeys.toSet()
         draftMode = row.resolvedDisplayMode()
-        draftContentType = row.resolvedContentType()
         draftBlendMode = row.resolvedBlendMode()
         draftSortMode = row.resolvedSortMode()
         draftHideIncludedRows = row.hideIncludedRows
@@ -191,7 +184,11 @@ private fun MergedHomeRowsEditor(
                                 Text(row.title, style = MaterialTheme.typography.titleMedium)
                                 Spacer(Modifier.height(3.dp))
                                 Text(
-                                    text = "${row.sourceKeys.size} catalogs · ${if (row.resolvedDisplayMode() == MergedHomeRowDisplayMode.SOURCE_TABS) stringResource(Res.string.settings_merged_rows_mode_tabs) else stringResource(Res.string.settings_merged_rows_mode_unified)}",
+                                    text = "${row.sourceKeys.size} catalogs · ${stringResource(when (row.resolvedDisplayMode()) {
+                                        MergedHomeRowDisplayMode.SOURCE_TABS -> Res.string.settings_merged_rows_mode_tabs
+                                        MergedHomeRowDisplayMode.TYPE_TABS -> Res.string.settings_merged_rows_mode_type_tabs
+                                        MergedHomeRowDisplayMode.UNIFIED_CAROUSEL -> Res.string.settings_merged_rows_mode_unified
+                                    })}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -277,17 +274,16 @@ private fun MergedHomeRowsEditor(
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
-
-                    Text(stringResource(Res.string.settings_merged_rows_type), style = MaterialTheme.typography.titleSmall)
-                    listOf(
-                        MergedHomeRowContentType.ALL to Res.string.settings_merged_rows_type_all,
-                        MergedHomeRowContentType.MOVIES to Res.string.settings_merged_rows_type_movies,
-                        MergedHomeRowContentType.SERIES to Res.string.settings_merged_rows_type_series,
-                    ).forEach { (type, label) ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = draftContentType == type, onClick = { draftContentType = type })
-                            Text(stringResource(label), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                        }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(
+                            selected = draftMode == MergedHomeRowDisplayMode.TYPE_TABS,
+                            onClick = { draftMode = MergedHomeRowDisplayMode.TYPE_TABS },
+                        )
+                        Text(
+                            stringResource(Res.string.settings_merged_rows_mode_type_tabs),
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
                     }
 
                     Text(stringResource(Res.string.settings_merged_rows_blend), style = MaterialTheme.typography.titleSmall)
@@ -392,7 +388,6 @@ private fun MergedHomeRowsEditor(
                                 sourceKeys = draftSourceKeys.toList(),
                                 displayMode = draftMode,
                                 deduplicate = draftDeduplicate,
-                                contentType = draftContentType,
                                 blendMode = draftBlendMode,
                                 sortMode = draftSortMode,
                                 hideIncludedRows = draftHideIncludedRows,
@@ -403,7 +398,6 @@ private fun MergedHomeRowsEditor(
                             sourceKeys = draftSourceKeys.toList(),
                             displayMode = draftMode,
                             deduplicate = draftDeduplicate,
-                            contentType = draftContentType,
                             blendMode = draftBlendMode,
                             sortMode = draftSortMode,
                             hideIncludedRows = draftHideIncludedRows,
