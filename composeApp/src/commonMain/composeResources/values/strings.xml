@@ -2645,7 +2645,7 @@
     <string name="settings_custom_poster_mode_off">Off</string>
     <string name="settings_custom_poster_mode_off_description">Use original posters and leave existing catalog metadata unchanged.</string>
     <string name="settings_custom_poster_mode_tags_only">Tags only</string>
-    <string name="settings_custom_poster_mode_tags_description">Keep original poster artwork. Ratings and popularity metadata continue to come from the catalogs.</string>
+    <string name="settings_custom_poster_mode_tags_description">Keep original poster artwork. This image URL returns artwork only, so separate rating or trending tags must come from catalog metadata.</string>
     <string name="settings_custom_poster_mode_posters_tags">Posters + tags</string>
     <string name="settings_custom_poster_mode_posters_description">Use the custom poster URL pattern. Any ratings or trending artwork baked into its returned image are shown with that poster.</string>
     <string name="profile_custom_background_url">Custom background URL</string>
