@@ -161,51 +161,59 @@ actual object PluginRepository {
             val urls = dedupeManifestUrls(rows.map { it.url })
             var repositoriesToRefresh: List<PluginRepositoryItem> = emptyList()
             var persistenceSnapshot: PluginPersistenceSnapshot? = null
-            val applied = synchronized(profileLock) {
-                if (
-                    currentProfileId != expectedProfile.first ||
-                    persistenceGeneration.value != expectedProfile.second
-                ) {
-                    false
-                } else {
-                    val existingState = _uiState.value
-                    val existingReposByUrl = existingState.repositories.associateBy { it.manifestUrl }
-                    val nowEpochMs = currentEpochMillis()
-                    val nextRepos = urls.map { url ->
-                        val existing = existingReposByUrl[url]
-                        if (existing == null) {
-                            PluginRepositoryItem(
-                                manifestUrl = url,
-                                name = url.substringBefore("?").substringAfterLast('/'),
-                                isRefreshing = true,
-                            )
-                        } else {
-                            val shouldRefresh = shouldRefreshRepository(
-                                repository = existing,
-                                scrapers = existingState.scrapers,
-                                nowEpochMs = nowEpochMs,
-                            )
-                            existing.copy(
-                                isRefreshing = shouldRefresh,
-                                errorMessage = if (shouldRefresh) null else existing.errorMessage,
-                            )
+            val jobsToCancel = mutableListOf<Job>()
+            val applied = synchronized(activeRefreshJobsLock) {
+                synchronized(profileLock) {
+                    if (
+                        currentProfileId != expectedProfile.first ||
+                        persistenceGeneration.value != expectedProfile.second
+                    ) {
+                        false
+                    } else {
+                        val existingState = _uiState.value
+                        val existingReposByUrl = existingState.repositories.associateBy { it.manifestUrl }
+                        val retainedUrls = urls.toSet()
+                        (existingReposByUrl.keys - retainedUrls).forEach { removedUrl ->
+                            activeRefreshJobs.remove(removedUrl)?.let(jobsToCancel::add)
                         }
-                    }
-                    val nextScrapers = existingState.scrapers.filter { scraper ->
-                        urls.contains(scraper.repositoryUrl)
-                    }
+                        val nowEpochMs = currentEpochMillis()
+                        val nextRepos = urls.map { url ->
+                            val existing = existingReposByUrl[url]
+                            if (existing == null) {
+                                PluginRepositoryItem(
+                                    manifestUrl = url,
+                                    name = url.substringBefore("?").substringAfterLast('/'),
+                                    isRefreshing = true,
+                                )
+                            } else {
+                                val shouldRefresh = shouldRefreshRepository(
+                                    repository = existing,
+                                    scrapers = existingState.scrapers,
+                                    nowEpochMs = nowEpochMs,
+                                )
+                                existing.copy(
+                                    isRefreshing = shouldRefresh,
+                                    errorMessage = if (shouldRefresh) null else existing.errorMessage,
+                                )
+                            }
+                        }
+                        val nextScrapers = existingState.scrapers.filter { scraper ->
+                            retainedUrls.contains(scraper.repositoryUrl)
+                        }
 
-                    _uiState.value = PluginsUiState(
-                        pluginsEnabled = existingState.pluginsEnabled,
-                        groupStreamsByRepository = existingState.groupStreamsByRepository,
-                        repositories = nextRepos,
-                        scrapers = nextScrapers,
-                    )
-                    repositoriesToRefresh = nextRepos.filter(PluginRepositoryItem::isRefreshing)
-                    persistenceSnapshot = persistenceSnapshotLocked()
-                    true
+                        _uiState.value = PluginsUiState(
+                            pluginsEnabled = existingState.pluginsEnabled,
+                            groupStreamsByRepository = existingState.groupStreamsByRepository,
+                            repositories = nextRepos,
+                            scrapers = nextScrapers,
+                        )
+                        repositoriesToRefresh = nextRepos.filter(PluginRepositoryItem::isRefreshing)
+                        persistenceSnapshot = persistenceSnapshotLocked()
+                        true
+                    }
                 }
             }
+            jobsToCancel.forEach(Job::cancel)
             if (!applied) return
             persistenceSnapshot?.let(::persist)
 
@@ -298,22 +306,28 @@ actual object PluginRepository {
         val expectedProfile = synchronized(profileLock) {
             currentProfileId to persistenceGeneration.value
         }
-        val snapshots = synchronized(profileLock) {
-            if (
-                currentProfileId != expectedProfile.first ||
-                persistenceGeneration.value != expectedProfile.second
-            ) {
-                null
-            } else {
-                _uiState.update { state ->
-                    state.copy(
-                        repositories = state.repositories.filterNot { it.manifestUrl == manifestUrl },
-                        scrapers = state.scrapers.filterNot { it.repositoryUrl == manifestUrl },
-                    )
+        val (snapshots, refreshJob) = synchronized(activeRefreshJobsLock) {
+            val committed = synchronized(profileLock) {
+                if (
+                    currentProfileId != expectedProfile.first ||
+                    persistenceGeneration.value != expectedProfile.second
+                ) {
+                    null
+                } else {
+                    _uiState.update { state ->
+                        state.copy(
+                            repositories = state.repositories.filterNot { it.manifestUrl == manifestUrl },
+                            scrapers = state.scrapers.filterNot { it.repositoryUrl == manifestUrl },
+                        )
+                    }
+                    persistenceSnapshotLocked() to serverPushSnapshotLocked()
                 }
-                persistenceSnapshotLocked() to serverPushSnapshotLocked()
             }
-        } ?: return
+            val job = if (committed != null) activeRefreshJobs.remove(manifestUrl) else null
+            committed to job
+        }
+        if (snapshots == null) return
+        refreshJob?.cancel()
         persist(snapshots.first)
         pushToServer(snapshots.second)
     }
