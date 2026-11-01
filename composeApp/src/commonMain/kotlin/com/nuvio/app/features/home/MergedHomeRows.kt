@@ -389,9 +389,14 @@ private fun sortMergedItems(
 internal fun cleanMergedSourceTabTitle(rawTitle: String): String {
     val raw = rawTitle.trim()
     if (raw.isBlank()) return "Unnamed Source"
+    if (raw.lowercase() in setOf("all", "movie", "movies", "series", "tv", "tv shows")) return raw
 
     val hasMixedType = raw.contains("mixed", ignoreCase = true)
     val cleaned = raw
+        .replace(
+            Regex("""\s*\([^)]*(?:/|_list_|[0-9]{5,})[^)]*\)""", RegexOption.IGNORE_CASE),
+            " ",
+        )
         .replace(
             Regex("""\s*\((?:other|movie|movies|series|tv|mixed)\)""", RegexOption.IGNORE_CASE),
             " ",
