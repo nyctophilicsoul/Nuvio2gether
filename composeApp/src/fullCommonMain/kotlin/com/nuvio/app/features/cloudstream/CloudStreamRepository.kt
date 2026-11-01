@@ -490,6 +490,9 @@ actual object CloudStreamRepository {
         if (!item.metadata.status.canInstall) {
             return CloudStreamInstallResult.Error("This CloudStream plugin is marked as down")
         }
+        if (!item.compatibility.isRunnable) {
+            return CloudStreamInstallResult.Error(item.compatibility.reason)
+        }
         var installationStarted = false
         val startCommitted = commitForProfile(expectedProfileGeneration) {
             val latest = _uiState.value.plugins.firstOrNull { it.metadata.id.value == pluginId }
