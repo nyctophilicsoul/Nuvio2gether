@@ -78,8 +78,10 @@ class CloudStreamPackageInspectorTest {
     @Test
     fun rejectsEntryAssignedToAnotherDisk() {
         val archive = fakeZip("manifest.json", "classes.dex")
-        // The first central-directory entry starts immediately after its 46-byte header.
-        archive[34] = 1
+        val endOffset = archive.size - 22
+        val centralDirectoryOffset = archive.readIntLeForTest(endOffset + 16)
+        // Disk-start is at byte 34 of the first central-directory record.
+        archive[centralDirectoryOffset + 34] = 1
 
         assertFailsWith<IllegalArgumentException> {
             CloudStreamPackageInspector.inspect(archive)
@@ -94,23 +96,41 @@ class CloudStreamPackageInspectorTest {
     }
 
     private fun fakeZip(vararg names: String): ByteArray {
-        val centralEntries = names.map { name ->
-            byteArrayOf(0x50, 0x4b, 0x01, 0x02) +
-                ByteArray(16) +
-                intLe(1) +
-                intLe(1) +
-                shortLe(name.encodeToByteArray().size) +
-                shortLe(0) +
-                shortLe(0) +
-                ByteArray(12) +
-                name.encodeToByteArray()
+        val localEntries = mutableListOf<ByteArray>()
+        val centralEntries = mutableListOf<ByteArray>()
+        names.forEach { name ->
+            val nameBytes = name.encodeToByteArray()
+            val localOffset = localEntries.sumOf { it.size }
+            val local = byteArrayOf(0x50, 0x4b, 0x03, 0x04) +
+                shortLe(20) + // version needed
+                shortLe(0) + // flags
+                shortLe(0) + // stored
+                shortLe(0) + shortLe(0) + // time/date
+                intLe(0) + intLe(0) + intLe(0) + // CRC, compressed size, uncompressed size
+                shortLe(nameBytes.size) + shortLe(0) +
+                nameBytes
+            localEntries += local
+
+            val central = byteArrayOf(0x50, 0x4b, 0x01, 0x02) +
+                shortLe(20) + shortLe(20) +
+                shortLe(0) + shortLe(0) +
+                shortLe(0) + shortLe(0) +
+                intLe(0) + intLe(0) + intLe(0) +
+                shortLe(nameBytes.size) + shortLe(0) + shortLe(0) +
+                shortLe(0) + shortLe(0) + intLe(0) +
+                intLe(localOffset) +
+                nameBytes
+            centralEntries += central
         }
+
+        val localData = localEntries.fold(ByteArray(0)) { acc, entry -> acc + entry }
         val central = centralEntries.fold(ByteArray(0)) { acc, entry -> acc + entry }
+        val centralOffset = localData.size
         val end = byteArrayOf(0x50, 0x4b, 0x05, 0x06) +
             shortLe(0) + shortLe(0) +
             shortLe(names.size) + shortLe(names.size) +
-            intLe(central.size) + intLe(0) + shortLe(0)
-        return central + end
+            intLe(central.size) + intLe(centralOffset) + shortLe(0)
+        return localData + central + end
     }
 
     private fun ByteArray.readIntLeForTest(offset: Int): Int =
