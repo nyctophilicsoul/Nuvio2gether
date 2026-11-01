@@ -34,6 +34,7 @@ import com.nuvio.app.features.home.HomeCatalogSettingsItem
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.HomeCatalogSettingsUiState
 import com.nuvio.app.features.home.MergedHomeRowDefinition
+import com.nuvio.app.features.home.MergedHomeRowContentType
 import com.nuvio.app.features.home.MergedHomeRowDisplayMode
 import com.nuvio.app.features.home.MergedHomeRowBlendMode
 import com.nuvio.app.features.home.MergedHomeRowSortMode
@@ -112,6 +113,7 @@ private fun MergedHomeRowsEditor(
     var draftSourceKeys by remember { mutableStateOf(setOf<String>()) }
     var draftMode by remember { mutableStateOf(MergedHomeRowDisplayMode.SOURCE_TABS) }
     var draftBlendMode by remember { mutableStateOf(MergedHomeRowBlendMode.SMART_FRESHNESS_POPULARITY) }
+    var draftContentType by remember { mutableStateOf(MergedHomeRowContentType.ALL) }
     var draftSortMode by remember { mutableStateOf(MergedHomeRowSortMode.OFF) }
     var draftHideIncludedRows by remember { mutableStateOf(false) }
     var draftHideTitlesWithoutPosters by remember { mutableStateOf(false) }
@@ -123,6 +125,7 @@ private fun MergedHomeRowsEditor(
         draftTitle = ""
         draftSourceKeys = emptySet()
         draftMode = MergedHomeRowDisplayMode.SOURCE_TABS
+        draftContentType = MergedHomeRowContentType.ALL
         draftBlendMode = MergedHomeRowBlendMode.SMART_FRESHNESS_POPULARITY
         draftSortMode = MergedHomeRowSortMode.OFF
         draftHideIncludedRows = false
@@ -136,6 +139,7 @@ private fun MergedHomeRowsEditor(
         draftTitle = row.title
         draftSourceKeys = row.sourceKeys.toSet()
         draftMode = row.resolvedDisplayMode()
+        draftContentType = row.resolvedContentType()
         draftBlendMode = row.resolvedBlendMode()
         draftSortMode = row.resolvedSortMode()
         draftHideIncludedRows = row.hideIncludedRows
@@ -293,7 +297,10 @@ private fun MergedHomeRowsEditor(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(
                             selected = draftMode == MergedHomeRowDisplayMode.TYPE_TABS,
-                            onClick = { draftMode = MergedHomeRowDisplayMode.TYPE_TABS },
+                            onClick = {
+                                draftMode = MergedHomeRowDisplayMode.TYPE_TABS
+                                draftContentType = MergedHomeRowContentType.ALL
+                            },
                         )
                         Text(
                             stringResource(Res.string.settings_merged_rows_mode_type_tabs),
@@ -307,6 +314,23 @@ private fun MergedHomeRowsEditor(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+
+                    if (draftMode != MergedHomeRowDisplayMode.TYPE_TABS) {
+                        Text(stringResource(Res.string.settings_merged_rows_type), style = MaterialTheme.typography.titleSmall)
+                        listOf(
+                            MergedHomeRowContentType.ALL to Res.string.settings_merged_rows_type_all,
+                            MergedHomeRowContentType.MOVIES to Res.string.settings_merged_rows_type_movies,
+                            MergedHomeRowContentType.SERIES to Res.string.settings_merged_rows_type_series,
+                        ).forEach { (type, label) ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                RadioButton(
+                                    selected = draftContentType == type,
+                                    onClick = { draftContentType = type },
+                                )
+                                Text(stringResource(label), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
                     }
 
                     Text(stringResource(Res.string.settings_merged_rows_blend), style = MaterialTheme.typography.titleSmall)
@@ -411,6 +435,7 @@ private fun MergedHomeRowsEditor(
                                 sourceKeys = draftSourceKeys.toList(),
                                 displayMode = draftMode,
                                 deduplicate = draftDeduplicate,
+                                contentType = draftContentType,
                                 blendMode = draftBlendMode,
                                 sortMode = draftSortMode,
                                 hideIncludedRows = draftHideIncludedRows,
@@ -421,6 +446,7 @@ private fun MergedHomeRowsEditor(
                             sourceKeys = draftSourceKeys.toList(),
                             displayMode = draftMode,
                             deduplicate = draftDeduplicate,
+                            contentType = draftContentType,
                             blendMode = draftBlendMode,
                             sortMode = draftSortMode,
                             hideIncludedRows = draftHideIncludedRows,
