@@ -185,10 +185,17 @@ object HomeRepository {
         fun HomeCatalogSection.withPosterOverlay(): HomeCatalogSection =
             copy(items = items.reapplyCustomPosterUrls(posterPattern))
 
+        val hiddenIncludedSourceKeys = snapshot.mergedRows
+            .asSequence()
+            .filter { it.hideIncludedRows }
+            .flatMap { it.sourceKeys.asSequence() }
+            .toSet()
         val catalogSections = orderHomeCatalogDefinitions(currentDefinitions, snapshot)
             .mapNotNull { definition ->
                 val preference = preferences[definition.key]
-                if (preference?.enabled == false) return@mapNotNull null
+                if (preference?.enabled == false || definition.key in hiddenIncludedSourceKeys) {
+                    return@mapNotNull null
+                }
 
                 val section = cachedSections[definition.cacheKey]
                     ?.withPosterOverlay()
@@ -230,6 +237,10 @@ object HomeRepository {
                     sourceItems = sourceSections.map(HomeCatalogSection::items),
                     deduplicate = mergedRow.deduplicate,
                     maxItems = HOME_MERGED_ROW_ITEM_LIMIT,
+                    blendMode = mergedRow.resolvedBlendMode(),
+                    sortMode = mergedRow.resolvedSortMode(),
+                    contentType = mergedRow.resolvedContentType(),
+                    hideTitlesWithoutPosters = mergedRow.hideTitlesWithoutPosters,
                 )
                 if (mergedItems.isEmpty()) return@mapNotNull null
 
@@ -250,9 +261,17 @@ object HomeRepository {
                             add(
                                 HomeCatalogTab(
                                     key = source.key,
-                                    title = source.title,
-                                    items = source.items,
-                                    availableItemCount = source.availableItemCount,
+                                    title = cleanMergedSourceTabTitle(source.title),
+                                    items = filterMergedHomeItems(
+                                        items = source.items,
+                                        contentType = mergedRow.resolvedContentType(),
+                                        hideTitlesWithoutPosters = mergedRow.hideTitlesWithoutPosters,
+                                    ),
+                                    availableItemCount = filterMergedHomeItems(
+                                        items = source.items,
+                                        contentType = mergedRow.resolvedContentType(),
+                                        hideTitlesWithoutPosters = mergedRow.hideTitlesWithoutPosters,
+                                    ).size,
                                     hasMore = source.hasMore,
                                 ),
                             )
