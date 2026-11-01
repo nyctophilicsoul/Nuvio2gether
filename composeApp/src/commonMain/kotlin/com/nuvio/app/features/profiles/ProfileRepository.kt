@@ -92,6 +92,7 @@ object ProfileRepository {
         val stored = decodeStoredPayload() ?: return false
         loadedCacheForUserId = stored.userId
         applyStoredPayload(stored)
+        CustomPosterUrlRepository.onProfileChanged()
         ThemeSettingsRepository.onProfileChanged()
         return _state.value.profiles.isNotEmpty()
     }
@@ -104,22 +105,26 @@ object ProfileRepository {
         if (stored == null) {
             _state.value = ProfileState()
             activeProfileIndex = 1
+            CustomPosterUrlRepository.onProfileChanged()
             return
         }
 
         if (stored.userId != userId) {
             _state.value = ProfileState()
             activeProfileIndex = 1
+            CustomPosterUrlRepository.onProfileChanged()
             return
         }
 
         applyStoredPayload(stored)
+        CustomPosterUrlRepository.onProfileChanged()
     }
 
     fun clearInMemory() {
         loadedCacheForUserId = null
         activeProfileIndex = 1
         _state.value = ProfileState()
+        CustomPosterUrlRepository.onProfileChanged()
     }
 
     suspend fun pullProfiles() {
