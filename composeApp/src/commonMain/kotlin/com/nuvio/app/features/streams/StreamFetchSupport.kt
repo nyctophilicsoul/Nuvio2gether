@@ -636,7 +636,7 @@ internal fun CloudStreamLoadItem.linkDataForCloudStreamRequest(
         }
         return exactEpisodes.bestEpisodeTitleMatch(request)?.data
             ?: exactEpisodes.firstOrNull()?.data
-            ?: titledEpisode?.takeIf { item -> item.episode == request.episode }?.data
+            ?: titledEpisode?.takeIf { item -> item.season == request.season && item.episode == request.episode }?.data
             ?: sortedEpisodes.safeUnknownSeasonEpisodeMatch(request)?.data
     }
 
