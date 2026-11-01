@@ -446,7 +446,13 @@ actual object CloudStreamRepository {
                 )
             }
         }
-        return manifest to CloudStreamRepositoryParser.mergePluginLists(lists)
+        // Keep the repository identity tied to the URL the user added. The fetched
+        // manifest may have come from the main/master fallback candidate; persisting
+        // that fallback URL would fail to match the existing repository during refresh.
+        val stableManifest = manifest.copy(
+            sourceUrl = normalizeCloudStreamRepositoryUrl(manifestUrl),
+        )
+        return stableManifest to CloudStreamRepositoryParser.mergePluginLists(lists)
     }
 
     private fun cloudStreamManifestCandidates(manifestUrl: String): List<String> {
@@ -468,7 +474,12 @@ actual object CloudStreamRepository {
         val refreshedIds = plugins.mapTo(mutableSetOf()) { it.id.value }
         // Stop removed providers and do not leave a stale checked/enabled state when
         // a repository changes a plugin's status or runtime compatibility.
-        (previous.map { it.metadata.id.value } - refreshedIds).forEach(CloudStreamPlatformRuntime::unload)
+        previous
+            .filterNot { it.metadata.id.value in refreshedIds }
+            .forEach { removed ->
+                CloudStreamPlatformRuntime.unload(removed.metadata.id.value)
+                CloudStreamPlatformStorage.deletePackage(removed.metadata.id.storageKey)
+            }
 
         _uiState.update { current ->
             val previousById = current.plugins.associateBy { it.metadata.id.value }
