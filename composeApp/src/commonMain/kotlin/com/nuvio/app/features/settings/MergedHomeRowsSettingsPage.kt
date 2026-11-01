@@ -38,6 +38,7 @@ import com.nuvio.app.features.home.MergedHomeRowDisplayMode
 import com.nuvio.app.features.home.MergedHomeRowBlendMode
 import com.nuvio.app.features.home.MergedHomeRowSortMode
 import com.nuvio.app.features.home.mergedHomeRowKey
+import com.nuvio.app.features.home.cleanMergedSourceTabTitle
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.settings_merged_rows_add
 import nuvio.composeapp.generated.resources.settings_merged_rows_cancel
@@ -206,7 +207,7 @@ private fun MergedHomeRowsEditor(
                         }
                         Text(
                             text = row.sourceKeys.joinToString(" · ") { key ->
-                                availableSources.firstOrNull { it.key == key }?.displayTitle ?: key
+                                availableSources.firstOrNull { it.key == key }?.displayTitle?.let(::cleanMergedSourceTabTitle) ?: key
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -255,6 +256,17 @@ private fun MergedHomeRowsEditor(
                         singleLine = true,
                         label = { Text(stringResource(Res.string.settings_merged_rows_name)) },
                     )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = draftDeduplicate,
+                            onCheckedChange = { draftDeduplicate = it },
+                        )
+                        Text(
+                            stringResource(Res.string.settings_merged_rows_deduplicate),
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
                     Text(stringResource(Res.string.settings_merged_rows_display_mode), style = MaterialTheme.typography.titleSmall)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(
@@ -380,28 +392,12 @@ private fun MergedHomeRowsEditor(
                             )
                             Spacer(Modifier.width(8.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(source.displayTitle, style = MaterialTheme.typography.bodyMedium)
+                                Text(cleanMergedSourceTabTitle(source.displayTitle), style = MaterialTheme.typography.bodyMedium)
                                 Text(source.addonName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(
-                                    text = "${source.key.substringBeforeLast(':').substringAfterLast(':')}/${source.key.substringAfterLast(':')}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
                             }
                         }
                     }
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = draftDeduplicate,
-                            onCheckedChange = { draftDeduplicate = it },
-                        )
-                        Text(
-                            stringResource(Res.string.settings_merged_rows_deduplicate),
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
                 }
             },
             confirmButton = {
