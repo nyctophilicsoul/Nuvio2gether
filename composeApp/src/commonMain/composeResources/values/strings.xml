@@ -2652,4 +2652,5 @@
     <string name="profile_custom_background_url_description">Paste an image or GIF link to use behind the profile selection screen.</string>
     <string name="profile_custom_background_url_placeholder">https://example.com/background.gif</string>
     <string name="profile_custom_background_url_invalid">Enter a valid HTTP or HTTPS image URL.</string>
+    <string name="settings_merged_rows_mode_type_tabs">All / Movies / Series</string>
 </resources>
