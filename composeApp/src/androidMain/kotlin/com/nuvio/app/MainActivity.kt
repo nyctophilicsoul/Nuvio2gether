@@ -99,7 +99,9 @@ open class MainActivity : AppCompatActivity() {
         SyncClientIdentityStorage.initialize(applicationContext)
         AddonHttpClientProvider.initialize(applicationContext)
         AddonStorage.initialize(applicationContext)
-        CloudStreamPlatformStorage.initialize(applicationContext)
+        // Pass the Activity so the CloudStream compatibility runtime can expose the
+        // current host activity to providers that use CloudStream's CommonActivity APIs.
+        CloudStreamPlatformStorage.initialize(this)
         AuthStorage.initialize(applicationContext)
         ServerConfigurationStorage.initialize(applicationContext)
         LibraryStorage.initialize(applicationContext)
