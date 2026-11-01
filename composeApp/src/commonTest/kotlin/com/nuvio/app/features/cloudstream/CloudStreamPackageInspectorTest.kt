@@ -24,6 +24,40 @@ class CloudStreamPackageInspectorTest {
     }
 
     @Test
+    fun rejectsCentralDirectoryThatOverlapsEndRecord() {
+        val archive = fakeZip("manifest.json", "classes.dex")
+        val endOffset = archive.size - 22
+        val declaredDirectorySize = archive.readIntLeForTest(endOffset + 12)
+        archive.writeIntLeForTest(endOffset + 12, declaredDirectorySize + 1)
+
+        assertFailsWith<IllegalArgumentException> {
+            CloudStreamPackageInspector.inspect(archive)
+        }
+    }
+
+    @Test
+    fun rejectsEntryThatRunsPastDeclaredCentralDirectory() {
+        val archive = fakeZip("manifest.json", "classes.dex")
+        val endOffset = archive.size - 22
+        archive.writeIntLeForTest(endOffset + 12, 1)
+
+        assertFailsWith<IllegalArgumentException> {
+            CloudStreamPackageInspector.inspect(archive)
+        }
+    }
+
+    @Test
+    fun rejectsMultiDiskArchives() {
+        val archive = fakeZip("manifest.json", "classes.dex")
+        val endOffset = archive.size - 22
+        archive[endOffset + 4] = 1
+
+        assertFailsWith<IllegalArgumentException> {
+            CloudStreamPackageInspector.inspect(archive)
+        }
+    }
+
+    @Test
     fun rejectsPackageWithoutDex() {
         assertFailsWith<IllegalArgumentException> {
             CloudStreamPackageInspector.inspect(fakeZip("manifest.json"))
@@ -48,6 +82,16 @@ class CloudStreamPackageInspectorTest {
             shortLe(names.size) + shortLe(names.size) +
             intLe(central.size) + intLe(0) + shortLe(0)
         return central + end
+    }
+
+    private fun ByteArray.readIntLeForTest(offset: Int): Int =
+        (this[offset].toInt() and 0xff) or
+            ((this[offset + 1].toInt() and 0xff) shl 8) or
+            ((this[offset + 2].toInt() and 0xff) shl 16) or
+            ((this[offset + 3].toInt() and 0xff) shl 24)
+
+    private fun ByteArray.writeIntLeForTest(offset: Int, value: Int) {
+        repeat(4) { index -> this[offset + index] = (value ushr (index * 8)).toByte() }
     }
 
     private fun shortLe(value: Int): ByteArray = byteArrayOf(value.toByte(), (value ushr 8).toByte())
