@@ -112,10 +112,11 @@ internal actual object CloudStreamPlatformRuntime {
         val installedHash = item.installedFileHash
             ?.let(CloudStreamFileHash::parse)
             ?: item.metadata.fileHash.takeIf { item.installedVersion == item.metadata.version }
-        installedHash?.let { expectedHash ->
-            require(expectedHash.matches(file.readBytes())) {
-                "Installed CloudStream package SHA-256 no longer matches its installed verification hash"
-            }
+        val expectedHash = requireNotNull(installedHash) {
+            "Installed CloudStream package has no verified SHA-256 hash"
+        }
+        require(expectedHash.matches(file.readBytes())) {
+            "Installed CloudStream package SHA-256 no longer matches its installed verification hash"
         }
         require(file.setReadOnly() || !file.canWrite()) { "CloudStream package could not be made read-only" }
 
