@@ -280,6 +280,36 @@ val iosDistributionSourceDir = if (iosDistribution == "full") {
 val iosFrameworkBundleId = "com.nuvio.media"
 val nuvioEngineAppleFramework = rootProject.file("../nuvio-engine/platform/apple/NuvioEngine.xcframework")
 val fullCommonSourceDir = project.file("src/fullCommonMain/kotlin")
+val cloudStreamRuntimeAar = layout.projectDirectory.file("libs/cloudstream-runtime-api-4.8.0-3496e5f.aar")
+val downloadCloudStreamRuntime = tasks.register("downloadCloudStreamRuntime") {
+    outputs.file(cloudStreamRuntimeAar)
+    doLast {
+        val destination = cloudStreamRuntimeAar.asFile
+        val expectedSha256 = "b67a4384bea1f4072123b86c5f164471422d9c6c12845d5067f12db44674d427"
+        val url = "https://raw.githubusercontent.com/yesnt10/NuvioMobile-Enhanced/894499115fb1a69cd4bb34d6969a74832f0e5636/composeApp/libs/cloudstream-runtime-api-4.8.0-3496e5f.aar"
+        if (!destination.isFile || java.security.MessageDigest.getInstance("SHA-256")
+                .digest(destination.readBytes()).joinToString("") { "%02x".format(it) } != expectedSha256
+        ) {
+            destination.parentFile.mkdirs()
+            val temporary = destination.resolveSibling(destination.name + ".download")
+            try {
+                java.net.URL(url).openStream().use { input ->
+                    temporary.outputStream().use { output -> input.copyTo(output) }
+                }
+                val actualSha256 = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(temporary.readBytes()).joinToString("") { "%02x".format(it) }
+                check(actualSha256 == expectedSha256) {
+                    "CloudStream runtime AAR SHA-256 mismatch: $actualSha256"
+                }
+                check(temporary.length() > 0L) { "CloudStream runtime AAR download was empty" }
+                if (destination.exists()) destination.delete()
+                check(temporary.renameTo(destination)) { "Could not install CloudStream runtime AAR" }
+            } finally {
+                temporary.delete()
+            }
+        }
+    }
+}
 val generatedRuntimeConfigDir = layout.buildDirectory.dir("generated/runtime-config/kotlin")
 val requestedGradleTasks = gradle.startParameter.taskNames.map { taskName ->
     taskName.substringAfterLast(':').lowercase()
@@ -375,6 +405,9 @@ val generateRuntimeConfigs = tasks.register<GenerateRuntimeConfigsTask>("generat
 
 tasks.withType<KotlinCompilationTask<*>>().configureEach {
     dependsOn(generateRuntimeConfigs)
+    if (androidDistribution == "full" && name.contains("android", ignoreCase = true)) {
+        dependsOn(downloadCloudStreamRuntime)
+    }
 }
 
 kotlin {
@@ -528,7 +561,22 @@ kotlin {
                 )
                 if (androidDistribution == "full") {
                     implementation(files("libs/quickjs-kt-android-1.0.5-nuvio.aar"))
+                    implementation(files(cloudStreamRuntimeAar))
                     implementation(libs.ksoup)
+                    implementation("androidx.annotation:annotation:1.10.0")
+                    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.1")
+                    implementation("org.jsoup:jsoup:1.22.1")
+                    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0")
+                    implementation("com.github.Blatzar:NiceHttp:0.4.18")
+                    implementation("me.xdrop:fuzzywuzzy:1.4.0")
+                    implementation("org.mozilla:rhino:1.8.1")
+                    implementation("com.uwetrottmann.tmdb2:tmdb-java:2.13.0")
+                    implementation("dev.whyoleg.cryptography:cryptography-core:0.6.0")
+                    implementation("dev.whyoleg.cryptography:cryptography-provider-optimal:0.6.0")
+                    implementation("com.github.teamnewpipe:NewPipeExtractor:v0.26.3") {
+                        exclude(group = "org.mozilla", module = "rhino-engine")
+                    }
+                    implementation(kotlin("reflect"))
                 }
             }
         }
