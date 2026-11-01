@@ -156,6 +156,9 @@ actual object CloudStreamRepository {
     actual fun removeRepository(manifestUrl: String) {
         initialize()
         val normalizedUrl = runCatching { normalizeCloudStreamRepositoryUrl(manifestUrl) }.getOrNull() ?: return
+        // Stop an in-flight refresh before removing its repository. Otherwise its completion
+        // can repopulate plugin entries after the repository has already been removed.
+        refreshJobs.remove(normalizedUrl)?.cancel()
         val removedPlugins = _uiState.value.plugins.filter { it.metadata.repositoryManifestUrl == normalizedUrl }
         removedPlugins.forEach {
             CloudStreamPlatformRuntime.unload(it.metadata.id.value)
