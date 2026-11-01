@@ -16,6 +16,14 @@ class MergedHomeRowsTest {
         ).displayMode)
     }
 
+    @Test
+    fun allMoviesSeriesDisplayModeRoundTrips() {
+        assertEquals(
+            MergedHomeRowDisplayMode.TYPE_TABS,
+            MergedHomeRowDisplayMode.fromStorage(MergedHomeRowDisplayMode.TYPE_TABS.storageValue),
+        )
+    }
+
     private fun item(id: String, type: String = "movie", name: String = id) =
         MetaPreview(id = id, type = type, name = name)
 
