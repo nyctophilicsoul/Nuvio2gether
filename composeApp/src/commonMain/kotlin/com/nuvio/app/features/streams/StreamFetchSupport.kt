@@ -295,7 +295,7 @@ internal suspend fun cloudStreamSourcesToStreamItems(
 internal fun cloudStreamStreamIdentity(stream: StreamItem): String {
     val requestHeaders = stream.behaviorHints.proxyHeaders?.request.orEmpty()
         .entries
-        .sortedBy { it.key.lowercase() }
+        .sortedWith(compareBy({ it.key.lowercase() }, { it.value }))
         .joinToString("\u001f") { "${it.key.lowercase()}=${it.value}" }
     val subtitleIdentity = stream.externalSubtitles.joinToString("\u001e") { subtitle ->
         listOf(
@@ -303,7 +303,7 @@ internal fun cloudStreamStreamIdentity(stream: StreamItem): String {
             subtitle.language,
             subtitle.name.orEmpty(),
             subtitle.headers.orEmpty().entries
-                .sortedBy { it.key.lowercase() }
+                .sortedWith(compareBy({ it.key.lowercase() }, { it.value }))
                 .joinToString("\u001f") { "${it.key.lowercase()}=${it.value}" },
         ).joinToString("\u001d")
     }

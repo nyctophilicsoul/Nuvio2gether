@@ -575,9 +575,9 @@ private class CloudStreamSettingsCopy private constructor(
         if (turkish) "Paketi yeniden indir" else "Download again"
     val noCompatibleProviders: String =
         if (turkish) {
-            "Bu filtrede etkinleştirilebilecek başka uyumlu provider yok. Desteklenmeyen paketler yine de ayrı ayrı indirilebilir."
+            "Etkinleştirilecek başka uyumlu provider yok."
         } else {
-            "No additional compatible providers can be enabled for this filter. Unsupported packages can still be downloaded individually."
+            "No more compatible providers to enable."
         }
     val update: String =
         if (turkish) "Güncelle" else "Update"

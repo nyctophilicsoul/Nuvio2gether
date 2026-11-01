@@ -1,8 +1,8 @@
 package com.nuvio.app.features.cloudstream
 
+import com.nuvio.app.features.streams.cloudStreamStreamIdentity
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import com.nuvio.app.features.streams.cloudStreamStreamIdentity
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
