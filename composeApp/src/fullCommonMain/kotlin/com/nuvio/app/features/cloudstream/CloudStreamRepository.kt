@@ -533,7 +533,7 @@ actual object CloudStreamRepository {
             }
             CloudStreamPackageInspector.inspect(bytes)
             val expectedHash = item.metadata.fileHash
-            val verified = expectedHash?.matches(bytes) == true
+            val verified = expectedHash.verifies(bytes)
             if (expectedHash != null) require(verified) { ".cs3 SHA-256 hash mismatch" }
 
             var installed: CloudStreamPluginItem? = null
