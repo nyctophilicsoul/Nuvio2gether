@@ -387,25 +387,45 @@ private fun sortMergedItems(
  * then keep a short, recognisable 2–3 word label.
  */
 internal fun cleanMergedSourceTabTitle(rawTitle: String): String {
-    val cleaned = rawTitle
-        .replace(Regex("\\s*\\([^)]*(?:/|_list_|[0-9]{5,})[^)]*\\)", RegexOption.IGNORE_CASE), " ")
-        .replace(Regex("\\b(?:movie|movies|series|tv)/[A-Za-z0-9_.:-]+", RegexOption.IGNORE_CASE), " ")
-        .replace(Regex("[·•|]+"), " ")
-        .replace(Regex("[-–—]+"), " ")
-        .replace(Regex("\\s+"), " ")
+    val raw = rawTitle.trim()
+    if (raw.isBlank()) return "Unnamed Source"
+
+    val hasMixedType = raw.contains("mixed", ignoreCase = true)
+    val cleaned = raw
+        .replace(
+            Regex("""\\s*\\((?:other|movie|movies|series|tv|mixed)\\)""", RegexOption.IGNORE_CASE),
+            " ",
+        )
+        .replace(
+            Regex("""\\s*[-–—]\\s*(?:other|movie|movies|series|tv|mixed)\\s*$""", RegexOption.IGNORE_CASE),
+            " ",
+        )
+        .replace(
+            Regex("""\\b(?:other|movie|movies|series|tv|mixed)/[A-Za-z0-9_.:-]+""", RegexOption.IGNORE_CASE),
+            " ",
+        )
+        .replace(Regex("""[·•|]+"""), " ")
+        .replace(Regex("""[-–—]+"""), " ")
+        .replace(Regex("""\\s+"""), " ")
         .trim()
     if (cleaned.isBlank()) return "Unnamed Source"
-    val normalizedLabel = cleaned.replace(
-        Regex("\\bfor you\\b", RegexOption.IGNORE_CASE),
+
+    val canonical = when {
+        cleaned.equals("latest releases global", ignoreCase = true) -> "Global Releases"
+        cleaned.equals("new indian releases", ignoreCase = true) -> "Indian Releases"
+        cleaned.equals("anime", ignoreCase = true) && hasMixedType -> "Anime Mix"
+        cleaned.equals("movieboxin", ignoreCase = true) -> "MovieBox"
+        else -> cleaned
+    }.replace(
+        Regex("""\\bfor you\\b""", RegexOption.IGNORE_CASE),
         "Picks",
     )
-    val words = normalizedLabel.split(' ')
-        .filter { it.isNotBlank() && it.lowercase() !in setOf("movie", "movies", "series", "tv", "all", "catalog", "catalogs") }
+
+    val words = canonical.split(' ')
+        .filter {
+            it.isNotBlank() &&
+                it.lowercase() !in setOf("other", "movie", "movies", "series", "tv", "mixed", "catalog", "catalogs")
+        }
     if (words.isEmpty()) return "Unnamed Source"
-    val shortWords = when {
-        words.size <= 3 -> words
-        words.last().equals("next", ignoreCase = true) -> listOf(words.first(), words.last())
-        else -> words.take(3)
-    }
-    return if (shortWords.size == 1) "${shortWords.first()} Feed" else shortWords.joinToString(" ")
+    return words.take(3).joinToString(" ")
 }
