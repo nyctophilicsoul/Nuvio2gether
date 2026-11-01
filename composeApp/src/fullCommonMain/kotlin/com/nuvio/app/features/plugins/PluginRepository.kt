@@ -34,6 +34,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
 import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.addons_and_plugins_refreshed
 import nuvio.composeapp.generated.resources.plugins_error_enter_repo_url
 import nuvio.composeapp.generated.resources.plugins_error_enter_valid_url
 import nuvio.composeapp.generated.resources.plugins_error_provider_not_found
@@ -288,14 +289,27 @@ actual object PluginRepository {
 
     actual fun removeRepository(manifestUrl: String) {
         initialize()
-        _uiState.update { state ->
-            state.copy(
-                repositories = state.repositories.filterNot { it.manifestUrl == manifestUrl },
-                scrapers = state.scrapers.filterNot { it.repositoryUrl == manifestUrl },
-            )
+        val expectedProfile = synchronized(profileLock) {
+            currentProfileId to persistenceGeneration.value
         }
-        persist()
-        pushToServer()
+        val snapshots = synchronized(profileLock) {
+            if (
+                currentProfileId != expectedProfile.first ||
+                persistenceGeneration.value != expectedProfile.second
+            ) {
+                null
+            } else {
+                _uiState.update { state ->
+                    state.copy(
+                        repositories = state.repositories.filterNot { it.manifestUrl == manifestUrl },
+                        scrapers = state.scrapers.filterNot { it.repositoryUrl == manifestUrl },
+                    )
+                }
+                persistenceSnapshotLocked() to serverPushSnapshotLocked()
+            }
+        } ?: return
+        persist(snapshots.first)
+        pushToServer(snapshots.second)
     }
 
     actual fun refreshAll() {
@@ -415,7 +429,7 @@ actual object PluginRepository {
                             persistenceSnapshot?.let(::persist)
                             if (pushAfterRefresh) serverPushSnapshot?.let(::pushToServer)
                             if (pushAfterRefresh && result.isSuccess) {
-                                NuvioToastController.show("Addons and plugins refreshed")
+                                NuvioToastController.show(getString(Res.string.addons_and_plugins_refreshed))
                             }
                         } finally {
                             synchronized(activeRefreshJobsLock) {
@@ -435,30 +449,69 @@ actual object PluginRepository {
 
     actual fun toggleScraper(scraperId: String, enabled: Boolean) {
         initialize()
-        _uiState.update { state ->
-            state.copy(
-                scrapers = state.scrapers.map { scraper ->
-                    if (scraper.id == scraperId) {
-                        scraper.copy(enabled = if (scraper.manifestEnabled) enabled else false)
-                    } else {
-                        scraper
-                    }
-                },
-            )
+        val expectedProfile = synchronized(profileLock) {
+            currentProfileId to persistenceGeneration.value
         }
-        persist()
+        val snapshot = synchronized(profileLock) {
+            if (
+                currentProfileId != expectedProfile.first ||
+                persistenceGeneration.value != expectedProfile.second
+            ) {
+                null
+            } else {
+                _uiState.update { state ->
+                    state.copy(
+                        scrapers = state.scrapers.map { scraper ->
+                            if (scraper.id == scraperId) {
+                                scraper.copy(enabled = if (scraper.manifestEnabled) enabled else false)
+                            } else {
+                                scraper
+                            }
+                        },
+                    )
+                }
+                persistenceSnapshotLocked()
+            }
+        } ?: return
+        persist(snapshot)
     }
 
     actual fun setPluginsEnabled(enabled: Boolean) {
         initialize()
-        _uiState.update { it.copy(pluginsEnabled = enabled) }
-        persist()
+        val expectedProfile = synchronized(profileLock) {
+            currentProfileId to persistenceGeneration.value
+        }
+        val snapshot = synchronized(profileLock) {
+            if (
+                currentProfileId != expectedProfile.first ||
+                persistenceGeneration.value != expectedProfile.second
+            ) {
+                null
+            } else {
+                _uiState.update { it.copy(pluginsEnabled = enabled) }
+                persistenceSnapshotLocked()
+            }
+        } ?: return
+        persist(snapshot)
     }
 
     actual fun setGroupStreamsByRepository(enabled: Boolean) {
         initialize()
-        _uiState.update { it.copy(groupStreamsByRepository = enabled) }
-        persist()
+        val expectedProfile = synchronized(profileLock) {
+            currentProfileId to persistenceGeneration.value
+        }
+        val snapshot = synchronized(profileLock) {
+            if (
+                currentProfileId != expectedProfile.first ||
+                persistenceGeneration.value != expectedProfile.second
+            ) {
+                null
+            } else {
+                _uiState.update { it.copy(groupStreamsByRepository = enabled) }
+                persistenceSnapshotLocked()
+            }
+        } ?: return
+        persist(snapshot)
     }
 
     actual fun setLocalPluginSearchPaused(paused: Boolean) {
@@ -563,8 +616,10 @@ actual object PluginRepository {
             val manifest = PluginManifestParser.parse(payload)
             val baseUrl = manifestUrl.substringBefore("?").removeSuffix("/manifest.json")
 
-            val scrapers = manifest.scrapers
+            val supportedScrapers = manifest.scrapers
                 .filter { scraper -> scraper.isSupportedOnCurrentPlatform() }
+                .distinctBy { scraper -> scraper.id }
+            val scrapers = supportedScrapers
                 .mapNotNull { info ->
                     val codeUrl = if (info.filename.startsWith("http://") || info.filename.startsWith("https://")) {
                         info.filename
@@ -619,7 +674,7 @@ actual object PluginRepository {
                 name = manifest.name,
                 description = manifest.description,
                 version = manifest.version,
-                scraperCount = scrapers.size,
+                scraperCount = supportedScrapers.size,
                 lastUpdated = currentEpochMillis(),
                 isRefreshing = false,
                 errorMessage = null,
