@@ -15,6 +15,7 @@ import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -69,6 +70,12 @@ private data class LoadedPluginState(
     val requiresMigration: Boolean,
 )
 
+private data class PluginRefreshSnapshot(
+    val profileId: Int,
+    val generation: Long,
+    val previousScrapers: Map<String, PluginScraper>,
+)
+
 actual object PluginRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val log = Logger.withTag("PluginRepository")
@@ -79,7 +86,9 @@ actual object PluginRepository {
 
     private var initialized = false
     private var currentProfileId = 1
+    private val profileLock = SynchronizedObject()
     private val activeRefreshJobs = mutableMapOf<String, Job>()
+    private val activeRefreshJobsLock = SynchronizedObject()
     private val persistenceGeneration = atomic(0L)
     private val persistenceRevision = atomic(0L)
     private val persistenceLock = SynchronizedObject()
@@ -102,20 +111,28 @@ actual object PluginRepository {
 
     actual fun onProfileChanged(profileId: Int) {
         val effectiveProfileId = resolveEffectiveProfileId(profileId)
-        if (effectiveProfileId == currentProfileId && initialized) return
-
-        cancelActiveRefreshes()
-        currentProfileId = effectiveProfileId
-        initialized = false
-        _uiState.value = PluginsUiState()
+        val changed = synchronized(profileLock) {
+            if (effectiveProfileId == currentProfileId && initialized) {
+                false
+            } else {
+                persistenceGeneration.incrementAndGet()
+                currentProfileId = effectiveProfileId
+                initialized = false
+                _uiState.value = PluginsUiState()
+                true
+            }
+        }
+        if (changed) cancelActiveRefreshes()
     }
 
     actual fun clearLocalState() {
+        synchronized(profileLock) {
+            persistenceGeneration.incrementAndGet()
+            currentProfileId = 1
+            initialized = false
+            _uiState.value = PluginsUiState()
+        }
         cancelActiveRefreshes()
-        persistenceGeneration.incrementAndGet()
-        currentProfileId = 1
-        initialized = false
-        _uiState.value = PluginsUiState()
     }
 
     actual suspend fun pullFromServer(profileId: Int) {
@@ -236,63 +253,110 @@ actual object PluginRepository {
         pushAfterRefresh: Boolean,
         ensureInitialized: Boolean,
     ) {
-        if (ensureInitialized) {
-            initialize()
+        if (ensureInitialized) initialize()
+
+        val snapshot = synchronized(profileLock) {
+            PluginRefreshSnapshot(
+                profileId = currentProfileId,
+                generation = persistenceGeneration.value,
+                previousScrapers = _uiState.value.scrapers.associateBy { it.id },
+            )
         }
-        val existingJob = activeRefreshJobs[manifestUrl]
-        if (existingJob?.isActive == true) return
+        var jobToStart: Job? = null
 
-        markRefreshing(manifestUrl)
-        var refreshJob: Job? = null
-        refreshJob = scope.launch {
-            try {
-                val result = runCatching {
-                    val previous = _uiState.value.scrapers.associateBy { it.id }
-                    fetchRepositoryData(manifestUrl, previous)
+        synchronized(activeRefreshJobsLock) {
+            val existingJob = activeRefreshJobs[manifestUrl]
+            // A LAZY job is not active yet, but it already owns this repository's slot.
+            if (existingJob == null || existingJob.isCompleted) {
+                val canRefresh = synchronized(profileLock) {
+                    if (
+                        currentProfileId != snapshot.profileId ||
+                        persistenceGeneration.value != snapshot.generation ||
+                        _uiState.value.repositories.none { it.manifestUrl == manifestUrl }
+                    ) {
+                        false
+                    } else {
+                        markRefreshing(manifestUrl)
+                        true
+                    }
                 }
 
-                _uiState.update { state ->
-                    if (state.repositories.none { it.manifestUrl == manifestUrl }) return@update state
-                    result.fold(
-                        onSuccess = { (repo, scrapers) ->
-                            val updatedRepos = state.repositories.map { existing ->
-                                if (existing.manifestUrl == manifestUrl) repo else existing
+                if (canRefresh) {
+                    lateinit var refreshJob: Job
+                    refreshJob = scope.launch(start = CoroutineStart.LAZY) {
+                        try {
+                            val result = try {
+                                Result.success(fetchRepositoryData(manifestUrl, snapshot.previousScrapers))
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (error: Throwable) {
+                                Result.failure(error)
                             }
-                            state.copy(
-                                repositories = updatedRepos,
-                                scrapers = state.scrapers.filterNot { it.repositoryUrl == manifestUrl } + scrapers,
-                            )
-                        },
-                        onFailure = { error ->
-                            state.copy(
-                                repositories = state.repositories.map { existing ->
-                                    if (existing.manifestUrl == manifestUrl) {
-                                        existing.copy(
-                                            isRefreshing = false,
-                                            errorMessage = error.message ?: runBlocking { getString(Res.string.plugins_repository_refresh_failed) },
+
+                            val applied = synchronized(profileLock) {
+                                if (
+                                    currentProfileId != snapshot.profileId ||
+                                    persistenceGeneration.value != snapshot.generation ||
+                                    _uiState.value.repositories.none { it.manifestUrl == manifestUrl }
+                                ) {
+                                    false
+                                } else {
+                                    _uiState.update { state ->
+                                        result.fold(
+                                            onSuccess = { (repo, scrapers) ->
+                                                val updatedRepos = state.repositories.map { existing ->
+                                                    if (existing.manifestUrl == manifestUrl) {
+                                                        repo.copy(isRefreshing = false, errorMessage = null)
+                                                    } else {
+                                                        existing
+                                                    }
+                                                }
+                                                state.copy(
+                                                    repositories = updatedRepos,
+                                                    scrapers = state.scrapers.filterNot { it.repositoryUrl == manifestUrl } + scrapers,
+                                                )
+                                            },
+                                            onFailure = { error ->
+                                                state.copy(
+                                                    repositories = state.repositories.map { existing ->
+                                                        if (existing.manifestUrl == manifestUrl) {
+                                                            existing.copy(
+                                                                isRefreshing = false,
+                                                                errorMessage = error.message
+                                                                    ?: runBlocking { getString(Res.string.plugins_repository_refresh_failed) },
+                                                            )
+                                                        } else {
+                                                            existing
+                                                        }
+                                                    },
+                                                )
+                                            },
                                         )
-                                    } else {
-                                        existing
                                     }
-                                },
-                            )
-                        },
-                    )
-                }
-                persist()
-                if (pushAfterRefresh) {
-                    pushToServer()
-                }
-                if (pushAfterRefresh && result.isSuccess) {
-                    NuvioToastController.show("Addons and plugins refreshed")
-                }
-            } finally {
-                if (activeRefreshJobs[manifestUrl] === refreshJob) {
-                    activeRefreshJobs.remove(manifestUrl)
+                                    true
+                                }
+                            }
+                            if (!applied) return@launch
+
+                            persist()
+                            if (pushAfterRefresh) pushToServer()
+                            if (pushAfterRefresh && result.isSuccess) {
+                                NuvioToastController.show("Addons and plugins refreshed")
+                            }
+                        } finally {
+                            synchronized(activeRefreshJobsLock) {
+                                if (activeRefreshJobs[manifestUrl] === refreshJob) {
+                                    activeRefreshJobs.remove(manifestUrl)
+                                }
+                            }
+                        }
+                    }
+                    activeRefreshJobs[manifestUrl] = refreshJob
+                    jobToStart = refreshJob
                 }
             }
         }
-        activeRefreshJobs[manifestUrl] = refreshJob
+        jobToStart?.start()
     }
 
     actual fun toggleScraper(scraperId: String, enabled: Boolean) {
@@ -516,20 +580,21 @@ actual object PluginRepository {
     }
 
     private fun pushToServer() {
+        val snapshot = synchronized(profileLock) {
+            currentProfileId to _uiState.value.repositories.mapIndexed { index, repo ->
+                PluginPushItem(
+                    url = repo.manifestUrl,
+                    name = repo.name,
+                    enabled = true,
+                    sortOrder = index,
+                )
+            }
+        }
         scope.launch {
             runCatching {
-                val repos = _uiState.value.repositories.mapIndexed { index, repo ->
-                    PluginPushItem(
-                        url = repo.manifestUrl,
-                        name = repo.name,
-                        enabled = true,
-                        sortOrder = index,
-                    )
-                }
-
                 val params = buildJsonObject {
-                    put("p_profile_id", currentProfileId)
-                    put("p_plugins", json.encodeToJsonElement(repos))
+                    put("p_profile_id", snapshot.first)
+                    put("p_plugins", json.encodeToJsonElement(snapshot.second))
                 }
                 SupabaseProvider.client.postgrest.rpc("sync_push_plugins", params)
             }.onFailure { error ->
@@ -539,12 +604,14 @@ actual object PluginRepository {
     }
 
     private fun persist() {
-        val snapshot = PluginPersistenceSnapshot(
-            profileId = currentProfileId,
-            generation = persistenceGeneration.value,
-            revision = persistenceRevision.incrementAndGet(),
-            state = _uiState.value,
-        )
+        val snapshot = synchronized(profileLock) {
+            PluginPersistenceSnapshot(
+                profileId = currentProfileId,
+                generation = persistenceGeneration.value,
+                revision = persistenceRevision.incrementAndGet(),
+                state = _uiState.value,
+            )
+        }
         val requiresCodeWrite = snapshot.state.scrapers.any { scraper ->
             !PluginStorage.hasScraperCode(snapshot.profileId, scraper.id)
         }
@@ -593,22 +660,30 @@ actual object PluginRepository {
     }
 
     private fun cancelActiveRefreshes() {
-        activeRefreshJobs.values.forEach(Job::cancel)
-        activeRefreshJobs.clear()
+        val jobs = synchronized(activeRefreshJobsLock) {
+            activeRefreshJobs.values.toList().also { activeRefreshJobs.clear() }
+        }
+        jobs.forEach(Job::cancel)
     }
 
     private fun ensureStateLoadedForProfile(profileId: Int) {
-        if (initialized && currentProfileId == profileId) return
+        var profileChanged = false
+        var requiresMigration = false
+        synchronized(profileLock) {
+            if (initialized && currentProfileId == profileId) return
+            if (currentProfileId != profileId) {
+                persistenceGeneration.incrementAndGet()
+                profileChanged = true
+            }
 
-        if (currentProfileId != profileId) {
-            cancelActiveRefreshes()
+            currentProfileId = profileId
+            val loadedState = loadStateAsUiState(profileId)
+            _uiState.value = loadedState.state
+            initialized = true
+            requiresMigration = loadedState.requiresMigration
         }
-
-        currentProfileId = profileId
-        val loadedState = loadStateAsUiState(profileId)
-        _uiState.value = loadedState.state
-        initialized = true
-        if (loadedState.requiresMigration) persist()
+        if (profileChanged) cancelActiveRefreshes()
+        if (requiresMigration) persist()
     }
 
     private fun loadStateAsUiState(profileId: Int): LoadedPluginState {
