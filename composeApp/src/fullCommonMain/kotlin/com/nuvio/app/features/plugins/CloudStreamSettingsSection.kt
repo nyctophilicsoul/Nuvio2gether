@@ -482,9 +482,9 @@ private class CloudStreamSettingsCopy private constructor(
                 "Standard .cs3 packages can contain third-party Android DEX code. Android Full builds execute compatible packages inside the app process; this code is not sandboxed by Nuvio. Install only repositories and plugins you trust."
             }
         } else if (turkish) {
-            "Standart .cs3 paketleri üçüncü taraf Android DEX kodu içerebilir ve iOS üzerinde çalışmaz. Bu derleme yalnızca uygulamaya dahil edilmiş, incelenmiş çapraz platform adaptörlerini çalıştırabilir. Yalnızca güvendiğiniz depoları kurun."
+            "Standart .cs3 paketleri Android DEX kodu içerir. Nuvio indirilen eklenti kodunu çalıştırmaz; yalnızca uygulamaya dahil edilmiş, incelenmiş adaptörleri kullanır. Yalnızca güvendiğiniz depoları kurun."
         } else {
-            "Standard .cs3 packages can contain third-party Android DEX code and cannot run on iOS. This build can run only reviewed cross-platform adapters bundled with the app. Install only repositories you trust."
+            "Standard .cs3 packages contain Android DEX code. Nuvio does not execute downloaded plugin code; it runs only reviewed adapters bundled with the app. Install only repositories you trust."
         }
     val securityWarningTitle: String =
         if (turkish) "Üçüncü taraf kod güvenlik uyarısı" else "Third-party code security warning"
@@ -644,9 +644,9 @@ private class CloudStreamSettingsCopy private constructor(
             }
             CloudStreamPlatformSupport.Unsupported -> {
                 if (turkish) {
-                    "Bu standart .cs3 paketi Android DEX kodu içerir ve iOS üzerinde çalışamaz."
+                    "Bu standart .cs3 paketi Android DEX kodu içerir. Nuvio indirilen eklenti kodunu çalıştırmaz; incelenmiş yerleşik bir adaptör gereklidir."
                 } else {
-                    "This standard .cs3 package contains Android DEX code, which cannot run on iOS."
+                    "This standard .cs3 package contains Android DEX code. Nuvio does not execute downloaded plugin code; a reviewed built-in adapter is required."
                 }
             }
         }
