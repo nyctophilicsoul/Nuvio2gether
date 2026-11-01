@@ -51,7 +51,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
 internal actual object CloudStreamPlatformRuntime {
-    actual val supportsAndroidDex: Boolean = true
+    actual val supportsAndroidDex: Boolean = false
 
     private val log = Logger.withTag("CloudStreamDex")
     private val json = Json { ignoreUnknownKeys = true }
