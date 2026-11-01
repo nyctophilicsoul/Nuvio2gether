@@ -127,7 +127,7 @@ data class HomeCatalogSettingsUiState(
             append(addonRowOrderPolicy.storageValue)
             append('|')
             append(mergedRows.sortedBy { it.order }.joinToString("|") { row ->
-                "${row.id}:${row.title}:${row.displayMode}:${row.deduplicate}:${row.sourceKeys.joinToString(",")}"
+                "${row.id}:${row.title}:${row.displayMode}:${row.deduplicate}:${row.contentType}:${row.blendMode}:${row.sortMode}:${row.hideIncludedRows}:${row.hideTitlesWithoutPosters}:${row.sourceKeys.joinToString(",")}"
             })
         }
 }
@@ -310,11 +310,13 @@ object HomeCatalogSettingsRepository {
         val duplicateTitleCounts = baseTitles.groupingBy { it }.eachCount()
         val sources = availableDefinitions.mapIndexed { index, definition ->
             val baseTitle = baseTitles[index]
-            val title = if ((duplicateTitleCounts[baseTitle] ?: 0) > 1) {
-                "$baseTitle (${definition.type}/${definition.catalogId})"
-            } else {
-                baseTitle
-            }
+            val title = cleanMergedSourceTabTitle(
+                if ((duplicateTitleCounts[baseTitle] ?: 0) > 1) {
+                    "$baseTitle ${definition.addonName}"
+                } else {
+                    baseTitle
+                },
+            )
             ResolvedMergedHomeRowSource(
                 definition = definition,
                 title = title,
@@ -449,6 +451,11 @@ object HomeCatalogSettingsRepository {
         sourceKeys: List<String>,
         displayMode: MergedHomeRowDisplayMode,
         deduplicate: Boolean = true,
+        contentType: MergedHomeRowContentType = MergedHomeRowContentType.ALL,
+        blendMode: MergedHomeRowBlendMode = MergedHomeRowBlendMode.SMART_FRESHNESS_POPULARITY,
+        sortMode: MergedHomeRowSortMode = MergedHomeRowSortMode.OFF,
+        hideIncludedRows: Boolean = false,
+        hideTitlesWithoutPosters: Boolean = false,
     ): String? {
         ensureLoaded()
         val validSources = sourceKeys.distinct().filter { key ->
@@ -472,6 +479,11 @@ object HomeCatalogSettingsRepository {
             displayMode = displayMode.storageValue,
             deduplicate = deduplicate,
             order = (mergedRows.maxOfOrNull { it.order } ?: -1) + 1,
+            contentType = contentType.storageValue,
+            blendMode = blendMode.storageValue,
+            sortMode = sortMode.storageValue,
+            hideIncludedRows = hideIncludedRows,
+            hideTitlesWithoutPosters = hideTitlesWithoutPosters,
         )
         mergedRows = mergedRows + row
         val key = mergedHomeRowKey(id)
@@ -495,6 +507,11 @@ object HomeCatalogSettingsRepository {
         sourceKeys: List<String>,
         displayMode: MergedHomeRowDisplayMode,
         deduplicate: Boolean,
+        contentType: MergedHomeRowContentType? = null,
+        blendMode: MergedHomeRowBlendMode? = null,
+        sortMode: MergedHomeRowSortMode? = null,
+        hideIncludedRows: Boolean? = null,
+        hideTitlesWithoutPosters: Boolean? = null,
     ): Boolean {
         ensureLoaded()
         val existing = mergedRows.firstOrNull { it.id == id } ?: return false
@@ -512,6 +529,11 @@ object HomeCatalogSettingsRepository {
             sourceKeys = validSources,
             displayMode = displayMode.storageValue,
             deduplicate = deduplicate,
+            contentType = contentType?.storageValue ?: existing.contentType,
+            blendMode = blendMode?.storageValue ?: existing.blendMode,
+            sortMode = sortMode?.storageValue ?: existing.sortMode,
+            hideIncludedRows = hideIncludedRows ?: existing.hideIncludedRows,
+            hideTitlesWithoutPosters = hideTitlesWithoutPosters ?: existing.hideTitlesWithoutPosters,
         )
         if (updated == existing) return true
         mergedRows = mergedRows.map { if (it.id == id) updated else it }
