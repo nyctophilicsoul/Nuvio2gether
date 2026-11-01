@@ -666,6 +666,13 @@ actual object CloudStreamRepository {
         val previous = _uiState.value.plugins
             .filter { it.metadata.repositoryManifestUrl == repository.sourceUrl }
         val refreshedIds = plugins.mapTo(mutableSetOf()) { it.id.value }
+        // Cached routes are tied to the provider metadata that produced them. Invalidate
+        // them before the StateFlow transform so its retryable lambda remains side-effect free.
+        plugins.forEach { metadata ->
+            if (previous.firstOrNull { it.metadata.id.value == metadata.id.value }?.metadata != metadata) {
+                CloudStreamSearchRouteIndex.clearProvider(metadata.id.value)
+            }
+        }
         // Stop removed providers and do not leave a stale checked/enabled state when
         // a repository changes a plugin's status or runtime compatibility.
         previous
@@ -680,9 +687,6 @@ actual object CloudStreamRepository {
             val previousById = current.plugins.associateBy { it.metadata.id.value }
             val refreshed = plugins.map { metadata ->
                 val previousItem = previousById[metadata.id.value]
-                if (previousItem != null && previousItem.metadata != metadata) {
-                    CloudStreamSearchRouteIndex.clearProvider(metadata.id.value)
-                }
                 val compatibility = resolveCompatibility(metadata)
                 previousItem?.let { previous ->
                     val installedPackageMatchesCurrentMetadata = previous.installedVersion != metadata.version ||
