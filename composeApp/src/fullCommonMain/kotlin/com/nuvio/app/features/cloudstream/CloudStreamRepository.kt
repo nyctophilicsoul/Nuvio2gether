@@ -425,6 +425,7 @@ actual object CloudStreamRepository {
                             item.copy(
                                 installedVersion = null,
                                 installedAtEpochMs = 0L,
+                                installedFileHash = null,
                                 enabled = false,
                                 verified = false,
                                 isInstalling = false,
@@ -544,6 +545,7 @@ actual object CloudStreamRepository {
                 installed = currentItem.copy(
                     installedVersion = currentItem.metadata.version,
                     installedAtEpochMs = currentEpochMillis(),
+                    installedFileHash = expectedHash?.wireValue,
                     enabled = currentItem.enabled && verified && currentItem.compatibility.isRunnable,
                     verified = verified,
                     isInstalling = false,
@@ -654,13 +656,24 @@ actual object CloudStreamRepository {
             val refreshed = plugins.map { metadata ->
                 val previousItem = previousById[metadata.id.value]
                 val compatibility = resolveCompatibility(metadata)
-                previousItem?.copy(
-                    metadata = metadata,
-                    compatibility = compatibility,
-                    enabled = previousItem.enabled && metadata.status.canInstall && compatibility.isRunnable,
-                    isInstalling = false,
-                    errorMessage = null,
-                ) ?: newPluginItem(metadata)
+                previousItem?.let { previous ->
+                    val installedPackageMatchesCurrentMetadata = previous.installedVersion != metadata.version ||
+                        when {
+                            metadata.fileHash != null ->
+                                previous.installedFileHash == metadata.fileHash.wireValue
+                            previous.metadata.packageUrl != metadata.packageUrl -> false
+                            else -> true
+                        }
+                    val verified = previous.verified && installedPackageMatchesCurrentMetadata
+                    previous.copy(
+                        metadata = metadata,
+                        compatibility = compatibility,
+                        verified = verified,
+                        enabled = previous.enabled && verified && metadata.status.canInstall && compatibility.isRunnable,
+                        isInstalling = false,
+                        errorMessage = null,
+                    )
+                } ?: newPluginItem(metadata)
             }
             current.copy(
                 repositories = current.repositories.map { item ->
@@ -733,6 +746,8 @@ actual object CloudStreamRepository {
                 installedAtEpochMs = plugin.installedAtEpochMs.takeIf { packageExists } ?: 0L,
                 enabled = plugin.enabled && packageExists && plugin.verified && compatibility.isRunnable && metadata.status.canInstall,
                 verified = plugin.verified && packageExists,
+                installedFileHash = plugin.installedFileHash
+                    ?: plugin.fileHash.takeIf { plugin.installedVersion == plugin.availableVersion && packageExists },
             )
         }
         return CloudStreamUiState(
@@ -779,6 +794,7 @@ actual object CloudStreamRepository {
         iconUrl = metadata.iconUrl,
         apiVersion = metadata.apiVersion,
         fileHash = metadata.fileHash?.wireValue,
+        installedFileHash = installedFileHash,
         enabled = enabled,
         verified = verified,
         installedAtEpochMs = installedAtEpochMs.takeIf { installedVersion != null } ?: 0L,
