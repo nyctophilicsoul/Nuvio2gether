@@ -293,6 +293,8 @@ actual object PluginRepository {
                                 Result.failure(error)
                             }
 
+                            var persistenceSnapshot: PluginPersistenceSnapshot? = null
+                            var serverPushSnapshot: Pair<Int, List<PluginPushItem>>? = null
                             val applied = synchronized(profileLock) {
                                 if (
                                     currentProfileId != snapshot.profileId ||
@@ -333,13 +335,15 @@ actual object PluginRepository {
                                             },
                                         )
                                     }
+                                    persistenceSnapshot = persistenceSnapshotLocked()
+                                    if (pushAfterRefresh) serverPushSnapshot = serverPushSnapshotLocked()
                                     true
                                 }
                             }
                             if (!applied) return@launch
 
-                            persist()
-                            if (pushAfterRefresh) pushToServer()
+                            persistenceSnapshot?.let(::persist)
+                            if (pushAfterRefresh) serverPushSnapshot?.let(::pushToServer)
                             if (pushAfterRefresh && result.isSuccess) {
                                 NuvioToastController.show("Addons and plugins refreshed")
                             }
@@ -579,17 +583,21 @@ actual object PluginRepository {
         }
     }
 
-    private fun pushToServer() {
-        val snapshot = synchronized(profileLock) {
-            currentProfileId to _uiState.value.repositories.mapIndexed { index, repo ->
-                PluginPushItem(
-                    url = repo.manifestUrl,
-                    name = repo.name,
-                    enabled = true,
-                    sortOrder = index,
-                )
-            }
+    private fun serverPushSnapshotLocked(): Pair<Int, List<PluginPushItem>> =
+        currentProfileId to _uiState.value.repositories.mapIndexed { index, repo ->
+            PluginPushItem(
+                url = repo.manifestUrl,
+                name = repo.name,
+                enabled = true,
+                sortOrder = index,
+            )
         }
+
+    private fun pushToServer() {
+        pushToServer(synchronized(profileLock) { serverPushSnapshotLocked() })
+    }
+
+    private fun pushToServer(snapshot: Pair<Int, List<PluginPushItem>>) {
         scope.launch {
             runCatching {
                 val params = buildJsonObject {
@@ -603,15 +611,16 @@ actual object PluginRepository {
         }
     }
 
+    private fun persistenceSnapshotLocked(): PluginPersistenceSnapshot =
+        PluginPersistenceSnapshot(
+            profileId = currentProfileId,
+            generation = persistenceGeneration.value,
+            revision = persistenceRevision.incrementAndGet(),
+            state = _uiState.value,
+        )
+
     private fun persist() {
-        val snapshot = synchronized(profileLock) {
-            PluginPersistenceSnapshot(
-                profileId = currentProfileId,
-                generation = persistenceGeneration.value,
-                revision = persistenceRevision.incrementAndGet(),
-                state = _uiState.value,
-            )
-        }
+        val snapshot = synchronized(profileLock) { persistenceSnapshotLocked() }
         val requiresCodeWrite = snapshot.state.scrapers.any { scraper ->
             !PluginStorage.hasScraperCode(snapshot.profileId, scraper.id)
         }
