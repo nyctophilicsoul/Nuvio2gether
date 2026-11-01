@@ -54,6 +54,7 @@ import nuvio.composeapp.generated.resources.settings_merged_rows_edit_title
 import nuvio.composeapp.generated.resources.settings_merged_rows_empty
 import nuvio.composeapp.generated.resources.settings_merged_rows_mode_tabs
 import nuvio.composeapp.generated.resources.settings_merged_rows_mode_type_tabs
+import nuvio.composeapp.generated.resources.settings_merged_rows_mode_type_tabs_description
 import nuvio.composeapp.generated.resources.settings_merged_rows_mode_unified
 import nuvio.composeapp.generated.resources.settings_merged_rows_name
 import nuvio.composeapp.generated.resources.settings_merged_rows_save
@@ -286,6 +287,13 @@ private fun MergedHomeRowsEditor(
                             stringResource(Res.string.settings_merged_rows_mode_type_tabs),
                             modifier = Modifier.weight(1f),
                             style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                    if (draftMode == MergedHomeRowDisplayMode.TYPE_TABS) {
+                        Text(
+                            text = stringResource(Res.string.settings_merged_rows_mode_type_tabs_description),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
 
