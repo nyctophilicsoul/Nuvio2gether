@@ -127,12 +127,12 @@ object ProfileRepository {
         CustomPosterUrlRepository.onProfileChanged()
     }
 
-    suspend fun pullProfiles() {
+    suspend fun pullProfiles(): Boolean {
         if (AuthRepository.state.value.isAnonymous) {
             if (!_state.value.isLoaded) {
                 _state.value = _state.value.copy(isLoaded = true)
             }
-            return
+            return true
         }
         try {
             val result = SupabaseProvider.client.postgrest.rpc("sync_pull_profiles")
@@ -147,12 +147,16 @@ object ProfileRepository {
                 activeProfileIndex = _state.value.activeProfile!!.profileIndex
             }
             persist()
+            return true
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (e: Throwable) {
-            if (AuthRepository.signOutIfSessionInvalid(e, "Profile pull")) return
+            if (AuthRepository.signOutIfSessionInvalid(e, "Profile pull")) return false
             log.e(e) { "Failed to pull profiles" }
             if (!_state.value.isLoaded) {
                 _state.value = _state.value.copy(isLoaded = true)
             }
+            return false
         }
     }
 
@@ -201,10 +205,10 @@ object ProfileRepository {
         ProfileSettingsSync.onProfileChanged()
     }
 
-    suspend fun pushProfiles(profiles: List<ProfilePushPayload>) {
+    suspend fun pushProfiles(profiles: List<ProfilePushPayload>): Boolean {
         if (AuthRepository.state.value.isAnonymous) {
             applyPayloadsLocally(profiles)
-            return
+            return true
         }
         try {
             val params = buildJsonObject {
@@ -213,10 +217,16 @@ object ProfileRepository {
                 putSyncOriginClientId()
             }
             SupabaseProvider.client.postgrest.rpc("sync_push_profiles", params)
-            pullProfiles()
+            if (!pullProfiles() && AuthRepository.state.value is AuthState.Authenticated) {
+                applyPayloadsLocally(profiles)
+            }
+            true
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (e: Throwable) {
-            if (AuthRepository.signOutIfSessionInvalid(e, "Profile push")) return
+            if (AuthRepository.signOutIfSessionInvalid(e, "Profile push")) return false
             log.e(e) { "Failed to push profiles" }
+            false
         }
     }
 
@@ -227,9 +237,9 @@ object ProfileRepository {
         avatarUrl: String? = null,
         usesPrimaryAddons: Boolean = false,
         profileBackgroundUrl: String? = null,
-    ) {
+    ): Boolean {
         val existing = _state.value.profiles
-        val nextIndex = ((1..MAX_PROFILES).toSet() - existing.map { it.profileIndex }.toSet()).minOrNull() ?: return
+        val nextIndex = ((1..MAX_PROFILES).toSet() - existing.map { it.profileIndex }.toSet()).minOrNull() ?: return false
 
         val allPayloads = existing.map { profile ->
             ProfilePushPayload(
@@ -253,7 +263,7 @@ object ProfileRepository {
             profileBackgroundUrl = profileBackgroundUrl,
         )
 
-        pushProfiles(allPayloads)
+        return pushProfiles(allPayloads)
     }
 
     suspend fun updateProfile(
@@ -265,7 +275,8 @@ object ProfileRepository {
         profileBackgroundId: String? = null,
         profileBackgroundUrl: String? = null,
         usesPrimaryAddons: Boolean = false,
-    ) {
+    ): Boolean {
+        if (_state.value.profiles.none { it.profileIndex == profileIndex }) return false
         val allPayloads = _state.value.profiles.map { profile ->
             if (profile.profileIndex == profileIndex) {
                 ProfilePushPayload(
@@ -293,7 +304,7 @@ object ProfileRepository {
             }
         }
 
-        pushProfiles(allPayloads)
+        return pushProfiles(allPayloads)
     }
 
     suspend fun deleteProfile(profileIndex: Int) {
