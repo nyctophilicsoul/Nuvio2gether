@@ -177,49 +177,59 @@ object StreamsRepository {
                 isAnyLoading = true,
             )
             activeJob = scope.launch {
-                CloudStreamRepository.loadLinks(cloudStreamRoute.providerId, cloudStreamRoute.data)
-                    .fold(
-                        onSuccess = { sources ->
-                            val streams = cloudStreamSourcesToStreamItems(
-                                providerId = cloudStreamRoute.providerId,
-                                providerName = providerName,
-                                sources = sources,
-                            )
-                            _uiState.value = StreamsUiState(
-                                requestToken = requestToken,
-                                groups = listOf(
-                                    AddonStreamGroup(
-                                        addonName = providerName,
-                                        addonId = providerAddonId,
-                                        streams = streams,
-                                        isLoading = false,
-                                        error = if (streams.isEmpty()) "No links found" else null,
+                resolveCloudStreamDirectRoute(
+                    providerId = cloudStreamRoute.providerId,
+                    providerName = providerName,
+                    data = cloudStreamRoute.data,
+                ).fold(
+                    onSuccess = { streams ->
+                        _uiState.update { current ->
+                            if (current.requestToken != requestToken) {
+                                current
+                            } else {
+                                StreamsUiState(
+                                    requestToken = requestToken,
+                                    groups = listOf(
+                                        AddonStreamGroup(
+                                            addonName = providerName,
+                                            addonId = providerAddonId,
+                                            streams = streams,
+                                            isLoading = false,
+                                            error = if (streams.isEmpty()) "No links found" else null,
+                                        ),
                                     ),
-                                ),
-                                activeAddonIds = setOf(providerAddonId),
-                                isAnyLoading = false,
-                                emptyStateReason = if (streams.isEmpty()) StreamsEmptyStateReason.NoStreamsFound else null,
-                            )
-                        },
-                        onFailure = { error ->
-                            log.w(error) { "CloudStream link resolution failed provider=${cloudStreamRoute.providerId}" }
-                            _uiState.value = StreamsUiState(
-                                requestToken = requestToken,
-                                groups = listOf(
-                                    AddonStreamGroup(
-                                        addonName = providerName,
-                                        addonId = providerAddonId,
-                                        streams = emptyList(),
-                                        isLoading = false,
-                                        error = error.message ?: "CloudStream link resolution failed",
+                                    activeAddonIds = setOf(providerAddonId),
+                                    isAnyLoading = false,
+                                    emptyStateReason = if (streams.isEmpty()) StreamsEmptyStateReason.NoStreamsFound else null,
+                                )
+                            }
+                        }
+                    },
+                    onFailure = { error ->
+                        log.w(error) { "CloudStream link resolution failed provider=${cloudStreamRoute.providerId}" }
+                        _uiState.update { current ->
+                            if (current.requestToken != requestToken) {
+                                current
+                            } else {
+                                StreamsUiState(
+                                    requestToken = requestToken,
+                                    groups = listOf(
+                                        AddonStreamGroup(
+                                            addonName = providerName,
+                                            addonId = providerAddonId,
+                                            streams = emptyList(),
+                                            isLoading = false,
+                                            error = error.message ?: "CloudStream link resolution failed",
+                                        ),
                                     ),
-                                ),
-                                activeAddonIds = setOf(providerAddonId),
-                                isAnyLoading = false,
-                                emptyStateReason = StreamsEmptyStateReason.StreamFetchFailed,
-                            )
-                        },
-                    )
+                                    activeAddonIds = setOf(providerAddonId),
+                                    isAnyLoading = false,
+                                    emptyStateReason = StreamsEmptyStateReason.StreamFetchFailed,
+                                )
+                            }
+                        }
+                    },
+                )
             }
             return
         }

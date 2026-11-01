@@ -114,6 +114,24 @@ internal fun cloudStreamProviderGroupsForRequest(
         .distinctBy { it.providerId }
 }
 
+internal suspend fun resolveCloudStreamDirectRoute(
+    providerId: String,
+    providerName: String,
+    data: String,
+): Result<List<StreamItem>> {
+    val sourceResult = withTimeoutOrNull(CLOUDSTREAM_PROVIDER_STREAM_TIMEOUT_MS) {
+        CloudStreamRepository.loadLinks(providerId, data)
+    } ?: return Result.failure(IllegalStateException("CloudStream provider timed out"))
+    val sources = sourceResult.getOrElse { return Result.failure(it) }
+    return Result.success(
+        cloudStreamSourcesToStreamItems(
+            providerId = providerId,
+            providerName = providerName,
+            sources = sources,
+        ),
+    )
+}
+
 internal suspend fun resolveCloudStreamProviderStreams(
     providerGroup: CloudStreamProviderGroup,
     request: CloudStreamSearchRequest?,
