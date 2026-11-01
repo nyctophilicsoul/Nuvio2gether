@@ -257,6 +257,7 @@ class SettingsPagesTest {
                 "liquid-glass" to SettingsPage.Layout,
                 "navigation-bar" to SettingsPage.Layout,
                 "app-icon" to SettingsPage.Appearance,
+                "cloudstream" to SettingsPage.CloudStream,
             ).forEach { (key, page) ->
                 assertEquals(SettingsSearchTarget.Page(page), entries.single { it.key == key }.target)
             }
