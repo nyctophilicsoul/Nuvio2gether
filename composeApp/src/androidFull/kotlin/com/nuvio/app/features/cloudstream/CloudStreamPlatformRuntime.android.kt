@@ -109,9 +109,12 @@ internal actual object CloudStreamPlatformRuntime {
                 }
             }
         }
-        item.metadata.fileHash?.let { expectedHash ->
+        val installedHash = item.installedFileHash
+            ?.let(CloudStreamFileHash::parse)
+            ?: item.metadata.fileHash.takeIf { item.installedVersion == item.metadata.version }
+        installedHash?.let { expectedHash ->
             require(expectedHash.matches(file.readBytes())) {
-                "Installed CloudStream package SHA-256 no longer matches metadata"
+                "Installed CloudStream package SHA-256 no longer matches its installed verification hash"
             }
         }
         require(file.setReadOnly() || !file.canWrite()) { "CloudStream package could not be made read-only" }
