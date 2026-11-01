@@ -41,15 +41,19 @@ internal object CloudStreamSearchRouteIndex {
         type: String,
         year: Int?,
     ): List<CloudStreamSearchItem> {
-        val normalizedTitles = titles.map { title -> title.normalizedRouteTitle() }.filter(String::isNotBlank).toSet()
+        val requestedType = normalizeRouteType(type)
+        val normalizedTitles = titles
+            .map { title -> title.canonicalRouteTitle() }
+            .filter(String::isNotBlank)
+            .toSet()
+        if (normalizedTitles.isEmpty()) return emptyList()
+
         return entries.value.asSequence()
             .filter { entry -> entry.providerId == providerId }
+            .filter { entry -> normalizeRouteType(entry.item.type.nuvioType) == requestedType }
             .filter { entry -> year == null || entry.item.year == null || entry.item.year == year }
             .filter { entry ->
-                val itemTitle = entry.item.name.normalizedRouteTitle()
-                itemTitle in normalizedTitles || normalizedTitles.any { title ->
-                    itemTitle.startsWith(title) || title.startsWith(itemTitle)
-                }
+                entry.item.name.canonicalRouteTitle() in normalizedTitles
             }
             .map(Entry::item)
             .distinctBy(CloudStreamSearchItem::data)
@@ -57,13 +61,28 @@ internal object CloudStreamSearchRouteIndex {
             .toList()
     }
 
-    private fun String.normalizedRouteTitle(): String = lowercase()
-        .map { char -> if (char.isLetterOrDigit()) char else ' ' }
-        .joinToString("")
-        .trim()
-        .split(Regex("\\s+"))
-        .filter(String::isNotBlank)
-        .joinToString(" ")
+    private fun String.canonicalRouteTitle(): String {
+        val normalized = lowercase()
+            .map { char -> if (char.isLetterOrDigit()) char else ' ' }
+            .joinToString("")
+            .trim()
+            .split(Regex("\\s+"))
+            .filter(String::isNotBlank)
+            .toMutableList()
+        if (normalized.lastOrNull()?.matches(Regex("\\d{4}")) == true) {
+            normalized.removeAt(normalized.lastIndex)
+        }
+        if (normalized.firstOrNull() in setOf("the", "a", "an")) {
+            normalized.removeAt(0)
+        }
+        return normalized.joinToString(" ")
+    }
+
+    private fun normalizeRouteType(type: String): String = when (type.trim().lowercase()) {
+        "tv", "show" -> "series"
+        "livetv", "channel" -> "live"
+        else -> type.trim().lowercase().ifBlank { "other" }
+    }
 
     private const val MAX_ENTRIES = 1_000
     private const val MAX_MATCHES = 5
