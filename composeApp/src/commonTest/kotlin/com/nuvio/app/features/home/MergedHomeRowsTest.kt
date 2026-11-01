@@ -99,4 +99,120 @@ class MergedHomeRowsTest {
 
         assertEquals(listOf("tt1", "tt1"), merged.map { it.id })
     }
+
+    @Test
+    fun legacyRowsKeepInterleaveAndOffDefaults() {
+        val row = MergedHomeRowDefinition(
+            id = "legacy",
+            title = "Legacy",
+            sourceKeys = listOf("a", "b"),
+        )
+        assertEquals(MergedHomeRowBlendMode.INTERLEAVE, row.resolvedBlendMode())
+        assertEquals(MergedHomeRowSortMode.OFF, row.resolvedSortMode())
+        assertEquals(MergedHomeRowContentType.ALL, row.resolvedContentType())
+    }
+
+    @Test
+    fun smartBlendPrioritisesTitlesThatAreBothNewerAndPopular() {
+        val olderPopular = item("old-popular").copy(
+            rawReleaseDate = "2023-04-01",
+            popularity = 950.0,
+            imdbRating = "7.2",
+        )
+        val recentPopular = item("new-popular").copy(
+            rawReleaseDate = "2026-10-01",
+            popularity = 900.0,
+            imdbRating = "8.6",
+        )
+        val middle = item("middle").copy(
+            rawReleaseDate = "2025-03-01",
+            popularity = 300.0,
+            imdbRating = "7.8",
+        )
+
+        val merged = mergeHomeRowItems(
+            sourceItems = listOf(listOf(olderPopular, middle), listOf(recentPopular)),
+            deduplicate = true,
+            blendMode = MergedHomeRowBlendMode.SMART_FRESHNESS_POPULARITY,
+        )
+
+        assertEquals("new-popular", merged.first().id)
+    }
+
+    @Test
+    fun mergedContentTypeSeparatesMoviesAndSeries() {
+        val merged = mergeHomeRowItems(
+            sourceItems = listOf(
+                listOf(item("movie-1", type = "movie"), item("series-1", type = "series")),
+                listOf(item("movie-2", type = "movie"), item("series-2", type = "tv")),
+            ),
+            deduplicate = true,
+            contentType = MergedHomeRowContentType.MOVIES,
+        )
+
+        assertEquals(listOf("movie-1", "movie-2"), merged.map { it.id })
+    }
+
+    @Test
+    fun seriesFilterIncludesTvTypeAndExcludesMovies() {
+        val merged = mergeHomeRowItems(
+            sourceItems = listOf(
+                listOf(item("movie-1", type = "movie"), item("series-1", type = "series")),
+                listOf(item("tv-1", type = "tv")),
+            ),
+            deduplicate = true,
+            contentType = MergedHomeRowContentType.SERIES,
+        )
+
+        assertEquals(listOf("series-1", "tv-1"), merged.map { it.id })
+    }
+
+    @Test
+    fun posterlessFilterKeepsTitlesWithEitherCustomOrOriginalPoster() {
+        val merged = mergeHomeRowItems(
+            sourceItems = listOf(
+                listOf(
+                    item("has-poster").copy(poster = "https://example.com/poster.jpg"),
+                    item("missing-poster"),
+                    item("has-original").copy(rawPosterUrl = "https://example.com/original.jpg"),
+                ),
+            ),
+            deduplicate = true,
+            hideTitlesWithoutPosters = true,
+        )
+
+        assertEquals(listOf("has-poster", "has-original"), merged.map { it.id })
+    }
+
+    @Test
+    fun newestSortOverridesBlendOrder() {
+        val merged = mergeHomeRowItems(
+            sourceItems = listOf(
+                listOf(
+                    item("older").copy(rawReleaseDate = "2024-01-01"),
+                    item("newer").copy(rawReleaseDate = "2026-06-01"),
+                ),
+            ),
+            deduplicate = true,
+            sortMode = MergedHomeRowSortMode.NEWEST,
+        )
+
+        assertEquals(listOf("newer", "older"), merged.map { it.id })
+    }
+
+    @Test
+    fun mergedSourceLabelsDropInternalIdsAndTypeSuffixes() {
+        assertEquals(
+            "AI Recommendations",
+            cleanMergedSourceTabTitle("AI Recommendations (movie/aicat_list_125836)"),
+        )
+        assertEquals(
+            "BanglaPlex 2026",
+            cleanMergedSourceTabTitle("BanglaPlex · 2026 - Movies"),
+        )
+        assertEquals(
+            "Seerr Next",
+            cleanMergedSourceTabTitle("Seerr · For you · Movies · Next"),
+        )
+    }
 }
