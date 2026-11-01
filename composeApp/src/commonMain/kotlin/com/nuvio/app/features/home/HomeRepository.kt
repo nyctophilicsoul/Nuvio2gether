@@ -187,7 +187,10 @@ object HomeRepository {
 
         val hiddenIncludedSourceKeys = snapshot.mergedRows
             .asSequence()
-            .filter { it.hideIncludedRows }
+            .filter { row ->
+                row.hideIncludedRows &&
+                    preferences[mergedHomeRowKey(row.id)]?.enabled != false
+            }
             .flatMap { it.sourceKeys.asSequence() }
             .toSet()
         val catalogSections = orderHomeCatalogDefinitions(currentDefinitions, snapshot)
