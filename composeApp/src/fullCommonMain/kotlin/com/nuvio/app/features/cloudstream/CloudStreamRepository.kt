@@ -115,7 +115,18 @@ actual object CloudStreamRepository {
                     .fold(
                         onSuccess = { (repository, plugins) -> applyRepositoryRefresh(repository, plugins) },
                         onFailure = { error ->
-                            if (error is CancellationException) throw error
+                            if (error is CancellationException) {
+                                _uiState.update { current ->
+                                    current.copy(
+                                        repositories = current.repositories.map { item ->
+                                            if (item.manifest.sourceUrl == normalizedUrl) {
+                                                item.copy(isRefreshing = false)
+                                            } else item
+                                        },
+                                    )
+                                }
+                                throw error
+                            }
                             log.w(error) { "CloudStream repository refresh failed url=$normalizedUrl" }
                             _uiState.update { current ->
                                 current.copy(
@@ -380,7 +391,10 @@ actual object CloudStreamRepository {
         }.fold(
             onSuccess = { CloudStreamInstallResult.Success(it) },
             onFailure = { error ->
-                if (error is CancellationException) throw error
+                if (error is CancellationException) {
+                    markInstalling(pluginId, false, null)
+                    throw error
+                }
                 log.w(error) { "CloudStream plugin installation failed id=$pluginId" }
                 markInstalling(pluginId, false, error.message ?: "Plugin installation failed")
                 CloudStreamInstallResult.Error(error.message ?: "Plugin installation failed")
