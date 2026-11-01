@@ -15,7 +15,6 @@ import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.addons.firstEnabledManifestError
 import com.nuvio.app.features.addons.hasPendingEnabledManifests
 import com.nuvio.app.features.addons.isWaitingForFirstEnabledManifest
-import com.nuvio.app.features.cloudstream.CloudStreamPlatformRuntime
 import com.nuvio.app.features.collection.CollectionRepository
 import com.nuvio.app.features.details.MetaScreenSettingsRepository
 import com.nuvio.app.features.plugins.PluginRepository
@@ -197,7 +196,7 @@ fun PluginsSettingsScreen(
 fun CloudStreamSettingsScreen(
     onBack: () -> Unit,
 ) {
-    if (!AppFeaturePolicy.pluginsEnabled || !CloudStreamPlatformRuntime.supportsAndroidDex) {
+    if (!AppFeaturePolicy.pluginsEnabled) {
         AddonsSettingsScreen(onBack)
         return
     }
