@@ -175,38 +175,39 @@ fun ProfileEditScreen(
             }
         }
 
-        if (canChooseBackground) {
-            item {
-                NuvioSurfaceCard {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item {
+            NuvioSurfaceCard {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = stringResource(Res.string.profile_custom_background_url),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = stringResource(Res.string.profile_custom_background_url_description),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    NuvioInputField(
+                        value = selectedBackgroundUrl.orEmpty(),
+                        onValueChange = { value ->
+                            selectedBackgroundUrl = value.trim().takeIf(String::isNotBlank)
+                            if (!selectedBackgroundUrl.isNullOrBlank()) selectedBackgroundId = null
+                        },
+                        placeholder = stringResource(Res.string.profile_custom_background_url_placeholder),
+                    )
+                    if (backgroundUrlIsInvalid) {
                         Text(
-                            text = stringResource(Res.string.profile_custom_background_url),
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            text = stringResource(Res.string.profile_custom_background_url_invalid),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
                         )
-                        Text(
-                            text = stringResource(Res.string.profile_custom_background_url_description),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        NuvioInputField(
-                            value = selectedBackgroundUrl.orEmpty(),
-                            onValueChange = { value ->
-                                selectedBackgroundUrl = value.trim().takeIf(String::isNotBlank)
-                                if (!selectedBackgroundUrl.isNullOrBlank()) selectedBackgroundId = null
-                            },
-                            placeholder = stringResource(Res.string.profile_custom_background_url_placeholder),
-                        )
-                        if (backgroundUrlIsInvalid) {
-                            Text(
-                                text = stringResource(Res.string.profile_custom_background_url_invalid),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        }
                     }
                 }
             }
+        }
+
+        if (canChooseBackground) {
             item {
                 NuvioSurfaceCard {
                     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -322,6 +323,7 @@ fun ProfileEditScreen(
                                 avatarColorHex = avatarColorHex,
                                 avatarId = if (customAvatarUrl == null) selectedAvatarId else null,
                                 avatarUrl = customAvatarUrl,
+                                profileBackgroundUrl = selectedBackgroundUrl,
                                 usesPrimaryAddons = usesPrimaryAddons,
                             )
                         } else {
