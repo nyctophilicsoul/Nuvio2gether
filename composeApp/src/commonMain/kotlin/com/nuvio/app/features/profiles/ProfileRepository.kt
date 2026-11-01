@@ -218,8 +218,8 @@ object ProfileRepository {
         avatarColorHex: String,
         avatarId: String? = null,
         avatarUrl: String? = null,
-        profileBackgroundUrl: String? = null,
         usesPrimaryAddons: Boolean = false,
+        profileBackgroundUrl: String? = null,
     ) {
         val existing = _state.value.profiles
         val nextIndex = ((1..MAX_PROFILES).toSet() - existing.map { it.profileIndex }.toSet()).minOrNull() ?: return
@@ -256,8 +256,8 @@ object ProfileRepository {
         avatarId: String? = null,
         avatarUrl: String? = null,
         profileBackgroundId: String? = null,
-        profileBackgroundUrl: String? = null,
         usesPrimaryAddons: Boolean = false,
+        profileBackgroundUrl: String? = null,
     ) {
         val allPayloads = _state.value.profiles.map { profile ->
             if (profile.profileIndex == profileIndex) {
