@@ -319,7 +319,9 @@ private fun sortMergedItems(
         MergedHomeRowSortMode.TOP_RATED ->
             compareBy<IndexedValue<MetaPreview>>({ it.value.ratingValue() == null }, { -(it.value.ratingValue() ?: 0.0) }, { it.index })
         MergedHomeRowSortMode.NEWEST ->
-            compareBy<IndexedValue<MetaPreview>>({ it.value.releaseDateKey() == null }, { it.value.releaseDateKey().orEmpty().reversed() }, { it.index })
+            compareBy<IndexedValue<MetaPreview>> { it.value.releaseDateKey() == null }
+                .thenByDescending { it.value.releaseDateKey() }
+                .thenBy { it.index }
         MergedHomeRowSortMode.OLDEST ->
             compareBy<IndexedValue<MetaPreview>>({ it.value.releaseDateKey() == null }, { it.value.releaseDateKey().orEmpty() }, { it.index })
     }
