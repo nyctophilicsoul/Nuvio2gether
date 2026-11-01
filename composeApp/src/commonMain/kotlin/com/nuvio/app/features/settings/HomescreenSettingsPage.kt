@@ -1,7 +1,6 @@
 package com.nuvio.app.features.settings
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material3.OutlinedTextField
-import com.nuvio.app.features.settings.ThemeSettingsRepository
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
@@ -724,7 +723,6 @@ private fun HomescreenSummaryCard(
     }
 }
 
-@Composable
 @Composable
 private fun HomeScreenBackgroundUrlSettings(isTablet: Boolean) {
     ThemeSettingsRepository.ensureLoaded()
