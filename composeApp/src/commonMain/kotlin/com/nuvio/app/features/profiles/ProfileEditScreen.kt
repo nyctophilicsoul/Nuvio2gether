@@ -104,8 +104,8 @@ fun ProfileEditScreen(
 
     val customAvatarUrl = remember(avatarUrl) { normalizedAvatarUrl(avatarUrl) }
     val avatarUrlIsInvalid = avatarUrl.isNotBlank() && customAvatarUrl == null
-    val backgroundUrlIsInvalid = !selectedBackgroundUrl.isNullOrBlank() &&
-        !selectedBackgroundUrl.isValidAvatarUrl()
+    val backgroundUrlIsInvalid = selectedBackgroundUrl
+        ?.let { it.isNotBlank() && !it.isValidAvatarUrl() } == true
     val selectedAvatarItem = remember(selectedAvatarId, avatars) {
         selectedAvatarId?.let { id -> avatars.find { it.id == id } }
     }
