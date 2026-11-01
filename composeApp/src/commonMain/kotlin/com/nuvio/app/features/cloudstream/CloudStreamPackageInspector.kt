@@ -25,11 +25,25 @@ object CloudStreamPackageInspector {
     fun inspect(bytes: ByteArray): CloudStreamPackageInspection {
         require(bytes.size >= 22) { "Invalid .cs3 ZIP archive" }
         val endOffset = findEndOfCentralDirectory(bytes)
+        val diskNumber = bytes.readUInt16Le(endOffset + 4)
+        val centralDirectoryDisk = bytes.readUInt16Le(endOffset + 6)
+        val entriesOnDisk = bytes.readUInt16Le(endOffset + 8)
         val entryCount = bytes.readUInt16Le(endOffset + 10)
         val centralDirectorySize = bytes.readUInt32Le(endOffset + 12)
         val centralDirectoryOffset = bytes.readUInt32Le(endOffset + 16)
+        require(diskNumber == 0 && centralDirectoryDisk == 0 && entriesOnDisk == entryCount) {
+            "Multi-disk .cs3 archives are not supported"
+        }
         require(entryCount in 1..maxEntries) { "Invalid .cs3 entry count" }
-        require(centralDirectoryOffset + centralDirectorySize <= bytes.size.toLong()) {
+        // The directory must end before the EOCD record. Checking only against the
+        // archive size would allow malformed entries to consume bytes from the EOCD
+        // record or its comment as if they were central-directory records.
+        val centralDirectoryEnd = centralDirectoryOffset + centralDirectorySize
+        require(
+            centralDirectoryOffset <= endOffset.toLong() &&
+                centralDirectoryEnd <= endOffset.toLong() &&
+                centralDirectoryEnd <= bytes.size.toLong()
+        ) {
             "Invalid .cs3 central directory"
         }
 
@@ -37,6 +51,9 @@ object CloudStreamPackageInspector {
         var cursor = centralDirectoryOffset.toInt()
         var totalUncompressed = 0L
         repeat(entryCount) {
+            require(cursor.toLong() + 46L <= centralDirectoryEnd) {
+                "Truncated .cs3 central directory entry"
+            }
             require(bytes.readInt32Le(cursor) == centralDirectorySignature) { "Invalid .cs3 central directory entry" }
             val compressedSize = bytes.readUInt32Le(cursor + 20)
             val uncompressedSize = bytes.readUInt32Le(cursor + 24)
@@ -44,8 +61,16 @@ object CloudStreamPackageInspector {
             val extraLength = bytes.readUInt16Le(cursor + 30)
             val commentLength = bytes.readUInt16Le(cursor + 32)
             val nameStart = cursor + 46
-            val nameEnd = nameStart + nameLength
-            require(nameStart >= 0 && nameEnd <= bytes.size) { "Invalid .cs3 entry name" }
+            val nameEndLong = nameStart.toLong() + nameLength
+            val entryEndLong = nameEndLong + extraLength + commentLength
+            require(
+                nameEndLong <= centralDirectoryEnd &&
+                    entryEndLong <= centralDirectoryEnd &&
+                    entryEndLong <= bytes.size.toLong()
+            ) {
+                "Invalid .cs3 central directory entry length"
+            }
+            val nameEnd = nameEndLong.toInt()
             val name = bytes.copyOfRange(nameStart, nameEnd).decodeToString()
             validateEntryName(name)
             totalUncompressed += uncompressedSize
@@ -55,8 +80,7 @@ object CloudStreamPackageInspector {
                 compressedSize = compressedSize,
                 uncompressedSize = uncompressedSize,
             )
-            cursor = nameEnd + extraLength + commentLength
-            require(cursor <= bytes.size) { "Invalid .cs3 central directory length" }
+            cursor = entryEndLong.toInt()
         }
 
         return CloudStreamPackageInspection(entries).also { inspection ->
@@ -68,7 +92,9 @@ object CloudStreamPackageInspector {
     private fun findEndOfCentralDirectory(bytes: ByteArray): Int {
         val minimum = (bytes.size - 65_557).coerceAtLeast(0)
         for (offset in bytes.size - 22 downTo minimum) {
-            if (bytes.readInt32Le(offset) == endOfCentralDirectorySignature) return offset
+            if (bytes.readInt32Le(offset) != endOfCentralDirectorySignature) continue
+            val commentLength = bytes.readUInt16Le(offset + 20)
+            if (offset.toLong() + 22L + commentLength <= bytes.size.toLong()) return offset
         }
         error("Invalid .cs3 ZIP end record")
     }
