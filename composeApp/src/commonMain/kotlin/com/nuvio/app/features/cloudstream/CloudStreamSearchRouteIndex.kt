@@ -26,7 +26,7 @@ internal object CloudStreamSearchRouteIndex {
     ) {
         if (items.isEmpty()) return
         val additions = items.map { item ->
-            Entry(providerId = providerId, query = query.normalizedRouteTitle(), item = item)
+            Entry(providerId = providerId, query = query.canonicalRouteTitle(), item = item)
         }
         entries.update { current ->
             (additions + current)
