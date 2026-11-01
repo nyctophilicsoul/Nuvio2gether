@@ -286,15 +286,37 @@ internal suspend fun cloudStreamSourcesToStreamItems(
                 providerName = providerName,
             )
         }
-        .distinctBy { stream ->
-            listOf(
-                stream.addonId,
-                stream.sourceName.orEmpty(),
-                stream.streamLabel,
-                stream.playableDirectUrl.orEmpty(),
-            )
-        }
+        .distinctBy(::cloudStreamStreamIdentity)
 
+/**
+ * The same URL can represent different playable variants when providers attach
+ * different request headers or subtitle tracks. Keep those variants separate.
+ */
+internal fun cloudStreamStreamIdentity(stream: StreamItem): String {
+    val requestHeaders = stream.behaviorHints.proxyHeaders?.request.orEmpty()
+        .entries
+        .sortedBy { it.key.lowercase() }
+        .joinToString("\u001f") { "${it.key.lowercase()}=${it.value}" }
+    val subtitleIdentity = stream.externalSubtitles.joinToString("\u001e") { subtitle ->
+        listOf(
+            subtitle.url,
+            subtitle.language,
+            subtitle.name.orEmpty(),
+            subtitle.headers.orEmpty().entries
+                .sortedBy { it.key.lowercase() }
+                .joinToString("\u001f") { "${it.key.lowercase()}=${it.value}" },
+        ).joinToString("\u001d")
+    }
+    return listOf(
+        stream.addonId,
+        stream.sourceName.orEmpty(),
+        stream.streamLabel,
+        stream.playableDirectUrl.orEmpty(),
+        stream.streamType.orEmpty(),
+        requestHeaders,
+        subtitleIdentity,
+    ).joinToString("\u001c")
+}
 
 internal fun List<PluginScraper>.toPluginProviderGroups(
     repositories: List<PluginRepositoryItem>,

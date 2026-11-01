@@ -2,7 +2,9 @@ package com.nuvio.app.features.cloudstream
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import com.nuvio.app.features.streams.cloudStreamStreamIdentity
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class CloudStreamNuvioAdapterTest {
@@ -90,6 +92,43 @@ class CloudStreamNuvioAdapterTest {
         )
 
         assertEquals("hls", stream.streamType)
+    }
+
+    @Test
+    fun streamIdentityPreservesDifferentRequestHeadersForTheSameUrl() {
+        val first = CloudStreamPlaybackSource(
+            name = "Provider CDN",
+            url = "https://video.example/master.m3u8",
+            headers = mapOf("Authorization" to "Bearer first"),
+            isHls = true,
+        ).toStreamItem("provider", "Provider")
+        val second = CloudStreamPlaybackSource(
+            name = "Provider CDN",
+            url = "https://video.example/master.m3u8",
+            headers = mapOf("Authorization" to "Bearer second"),
+            isHls = true,
+        ).toStreamItem("provider", "Provider")
+
+        assertNotEquals(cloudStreamStreamIdentity(first), cloudStreamStreamIdentity(second))
+        assertEquals(cloudStreamStreamIdentity(first), cloudStreamStreamIdentity(first.copy()))
+    }
+
+    @Test
+    fun streamIdentityPreservesDifferentSubtitleTracksForTheSameUrl() {
+        val first = CloudStreamPlaybackSource(
+            name = "Provider CDN",
+            url = "https://video.example/master.m3u8",
+            subtitles = listOf(CloudStreamSubtitle(url = "https://sub.example/en.vtt", language = "en")),
+            isHls = true,
+        ).toStreamItem("provider", "Provider")
+        val second = CloudStreamPlaybackSource(
+            name = "Provider CDN",
+            url = "https://video.example/master.m3u8",
+            subtitles = listOf(CloudStreamSubtitle(url = "https://sub.example/tr.vtt", language = "tr")),
+            isHls = true,
+        ).toStreamItem("provider", "Provider")
+
+        assertNotEquals(cloudStreamStreamIdentity(first), cloudStreamStreamIdentity(second))
     }
 
     @Test
