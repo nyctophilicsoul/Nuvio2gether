@@ -178,8 +178,21 @@ internal actual object CloudStreamPlatformRuntime {
             )
         } catch (error: Throwable) {
             log.e(error) { "Failed to load ${item.metadata.internalName}" }
-            APIHolder.allProviders.removeAll { it !in providersBefore && it.sourcePlugin == file.absolutePath }
+            // A provider can fail after registering APIs, extractors, mappings, or
+            // click actions. Roll back every registration owned by this package so
+            // the failed attempt cannot poison later provider loads.
+            runCatching { instance.beforeUnload() }
+                .onFailure { unloadError -> log.w(unloadError) { "CloudStream provider cleanup failed" } }
+            val newlyRegisteredProviders = APIHolder.allProviders.filter {
+                it !in providersBefore && it.sourcePlugin == file.absolutePath
+            }
+            newlyRegisteredProviders.forEach { api ->
+                APIHolder.allProviders.remove(api)
+                runCatching { APIHolder.removePluginMapping(api) }
+            }
             extractorApis.removeAll { it !in extractorsBefore && it.sourcePlugin == file.absolutePath }
+            VideoClickActionHolder.allVideoClickActions.removeAll { it.sourcePlugin == file.absolutePath }
+            runCatching { PluginManager.unregister(file.absolutePath) }
             throw error
         } finally {
             PluginManager.currentlyLoading = null
