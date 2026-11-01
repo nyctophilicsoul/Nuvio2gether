@@ -11,7 +11,6 @@ import com.nuvio.app.features.servers.serverMessage
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.HomeCatalogTab
 import com.nuvio.app.features.home.MergedHomeRowDisplayMode
-import com.nuvio.app.features.home.MergedHomeRowContentType
 import com.nuvio.app.features.home.buildMergedHomeTypeTabs
 import com.nuvio.app.features.home.ResolvedMergedHomeRowSource
 import com.nuvio.app.features.home.filterReleasedItems
