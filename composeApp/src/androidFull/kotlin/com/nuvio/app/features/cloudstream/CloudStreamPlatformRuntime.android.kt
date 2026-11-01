@@ -137,16 +137,19 @@ internal actual object CloudStreamPlatformRuntime {
         @Suppress("UNCHECKED_CAST")
         val instance = (pluginClass as Class<out BasePlugin>).getDeclaredConstructor().newInstance()
         instance.filename = file.absolutePath
-        PluginManager.currentlyLoading = item.metadata.internalName
         val identityContext = CloudStreamIdentityContext(context)
-        CloudStreamApp.context = identityContext
-        setContext(WeakReference(identityContext))
-        applyHostCompatibilityDefaults(pluginClassName)
-        if (manifest.requiresResources) instance.attachResources(identityContext, file)
-
         val providersBefore = APIHolder.allProviders.toSet()
         val extractorsBefore = extractorApis.toSet()
         try {
+            // Set the global CloudStream loading marker only inside this guarded block.
+            // Resource attachment and host compatibility setup can throw; if they run
+            // before try/finally, currentlyLoading remains stale and corrupts later loads.
+            PluginManager.currentlyLoading = item.metadata.internalName
+            CloudStreamApp.context = identityContext
+            setContext(WeakReference(identityContext))
+            applyHostCompatibilityDefaults(pluginClassName)
+            if (manifest.requiresResources) instance.attachResources(identityContext, file)
+
             if (instance is Plugin) instance.load(identityContext) else instance.load()
             val providers = APIHolder.allProviders
                 .filter { it !in providersBefore || it.sourcePlugin == file.absolutePath }
