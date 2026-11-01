@@ -38,7 +38,6 @@ object QualityFirstAutoPlayPolicy {
         val candidates = streams
             .filter { p2pEnabled || !it.isTorrentStream }
             .filter { it.isSelectableForPlayback(debridEnabled) }
-            .distinctBy(::candidateIdentityKey)
             .filter { stream ->
                 val height = detectQualityHeight(stream)
                 targetHeight == null || height == targetHeight
@@ -62,7 +61,14 @@ object QualityFirstAutoPlayPolicy {
             }.thenBy { indexed ->
                 audioRanks[indexed.index]
             }.thenBy { it.index },
-        ).map { it.value }
+        )
+            .asSequence()
+            .map { it.value }
+            // Resolve duplicate identities only after ranking. The same URL can
+            // be reported with different quality/format metadata by multiple addons;
+            // keeping the first raw item could otherwise hide the better candidate.
+            .distinctBy(::candidateIdentityKey)
+            .toList()
     }
 
     /**
@@ -197,7 +203,18 @@ object QualityFirstAutoPlayPolicy {
         .distinctBy(::candidateIdentityKey)
 
     internal fun candidateIdentityKey(stream: StreamItem): String {
-        stream.playableDirectUrl?.let { return "url:$it" }
+        stream.playableDirectUrl?.let { url ->
+            val requestHeaders = stream.behaviorHints.proxyHeaders?.request
+                .orEmpty()
+                .entries
+                .sortedBy { it.key.lowercase() }
+                .joinToString("&") { (name, value) -> "$name=$value" }
+            return if (requestHeaders.isBlank()) {
+                "url:$url"
+            } else {
+                "url:$url|headers:$requestHeaders"
+            }
+        }
         stream.externalOpenUrl?.let { return "external:$it" }
         stream.youTubeIdToResolve?.let { return "youtube:$it" }
         stream.p2pInfoHash?.let { return "p2p:${it.lowercase()}:${stream.p2pFileIdx ?: -1}" }
