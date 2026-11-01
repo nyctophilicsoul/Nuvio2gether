@@ -256,8 +256,8 @@ object ProfileRepository {
         avatarId: String? = null,
         avatarUrl: String? = null,
         profileBackgroundId: String? = null,
-        usesPrimaryAddons: Boolean = false,
         profileBackgroundUrl: String? = null,
+        usesPrimaryAddons: Boolean = false,
     ) {
         val allPayloads = _state.value.profiles.map { profile ->
             if (profile.profileIndex == profileIndex) {
