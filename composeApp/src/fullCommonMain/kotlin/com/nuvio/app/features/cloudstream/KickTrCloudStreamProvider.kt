@@ -94,7 +94,7 @@ internal object KickTrCloudStreamProvider : CloudStreamProvider {
                     "url",
                 )
             }.getOrNull()?.takeIf(String::isPlayableKickUrl)
-            ?: error("Kick yayını çevrimdışı veya oynatma bağlantısı bulunamadı")
+            ?: error("Kick stream is offline or no playback URL was found")
 
         return listOf(
             CloudStreamPlaybackSource(
@@ -122,12 +122,12 @@ internal object KickTrCloudStreamProvider : CloudStreamProvider {
                 .onFailure { lastError = it }
                 .getOrNull() ?: continue
             if (parsed.findFirstString("error")?.contains("blocked", ignoreCase = true) == true) {
-                lastError = IllegalStateException("Kick isteği güvenlik katmanı tarafından engellendi")
+                lastError = IllegalStateException("Kick request was blocked by the provider's security layer")
                 continue
             }
             return parsed
         }
-        throw lastError ?: IllegalStateException("Kick API isteği başarısız oldu")
+        throw lastError ?: IllegalStateException("Kick API request failed")
     }
 
     private fun parseLivestreamItems(root: JsonElement): List<CloudStreamSearchItem> {
