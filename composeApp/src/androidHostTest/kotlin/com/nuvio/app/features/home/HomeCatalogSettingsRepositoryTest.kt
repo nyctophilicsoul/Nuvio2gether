@@ -763,6 +763,55 @@ class HomeCatalogSettingsRepositoryTest {
         assertEquals(2, assertNotNull(HomeCatalogSettingsRepository.resolveMergedHomeRow(row.id)).sources.size)
     }
 
+    @Test
+    fun mergedRowTypeBlendSortAndVisibilityOptionsPersistAcrossReload() {
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(addon(listOf("popular", "latest"))))
+        val id = assertNotNull(
+            HomeCatalogSettingsRepository.createMergedRow(
+                title = "Smart Mix",
+                sourceKeys = listOf("test:movie:popular", "test:movie:latest"),
+                displayMode = MergedHomeRowDisplayMode.SOURCE_TABS,
+                contentType = MergedHomeRowContentType.SERIES,
+                blendMode = MergedHomeRowBlendMode.SMART_FRESHNESS_POPULARITY,
+                sortMode = MergedHomeRowSortMode.NEWEST,
+                hideIncludedRows = true,
+                hideTitlesWithoutPosters = true,
+            ),
+        )
+
+        val created = HomeCatalogSettingsRepository.snapshot().mergedRows.single { it.id == id }
+        assertEquals(MergedHomeRowContentType.SERIES, created.resolvedContentType())
+        assertEquals(MergedHomeRowBlendMode.SMART_FRESHNESS_POPULARITY, created.resolvedBlendMode())
+        assertEquals(MergedHomeRowSortMode.NEWEST, created.resolvedSortMode())
+        assertTrue(created.hideIncludedRows)
+        assertTrue(created.hideTitlesWithoutPosters)
+
+        assertTrue(
+            HomeCatalogSettingsRepository.updateMergedRow(
+                id = id,
+                title = "Updated Smart Mix",
+                sourceKeys = created.sourceKeys,
+                displayMode = MergedHomeRowDisplayMode.SOURCE_TABS,
+                deduplicate = true,
+                contentType = MergedHomeRowContentType.MOVIES,
+                blendMode = MergedHomeRowBlendMode.INTERLEAVE,
+                sortMode = MergedHomeRowSortMode.POPULARITY,
+                hideIncludedRows = false,
+                hideTitlesWithoutPosters = false,
+            ),
+        )
+
+        HomeCatalogSettingsRepository.clearLocalState()
+        HomeCatalogSettingsRepository.syncCatalogs(listOf(addon(listOf("popular", "latest"))))
+        val restored = HomeCatalogSettingsRepository.snapshot().mergedRows.single { it.id == id }
+        assertEquals("Updated Smart Mix", restored.title)
+        assertEquals(MergedHomeRowContentType.MOVIES, restored.resolvedContentType())
+        assertEquals(MergedHomeRowBlendMode.INTERLEAVE, restored.resolvedBlendMode())
+        assertEquals(MergedHomeRowSortMode.POPULARITY, restored.resolvedSortMode())
+        assertFalse(restored.hideIncludedRows)
+        assertFalse(restored.hideTitlesWithoutPosters)
+    }
+
     private fun addon(
         catalogIds: List<String> = listOf("popular"),
         addonId: String = "test",
