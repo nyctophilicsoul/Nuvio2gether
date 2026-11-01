@@ -117,8 +117,13 @@ actual object CloudStreamRepository {
     actual suspend fun addRepository(rawUrl: String): AddCloudStreamRepositoryResult {
         initialize()
         val expectedProfileGeneration = profileGenerationSnapshot()
-        val manifestUrl = runCatching { resolveCloudStreamRepositoryInput(rawUrl) }
-            .getOrElse { return AddCloudStreamRepositoryResult.Error(it.message ?: "Invalid repository URL") }
+        val manifestUrl = try {
+            resolveCloudStreamRepositoryInput(rawUrl)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            return AddCloudStreamRepositoryResult.Error(error.message ?: "Invalid repository URL")
+        }
         if (!isProfileGenerationCurrent(expectedProfileGeneration)) {
             return AddCloudStreamRepositoryResult.Error("Active profile changed while resolving the repository link")
         }
