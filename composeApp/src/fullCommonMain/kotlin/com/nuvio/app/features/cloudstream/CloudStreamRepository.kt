@@ -852,10 +852,7 @@ actual object CloudStreamRepository {
         _uiState.value.plugins.filter(CloudStreamPluginItem::isRunnable).map { it.metadata.id.value }
 
     private fun resolveCompatibility(metadata: CloudStreamPluginMetadata): CloudStreamCompatibility =
-        CloudStreamCompatibilityResolver.resolve(
-            metadata = metadata,
-            supportsAndroidDex = CloudStreamPlatformRuntime.supportsAndroidDex,
-        )
+        CloudStreamCompatibilityResolver.resolve(metadata)
 
     private suspend fun <T> providerResult(
         providerId: String,
