@@ -101,7 +101,7 @@ object QualityFirstAutoPlayPolicy {
                     p2pEnabled = p2pEnabled,
                 ).asSequence()
             }
-            .distinctBy(::identityKey)
+            .distinctBy(::candidateIdentityKey)
             .toList()
     }
 
