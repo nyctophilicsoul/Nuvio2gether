@@ -2,6 +2,7 @@ package com.nuvio.app.features.cloudstream
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
@@ -119,6 +120,22 @@ class CloudStreamRepositoryParserTest {
 
         assertEquals(1, plugins.size)
         assertEquals(CloudStreamPluginStatus.Slow, plugins.single().status)
+    }
+
+    @Test
+    fun rejectsNonEmptyPluginListsWhenEveryEntryIsMalformed() {
+        assertFailsWith<IllegalArgumentException> {
+            CloudStreamRepositoryParser.parsePluginList(
+                repositoryManifestUrl = "https://example.com/repo.json",
+                pluginListUrl = "https://example.com/plugins.json",
+                payload = """
+                    [
+                      {"name":"Missing identity"},
+                      {"url":"Broken.cs3","internalName":"Broken","fileHash":"md5-deadbeef"}
+                    ]
+                """.trimIndent(),
+            )
+        }
     }
 
     @Test
