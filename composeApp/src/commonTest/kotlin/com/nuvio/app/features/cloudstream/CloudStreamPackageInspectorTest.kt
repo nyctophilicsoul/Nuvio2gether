@@ -89,6 +89,29 @@ class CloudStreamPackageInspectorTest {
     }
 
     @Test
+    fun rejectsCentralEntryWithoutAValidLocalHeader() {
+        val archive = fakeZip("manifest.json", "classes.dex")
+        val endOffset = archive.size - 22
+        val centralOffset = archive.readIntLeForTest(endOffset + 16)
+        archive.writeIntLeForTest(centralOffset + 42, -1)
+
+        assertFailsWith<IllegalArgumentException> {
+            CloudStreamPackageInspector.inspect(archive)
+        }
+    }
+
+    @Test
+    fun rejectsDifferentLocalAndCentralEntryNames() {
+        val archive = fakeZip("manifest.json", "classes.dex")
+        // The first local file name starts after the 30-byte local ZIP header.
+        archive[30] = 'x'.code.toByte()
+
+        assertFailsWith<IllegalArgumentException> {
+            CloudStreamPackageInspector.inspect(archive)
+        }
+    }
+
+    @Test
     fun rejectsPackageWithoutDex() {
         assertFailsWith<IllegalArgumentException> {
             CloudStreamPackageInspector.inspect(fakeZip("manifest.json"))
