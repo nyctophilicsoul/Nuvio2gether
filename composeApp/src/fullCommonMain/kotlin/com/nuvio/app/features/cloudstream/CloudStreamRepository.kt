@@ -68,7 +68,7 @@ actual object CloudStreamRepository {
                 _uiState.value = restoreState(profileId)
             }
         }
-        jobsToCancel.forEach(Job::cancel)
+        jobsToCancel.forEach { it.cancel() }
     }
 
     actual fun onProfileChanged(profileId: Int) {
@@ -202,6 +202,7 @@ actual object CloudStreamRepository {
             }
         }
 
+        var shouldStart = false
         val registered = commitForProfile(expectedProfileGeneration) {
             val existingJob = refreshJobs[normalizedUrl]
             if (existingJob == null || existingJob.isCompleted) {
@@ -216,14 +217,11 @@ actual object CloudStreamRepository {
                             },
                         )
                     }
+                    shouldStart = true
                 }
             }
         }
-        if (registered && commitForProfile(expectedProfileGeneration) {
-                refreshJobs[normalizedUrl] === job
-            }) {
-            job.start()
-        }
+        if (registered && shouldStart) job.start()
     }
 
     actual fun refreshAll() {
