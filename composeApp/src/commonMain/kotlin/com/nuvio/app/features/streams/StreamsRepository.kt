@@ -41,6 +41,8 @@ object StreamsRepository {
 
     private var activeJob: Job? = null
     private var activeRequestKey: String? = null
+    private var qualityAutoPlayRequestToken: String? = null
+    private val qualityAutoPlayAttemptedKeys = mutableSetOf<String>()
 
     fun requestToken(
         type: String,
@@ -109,6 +111,8 @@ object StreamsRepository {
 
         activeRequestKey = requestKey
         activeJob?.cancel()
+        qualityAutoPlayRequestToken = null
+        qualityAutoPlayAttemptedKeys.clear()
         _uiState.value = StreamsUiState(requestToken = requestToken)
 
         PlayerSettingsRepository.ensureLoaded()
@@ -797,10 +801,48 @@ object StreamsRepository {
                 )
             }
         }
+        if (started) {
+            qualityAutoPlayRequestToken = expectedRequestToken
+            qualityAutoPlayAttemptedKeys.clear()
+        }
         return started
     }
 
+    /**
+     * Updates the active quality-first fallback queue when slower providers finish
+     * after playback has already started. The current candidate is never displaced,
+     * and streams already failed in this request are never reinserted.
+     */
+    fun refreshQualityFirstAutoPlayCandidates(
+        expectedRequestToken: String,
+        discoveredCandidates: List<StreamItem>,
+    ) {
+        if (qualityAutoPlayRequestToken != expectedRequestToken) return
+        _uiState.update { current ->
+            if (current.requestToken != expectedRequestToken) {
+                current
+            } else {
+                val refreshed = QualityFirstAutoPlayPolicy.refreshedFallbackCandidates(
+                    current = current.autoPlayStream,
+                    discovered = discoveredCandidates,
+                    attemptedKeys = qualityAutoPlayAttemptedKeys,
+                )
+                val nextStream = refreshed.firstOrNull()
+                current.copy(
+                    autoPlayDecided = true,
+                    autoPlayStream = nextStream,
+                    autoPlayCandidates = refreshed,
+                    isDirectAutoPlayFlow = nextStream != null,
+                    showDirectAutoPlayOverlay = nextStream != null,
+                    overlayMessage = null,
+                )
+            }
+        }
+    }
+
     fun consumeAutoPlay() {
+        qualityAutoPlayRequestToken = null
+        qualityAutoPlayAttemptedKeys.clear()
         activeRequestKey = null
         _uiState.update {
             it.copy(
@@ -813,6 +855,10 @@ object StreamsRepository {
     }
 
     fun skipAutoPlayStream(stream: StreamItem): Boolean {
+        val currentRequestToken = _uiState.value.requestToken
+        if (qualityAutoPlayRequestToken == currentRequestToken) {
+            qualityAutoPlayAttemptedKeys += QualityFirstAutoPlayPolicy.candidateIdentityKey(stream)
+        }
         var hasNext = false
         _uiState.update { current ->
             val failedIndex = current.autoPlayCandidates.indexOf(stream)
@@ -834,6 +880,8 @@ object StreamsRepository {
     }
 
     fun cancelLoading() {
+        qualityAutoPlayRequestToken = null
+        qualityAutoPlayAttemptedKeys.clear()
         PluginRepository.setLocalPluginSearchPaused(true)
         activeJob?.cancel()
         activeJob = null
@@ -858,6 +906,8 @@ object StreamsRepository {
     }
 
     fun clear() {
+        qualityAutoPlayRequestToken = null
+        qualityAutoPlayAttemptedKeys.clear()
         PluginRepository.setLocalPluginSearchPaused(true)
         activeJob?.cancel()
         activeJob = null
