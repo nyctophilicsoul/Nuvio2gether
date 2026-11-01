@@ -220,7 +220,7 @@ private fun smartFreshnessPopularityMerge(
     }
     if (candidates.isEmpty()) return emptyList()
 
-    val freshness = percentileScores(candidates.map { it.item.releaseDateKey() }, descending = true)
+    val freshness = percentileStringScores(candidates.map { it.item.releaseDateKey() }, descending = true)
     val popularity = percentileScores(candidates.map { it.item.popularity }, descending = true)
     val ratings = percentileScores(candidates.map { it.item.ratingValue() }, descending = true)
 
@@ -277,7 +277,7 @@ private fun percentileScores(values: List<Double?>, descending: Boolean): List<D
     return scores
 }
 
-private fun percentileScores(values: List<String?>, descending: Boolean): List<Double> {
+private fun percentileStringScores(values: List<String?>, descending: Boolean): List<Double> {
     val known = values.mapIndexedNotNull { index, value -> value?.let { index to it } }
     if (known.isEmpty()) return List(values.size) { 0.5 }
     if (known.size == 1) {
@@ -304,7 +304,7 @@ private fun MetaPreview.releaseDateKey(): String? {
 }
 
 private fun MetaPreview.ratingValue(): Double? =
-    imdbRating?.trim()?.toDoubleOrNull()?.takeIf { it in 0.0..10.0 }
+    imdbRating?.trim()?.substringBefore('/')?.toDoubleOrNull()?.takeIf { it in 0.0..10.0 }
 
 private fun sortMergedItems(
     items: List<MetaPreview>,
