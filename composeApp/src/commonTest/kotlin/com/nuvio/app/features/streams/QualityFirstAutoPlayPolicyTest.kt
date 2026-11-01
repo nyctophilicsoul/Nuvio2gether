@@ -232,6 +232,64 @@ class QualityFirstAutoPlayPolicyTest {
         assertEquals(listOf("late"), refreshed.map { it.addonName })
     }
 
+    @Test
+    fun `external and YouTube streams keep distinct fallback identities`() {
+        val externalA = StreamItem(
+            name = "Open externally",
+            externalUrl = "https://external.example/a",
+            addonName = "provider",
+            addonId = "addon:provider",
+        )
+        val externalB = externalA.copy(externalUrl = "https://external.example/b")
+        val youtubeA = StreamItem(
+            name = "YouTube",
+            ytId = "video-a",
+            addonName = "provider",
+            addonId = "addon:provider",
+        )
+        val youtubeB = youtubeA.copy(ytId = "video-b")
+
+        assertEquals(
+            listOf("https://external.example/a", "https://external.example/b"),
+            QualityFirstAutoPlayPolicy.rankCandidates(
+                listOf(externalA, externalB),
+                StreamAutoPlayPreferredQuality.ANY,
+                debridEnabled = true,
+            ).map { it.externalOpenUrl },
+        )
+        assertEquals(
+            listOf("video-a", "video-b"),
+            QualityFirstAutoPlayPolicy.rankCandidates(
+                listOf(youtubeA, youtubeB),
+                StreamAutoPlayPreferredQuality.ANY,
+                debridEnabled = true,
+            ).map { it.youTubeIdToResolve },
+        )
+    }
+
+    @Test
+    fun `debrid streams with different media ids are not deduplicated`() {
+        fun debrid(mediaId: String) = StreamItem(
+            name = "Cached source",
+            addonName = "provider",
+            addonId = "addon:provider",
+            clientResolve = StreamClientResolve(
+                type = "debrid",
+                service = "realdebrid",
+                mediaId = mediaId,
+                isCached = true,
+            ),
+        )
+
+        val ranked = QualityFirstAutoPlayPolicy.rankCandidates(
+            listOf(debrid("media-a"), debrid("media-b")),
+            StreamAutoPlayPreferredQuality.ANY,
+            debridEnabled = true,
+        )
+
+        assertEquals(listOf("media-a", "media-b"), ranked.map { it.clientResolve?.mediaId })
+    }
+
     private fun stream(addon: String, url: String?, name: String) = StreamItem(
         name = name,
         url = url,
