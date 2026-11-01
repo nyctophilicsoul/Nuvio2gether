@@ -83,7 +83,7 @@ actual object CloudStreamRepository {
                 _uiState.value = CloudStreamUiState()
             }
         }
-        jobsToCancel.forEach(Job::cancel)
+        jobsToCancel.forEach { it.cancel() }
     }
 
     actual fun clearLocalState() {
@@ -166,34 +166,43 @@ actual object CloudStreamRepository {
                     fetchRepository(normalizedUrl)
                 } catch (error: CancellationException) {
                     commitForProfile(expectedProfileGeneration) {
-                        _uiState.update { current ->
-                            current.copy(
-                                repositories = current.repositories.map { item ->
-                                    if (item.manifest.sourceUrl == normalizedUrl) item.copy(isRefreshing = false) else item
-                                },
-                            )
+                        if (refreshJobs[normalizedUrl] === job) {
+                            _uiState.update { current ->
+                                current.copy(
+                                    repositories = current.repositories.map { item ->
+                                        if (item.manifest.sourceUrl == normalizedUrl) item.copy(isRefreshing = false) else item
+                                    },
+                                )
+                            }
                         }
                     }
                     throw error
                 } catch (error: Throwable) {
                     log.w(error) { "CloudStream repository refresh failed url=$normalizedUrl" }
                     commitForProfile(expectedProfileGeneration) {
-                        _uiState.update { current ->
-                            current.copy(
-                                repositories = current.repositories.map { item ->
-                                    if (item.manifest.sourceUrl == normalizedUrl) {
-                                        item.copy(isRefreshing = false, errorMessage = error.message ?: "Refresh failed")
-                                    } else item
-                                },
-                            )
+                        if (refreshJobs[normalizedUrl] === job) {
+                            _uiState.update { current ->
+                                current.copy(
+                                    repositories = current.repositories.map { item ->
+                                        if (item.manifest.sourceUrl == normalizedUrl) {
+                                            item.copy(isRefreshing = false, errorMessage = error.message ?: "Refresh failed")
+                                        } else item
+                                    },
+                                )
+                            }
                         }
                     }
                     return@launch
                 }
 
                 commitForProfile(expectedProfileGeneration) {
-                    applyRepositoryRefresh(refreshed.first, refreshed.second)
-                    persist()
+                    if (
+                        refreshJobs[normalizedUrl] === job &&
+                        _uiState.value.repositories.any { it.manifest.sourceUrl == normalizedUrl }
+                    ) {
+                        applyRepositoryRefresh(refreshed.first, refreshed.second)
+                        persist()
+                    }
                 }
             } finally {
                 commitForProfile(expectedProfileGeneration) {
@@ -232,22 +241,28 @@ actual object CloudStreamRepository {
     actual fun removeRepository(manifestUrl: String) {
         initialize()
         val normalizedUrl = runCatching { normalizeCloudStreamRepositoryUrl(manifestUrl) }.getOrNull() ?: return
-        // Stop an in-flight refresh before removing its repository. Otherwise its completion
-        // can repopulate plugin entries after the repository has already been removed.
-        refreshJobs.remove(normalizedUrl)?.cancel()
-        val removedPlugins = _uiState.value.plugins.filter { it.metadata.repositoryManifestUrl == normalizedUrl }
-        removedPlugins.forEach {
-            CloudStreamPlatformRuntime.unload(it.metadata.id.value)
-            CloudStreamPlatformStorage.deletePackage(it.metadata.id.storageKey)
+        val expectedProfileGeneration = profileGenerationSnapshot()
+        var refreshJobToCancel: Job? = null
+        commitForProfile(expectedProfileGeneration) {
+            // Removing the registration before cancellation makes any late completion
+            // from this job fail the identity check in its success/error handlers.
+            refreshJobToCancel = refreshJobs.remove(normalizedUrl)
+            val removedPlugins = _uiState.value.plugins
+                .filter { it.metadata.repositoryManifestUrl == normalizedUrl }
+            removedPlugins.forEach {
+                CloudStreamPlatformRuntime.unload(it.metadata.id.value)
+                CloudStreamPlatformStorage.deletePackage(it.metadata.id.storageKey)
+            }
+            _uiState.update { current ->
+                current.copy(
+                    repositories = current.repositories.filterNot { it.manifest.sourceUrl == normalizedUrl },
+                    plugins = current.plugins.filterNot { it.metadata.repositoryManifestUrl == normalizedUrl },
+                    registryRevision = current.registryRevision + 1,
+                )
+            }
+            persist()
         }
-        _uiState.update { current ->
-            current.copy(
-                repositories = current.repositories.filterNot { it.manifest.sourceUrl == normalizedUrl },
-                plugins = current.plugins.filterNot { it.metadata.repositoryManifestUrl == normalizedUrl },
-                registryRevision = current.registryRevision + 1,
-            )
-        }
-        persist()
+        refreshJobToCancel?.cancel()
     }
 
     actual suspend fun installPlugin(pluginId: String): CloudStreamInstallResult = installOrUpdate(pluginId)
