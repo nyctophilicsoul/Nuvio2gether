@@ -217,11 +217,9 @@ private fun smartFreshnessPopularityMerge(
     val candidates = mutableListOf<SmartCandidate>()
     if (deduplicate) {
         val grouped = linkedMapOf<String, MutableList<Pair<Int, MetaPreview>>>()
-        var originalOrder = 0
         sourceItems.forEachIndexed { sourceIndex, items ->
             items.forEach { item ->
                 grouped.getOrPut(item.stableKey()) { mutableListOf() } += sourceIndex to item
-                originalOrder++
             }
         }
         var groupOrder = 0
