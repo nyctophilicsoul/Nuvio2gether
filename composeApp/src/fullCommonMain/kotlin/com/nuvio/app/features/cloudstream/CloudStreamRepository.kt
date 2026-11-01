@@ -493,6 +493,14 @@ actual object CloudStreamRepository {
         if (!item.compatibility.isRunnable) {
             return CloudStreamInstallResult.Error(item.compatibility.reason)
         }
+        // Never replace a locally verified package with an unverified update. The
+        // installed artifact may remain usable while the repository's new version
+        // is missing its checksum, but overwriting it would discard that guarantee.
+        if (item.isInstalled && item.verified && item.metadata.fileHash == null) {
+            return CloudStreamInstallResult.Error(
+                "This repository does not provide a SHA-256 hash. The previously verified package was preserved; this update cannot be installed safely.",
+            )
+        }
         var installationStarted = false
         val startCommitted = commitForProfile(expectedProfileGeneration) {
             val latest = _uiState.value.plugins.firstOrNull { it.metadata.id.value == pluginId }
