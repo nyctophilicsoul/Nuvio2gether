@@ -138,88 +138,148 @@ actual object PluginRepository {
     actual suspend fun pullFromServer(profileId: Int) {
         val effectiveProfileId = resolveEffectiveProfileId(profileId)
         ensureStateLoadedForProfile(effectiveProfileId)
-        runCatching {
+        val expectedProfile = synchronized(profileLock) {
+            currentProfileId to persistenceGeneration.value
+        }
+
+        try {
             val rows = SupabaseProvider.client.postgrest
                 .from("plugins")
                 .select {
-                    filter { eq("profile_id", currentProfileId) }
+                    filter { eq("profile_id", expectedProfile.first) }
                     order("sort_order", Order.ASCENDING)
                 }
                 .decodeList<PluginRow>()
 
             val urls = dedupeManifestUrls(rows.map { it.url })
-            val existingState = _uiState.value
-            val existingReposByUrl = existingState.repositories.associateBy { it.manifestUrl }
-            val nowEpochMs = currentEpochMillis()
-            val nextRepos = urls.map { url ->
-                val existing = existingReposByUrl[url]
-                if (existing == null) {
-                    PluginRepositoryItem(
-                        manifestUrl = url,
-                        name = url.substringBefore("?").substringAfterLast('/'),
-                        isRefreshing = true,
-                    )
+            var repositoriesToRefresh: List<PluginRepositoryItem> = emptyList()
+            var persistenceSnapshot: PluginPersistenceSnapshot? = null
+            val applied = synchronized(profileLock) {
+                if (
+                    currentProfileId != expectedProfile.first ||
+                    persistenceGeneration.value != expectedProfile.second
+                ) {
+                    false
                 } else {
-                    val shouldRefresh = shouldRefreshRepository(
-                        repository = existing,
-                        scrapers = existingState.scrapers,
-                        nowEpochMs = nowEpochMs,
+                    val existingState = _uiState.value
+                    val existingReposByUrl = existingState.repositories.associateBy { it.manifestUrl }
+                    val nowEpochMs = currentEpochMillis()
+                    val nextRepos = urls.map { url ->
+                        val existing = existingReposByUrl[url]
+                        if (existing == null) {
+                            PluginRepositoryItem(
+                                manifestUrl = url,
+                                name = url.substringBefore("?").substringAfterLast('/'),
+                                isRefreshing = true,
+                            )
+                        } else {
+                            val shouldRefresh = shouldRefreshRepository(
+                                repository = existing,
+                                scrapers = existingState.scrapers,
+                                nowEpochMs = nowEpochMs,
+                            )
+                            existing.copy(
+                                isRefreshing = shouldRefresh,
+                                errorMessage = if (shouldRefresh) null else existing.errorMessage,
+                            )
+                        }
+                    }
+                    val nextScrapers = existingState.scrapers.filter { scraper ->
+                        urls.contains(scraper.repositoryUrl)
+                    }
+
+                    _uiState.value = PluginsUiState(
+                        pluginsEnabled = existingState.pluginsEnabled,
+                        groupStreamsByRepository = existingState.groupStreamsByRepository,
+                        repositories = nextRepos,
+                        scrapers = nextScrapers,
                     )
-                    existing.copy(
-                        isRefreshing = shouldRefresh,
-                        errorMessage = if (shouldRefresh) null else existing.errorMessage,
-                    )
+                    repositoriesToRefresh = nextRepos.filter(PluginRepositoryItem::isRefreshing)
+                    persistenceSnapshot = persistenceSnapshotLocked()
+                    true
                 }
             }
-            val nextScrapers = existingState.scrapers.filter { scraper ->
-                urls.contains(scraper.repositoryUrl)
+            if (!applied) return
+            persistenceSnapshot?.let(::persist)
+
+            repositoriesToRefresh.forEach { repository ->
+                refreshRepositoryInternal(
+                    manifestUrl = repository.manifestUrl,
+                    pushAfterRefresh = false,
+                    ensureInitialized = false,
+                    expectedProfileId = expectedProfile.first,
+                    expectedGeneration = expectedProfile.second,
+                )
             }
-
-            _uiState.value = PluginsUiState(
-                pluginsEnabled = _uiState.value.pluginsEnabled,
-                groupStreamsByRepository = _uiState.value.groupStreamsByRepository,
-                repositories = nextRepos,
-                scrapers = nextScrapers,
-            )
-            persist()
-
-            nextRepos.filter(PluginRepositoryItem::isRefreshing).forEach { repository ->
-                refreshRepository(repository.manifestUrl, pushAfterRefresh = false)
-            }
-
-            initialized = true
-        }.onFailure { error ->
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
             log.e(error) { "pullFromServer failed" }
         }
     }
 
     actual suspend fun addRepository(rawUrl: String): AddPluginRepositoryResult {
         initialize()
+        val expectedProfile = synchronized(profileLock) {
+            currentProfileId to persistenceGeneration.value
+        }
         val manifestUrl = try {
             normalizeManifestUrl(rawUrl)
         } catch (error: IllegalArgumentException) {
             return AddPluginRepositoryResult.Error(error.message ?: getString(Res.string.plugins_error_enter_valid_url))
         }
 
-        if (_uiState.value.repositories.any { it.manifestUrl == manifestUrl }) {
-            return AddPluginRepositoryResult.Error(getString(Res.string.plugins_repository_already_installed))
-        }
+        val previousById = synchronized(profileLock) {
+            if (
+                currentProfileId != expectedProfile.first ||
+                persistenceGeneration.value != expectedProfile.second
+            ) {
+                null
+            } else {
+                _uiState.value.scrapers.associateBy { it.id }
+            }
+        } ?: return AddPluginRepositoryResult.Error("Active profile changed while adding the repository")
 
         return try {
-            val previousById = _uiState.value.scrapers.associateBy { it.id }
             val (repo, scrapers) = fetchRepositoryData(
                 manifestUrl = manifestUrl,
                 previousScrapers = previousById,
             )
-            _uiState.update { state ->
-                state.copy(
-                    repositories = state.repositories + repo,
-                    scrapers = state.scrapers.filterNot { it.repositoryUrl == manifestUrl } + scrapers,
-                )
+            var duplicate = false
+            var persistenceSnapshot: PluginPersistenceSnapshot? = null
+            var serverPushSnapshot: Pair<Int, List<PluginPushItem>>? = null
+            val applied = synchronized(profileLock) {
+                if (
+                    currentProfileId != expectedProfile.first ||
+                    persistenceGeneration.value != expectedProfile.second
+                ) {
+                    false
+                } else {
+                    duplicate = _uiState.value.repositories.any { it.manifestUrl == manifestUrl }
+                    if (!duplicate) {
+                        _uiState.update { state ->
+                            state.copy(
+                                repositories = state.repositories + repo,
+                                scrapers = state.scrapers.filterNot { it.repositoryUrl == manifestUrl } + scrapers,
+                            )
+                        }
+                        persistenceSnapshot = persistenceSnapshotLocked()
+                        serverPushSnapshot = serverPushSnapshotLocked()
+                    }
+                    true
+                }
             }
-            persist()
-            pushToServer()
-            AddPluginRepositoryResult.Success(repo)
+            when {
+                !applied -> AddPluginRepositoryResult.Error("Active profile changed before the repository could be added")
+                duplicate -> AddPluginRepositoryResult.Error(getString(Res.string.plugins_repository_already_installed))
+                else -> {
+                    persistenceSnapshot?.let(::persist)
+                    serverPushSnapshot?.let(::pushToServer)
+                    AddPluginRepositoryResult.Success(repo)
+                }
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (error: Throwable) {
             AddPluginRepositoryResult.Error(error.message ?: getString(Res.string.plugins_repository_install_failed))
         }
@@ -252,16 +312,25 @@ actual object PluginRepository {
         manifestUrl: String,
         pushAfterRefresh: Boolean,
         ensureInitialized: Boolean,
+        expectedProfileId: Int? = null,
+        expectedGeneration: Long? = null,
     ) {
         if (ensureInitialized) initialize()
 
         val snapshot = synchronized(profileLock) {
-            PluginRefreshSnapshot(
-                profileId = currentProfileId,
-                generation = persistenceGeneration.value,
-                previousScrapers = _uiState.value.scrapers.associateBy { it.id },
-            )
-        }
+            if (
+                expectedProfileId != null &&
+                (currentProfileId != expectedProfileId || persistenceGeneration.value != expectedGeneration)
+            ) {
+                null
+            } else {
+                PluginRefreshSnapshot(
+                    profileId = currentProfileId,
+                    generation = persistenceGeneration.value,
+                    previousScrapers = _uiState.value.scrapers.associateBy { it.id },
+                )
+            }
+        } ?: return
         var jobToStart: Job? = null
 
         synchronized(activeRefreshJobsLock) {
