@@ -258,6 +258,7 @@ actual object CloudStreamRepository {
 
     actual suspend fun installAndEnablePlugins(pluginIds: List<String>): CloudStreamBulkInstallResult {
         initialize()
+        val expectedProfileGeneration = profileGenerationSnapshot()
         val requestedIds = pluginIds.distinct()
         if (requestedIds.isEmpty()) {
             return CloudStreamBulkInstallResult(
@@ -288,6 +289,13 @@ actual object CloudStreamRepository {
         val failures = mutableListOf<CloudStreamBulkInstallFailure>()
 
         requestedIds.forEach { pluginId ->
+            if (profileGenerationSnapshot() != expectedProfileGeneration) {
+                failures += CloudStreamBulkInstallFailure(
+                    pluginName = pluginId,
+                    message = "Active profile changed; remaining plugins were not installed",
+                )
+                return@forEach
+            }
             val before = _uiState.value.plugins.firstOrNull { it.metadata.id.value == pluginId }
             if (before == null) {
                 failures += CloudStreamBulkInstallFailure(pluginName = pluginId, message = "CloudStream plugin was not found")
@@ -313,11 +321,20 @@ actual object CloudStreamRepository {
             }
 
             val needsInstall = !before.isInstalled || before.hasUpdate || !before.verified
-            val installResult = if (needsInstall) installOrUpdate(pluginId) else CloudStreamInstallResult.Success(before)
+            val installResult = if (needsInstall) installOrUpdate(pluginId, expectedProfileGeneration) else CloudStreamInstallResult.Success(before)
             when (installResult) {
                 is CloudStreamInstallResult.Success -> {
                     if (needsInstall) installedCount += 1
-                    setPluginEnabled(pluginId, true)
+                    val enabledInRequestedProfile = commitForProfile(expectedProfileGeneration) {
+                        setPluginEnabledForCurrentProfile(pluginId, true)
+                    }
+                    if (!enabledInRequestedProfile) {
+                        failures += CloudStreamBulkInstallFailure(
+                            pluginName = installResult.plugin.metadata.name,
+                            message = "Active profile changed before the plugin could be enabled",
+                        )
+                        return@forEach
+                    }
                     val after = _uiState.value.plugins.firstOrNull { it.metadata.id.value == pluginId }
                     if (after?.isRunnable == true) {
                         enabledCount += 1
@@ -348,6 +365,12 @@ actual object CloudStreamRepository {
 
     actual fun setPluginEnabled(pluginId: String, enabled: Boolean) {
         initialize()
+        synchronized(profileLock) {
+            setPluginEnabledForCurrentProfile(pluginId, enabled)
+        }
+    }
+
+    private fun setPluginEnabledForCurrentProfile(pluginId: String, enabled: Boolean) {
         _uiState.update { current ->
             var changed = false
             val plugins = current.plugins.map { item ->
@@ -423,9 +446,15 @@ actual object CloudStreamRepository {
     actual suspend fun loadLinks(providerId: String, data: String): Result<List<CloudStreamPlaybackSource>> =
         providerResult(providerId) { loadLinks(data) }
 
-    private suspend fun installOrUpdate(pluginId: String): CloudStreamInstallResult {
+    private suspend fun installOrUpdate(
+        pluginId: String,
+        expectedGeneration: Long? = null,
+    ): CloudStreamInstallResult {
         initialize()
-        val expectedProfileGeneration = profileGenerationSnapshot()
+        val expectedProfileGeneration = expectedGeneration ?: profileGenerationSnapshot()
+        if (!commitForProfile(expectedProfileGeneration) {}) {
+            return CloudStreamInstallResult.Error("Active profile changed before installation started")
+        }
         if (!_uiState.value.securityWarningAccepted) {
             return CloudStreamInstallResult.Error("Accept the third-party plugin security warning before installation")
         }
