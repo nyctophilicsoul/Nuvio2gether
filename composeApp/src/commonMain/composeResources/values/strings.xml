@@ -2656,4 +2656,5 @@
     <string name="settings_merged_rows_blend_interleave_description">Rotate evenly between providers, taking one available title from each in turn.</string>
     <string name="settings_merged_rows_blend_smart_description">Prioritise newer and popular titles, use ratings as a secondary signal, and balance provider contribution.</string>
     <string name="settings_merged_rows_sort_description">Sorting is applied after blending. Off preserves the blended order.</string>
+    <string name="settings_merged_rows_mode_type_tabs_description">Show one combined All tab and separate Movies and Series tabs across every catalog in this merged row.</string>
 </resources>
