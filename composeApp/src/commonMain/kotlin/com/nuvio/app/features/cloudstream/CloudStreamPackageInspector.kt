@@ -103,7 +103,7 @@ object CloudStreamPackageInspector {
             // or an appended payload look like a second valid end record.
             if (offset.toLong() + 22L + commentLength == bytes.size.toLong()) return offset
         }
-        error("Invalid .cs3 ZIP end record")
+        throw IllegalArgumentException("Invalid .cs3 ZIP end record")
     }
 
     private fun validateEntryName(name: String) {
