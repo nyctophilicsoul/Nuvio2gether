@@ -53,7 +53,8 @@ data class ResolvedMergedHomeRow(
 
 enum class MergedHomeRowDisplayMode(val storageValue: String) {
     UNIFIED_CAROUSEL("unified_carousel"),
-    SOURCE_TABS("source_tabs");
+    SOURCE_TABS("source_tabs"),
+    TYPE_TABS("type_tabs");
 
     companion object {
         fun fromStorage(value: String?): MergedHomeRowDisplayMode =
