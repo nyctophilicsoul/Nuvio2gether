@@ -288,7 +288,7 @@ val downloadCloudStreamRuntime = tasks.register("downloadCloudStreamRuntime") {
         val expectedSha256 = "b67a4384bea1f4072123b86c5f164471422d9c6c12845d5067f12db44674d427"
         val url = "https://raw.githubusercontent.com/yesnt10/NuvioMobile-Enhanced/894499115fb1a69cd4bb34d6969a74832f0e5636/composeApp/libs/cloudstream-runtime-api-4.8.0-3496e5f.aar"
         if (!destination.isFile || java.security.MessageDigest.getInstance("SHA-256")
-                .digest(destination.readBytes()).joinToString("") { "%02x".format(it) } != expectedSha256
+                .digest(destination.readBytes()).joinToString("") { "%02x".format(it.toInt() and 0xff) } != expectedSha256
         ) {
             destination.parentFile.mkdirs()
             val temporary = destination.resolveSibling(destination.name + ".download")
@@ -297,7 +297,7 @@ val downloadCloudStreamRuntime = tasks.register("downloadCloudStreamRuntime") {
                     temporary.outputStream().use { output -> input.copyTo(output) }
                 }
                 val actualSha256 = java.security.MessageDigest.getInstance("SHA-256")
-                    .digest(temporary.readBytes()).joinToString("") { "%02x".format(it) }
+                    .digest(temporary.readBytes()).joinToString("") { "%02x".format(it.toInt() and 0xff) }
                 check(actualSha256 == expectedSha256) {
                     "CloudStream runtime AAR SHA-256 mismatch: $actualSha256"
                 }
