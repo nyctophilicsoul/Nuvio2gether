@@ -48,6 +48,7 @@ object CloudStreamPackageInspector {
         }
 
         val entries = ArrayList<CloudStreamPackageEntry>(entryCount)
+        val entryNames = mutableSetOf<String>()
         var cursor = centralDirectoryOffset.toInt()
         var totalUncompressed = 0L
         repeat(entryCount) {
@@ -57,6 +58,8 @@ object CloudStreamPackageInspector {
             require(bytes.readInt32Le(cursor) == centralDirectorySignature) { "Invalid .cs3 central directory entry" }
             val compressedSize = bytes.readUInt32Le(cursor + 20)
             val uncompressedSize = bytes.readUInt32Le(cursor + 24)
+            val diskNumberStart = bytes.readUInt16Le(cursor + 34)
+            require(diskNumberStart == 0) { "Multi-disk .cs3 entries are not supported" }
             val nameLength = bytes.readUInt16Le(cursor + 28)
             val extraLength = bytes.readUInt16Le(cursor + 30)
             val commentLength = bytes.readUInt16Le(cursor + 32)
@@ -73,6 +76,7 @@ object CloudStreamPackageInspector {
             val nameEnd = nameEndLong.toInt()
             val name = bytes.copyOfRange(nameStart, nameEnd).decodeToString()
             validateEntryName(name)
+            require(entryNames.add(name)) { ".cs3 archive contains duplicate entry paths" }
             totalUncompressed += uncompressedSize
             require(totalUncompressed <= maxTotalUncompressedBytes) { ".cs3 archive is too large when extracted" }
             entries += CloudStreamPackageEntry(
@@ -94,7 +98,10 @@ object CloudStreamPackageInspector {
         for (offset in bytes.size - 22 downTo minimum) {
             if (bytes.readInt32Le(offset) != endOfCentralDirectorySignature) continue
             val commentLength = bytes.readUInt16Le(offset + 20)
-            if (offset.toLong() + 22L + commentLength <= bytes.size.toLong()) return offset
+            // A ZIP end record (including its optional comment) must terminate the
+            // archive. Allowing trailing bytes can make a signature inside a comment
+            // or an appended payload look like a second valid end record.
+            if (offset.toLong() + 22L + commentLength == bytes.size.toLong()) return offset
         }
         error("Invalid .cs3 ZIP end record")
     }
