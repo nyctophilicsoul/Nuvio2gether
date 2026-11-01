@@ -196,13 +196,13 @@ internal fun CloudStreamSettingsSection() {
                                     editingRepositoryUrl = null
                                     message = copy.repositoryAdded(result.repository.name)
                                 }
-                                is AddCloudStreamRepositoryResult.Error -> message = result.message
+                                is AddCloudStreamRepositoryResult.Error -> message = result.message.localizedCloudStreamFailure(copy)
                             }
                         }
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (error: Exception) {
-                        message = error.message ?: copy.repositoryAddFailed
+                        message = (error.message ?: copy.repositoryAddFailed).localizedCloudStreamFailure(copy)
                     } finally {
                         isAddingRepository = false
                     }
@@ -233,7 +233,7 @@ internal fun CloudStreamSettingsSection() {
                             overflow = TextOverflow.Ellipsis,
                         )
                         repository.errorMessage?.let {
-                            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                            Text(it.localizedCloudStreamFailure(copy), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                         }
                     }
                     IconButton(
@@ -308,7 +308,7 @@ internal fun CloudStreamSettingsSection() {
                         } catch (cancelled: CancellationException) {
                             throw cancelled
                         } catch (error: Exception) {
-                            bulkInstallMessage = error.message ?: copy.bulkInstallFailed
+                            bulkInstallMessage = (error.message ?: copy.bulkInstallFailed).localizedCloudStreamFailure(copy)
                         } finally {
                             isBulkInstalling = false
                         }
@@ -434,7 +434,7 @@ private fun CloudStreamPluginCard(
         )
         plugin.errorMessage?.let {
             Spacer(Modifier.height(6.dp))
-            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            Text(it.localizedCloudStreamFailure(copy), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
         Spacer(Modifier.height(12.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -507,9 +507,9 @@ private class CloudStreamSettingsCopy private constructor(
         if (turkish) "Üçüncü taraf kod güvenlik uyarısı" else "Third-party code security warning"
     val securityWarningBody: String =
         if (turkish) {
-            "Repository ve eklentiler Nuvio tarafından yönetilmez. Yalnızca güvendiğiniz kaynakları ekleyin. Paket denetlenmeden provider etkinleştirilemez."
+            "Repository ve eklentiler Nuvio tarafından yönetilmez. Yalnızca güvendiğiniz kaynakları ekleyin. Provider yalnızca paket SHA-256 ile doğrulandığında ve incelenmiş bir Nuvio adaptörü bulunduğunda etkinleştirilebilir. İndirilen DEX kodu çalıştırılmaz."
         } else {
-            "Repositories and plugins are not managed by Nuvio. Only add sources you trust. A provider cannot be enabled until its package is checked."
+            "Repositories and plugins are not managed by Nuvio. Add only sources you trust. A provider can be enabled only when its package is SHA-256 verified and a reviewed Nuvio adapter is available. Downloaded DEX code is never executed."
         }
     val acceptSecurityWarning: String =
         if (turkish) "Uyarıyı okudum ve kabul ediyorum" else "I have read and accept the warning"
@@ -574,7 +574,11 @@ private class CloudStreamSettingsCopy private constructor(
     val downloadAgainPackage: String =
         if (turkish) "Paketi yeniden indir" else "Download again"
     val noCompatibleProviders: String =
-        if (turkish) "Bu filtrede çalıştırılabilir yerleşik provider bulunamadı." else "No runnable built-in providers are available for this filter."
+        if (turkish) {
+            "Bu filtrede etkinleştirilebilecek başka uyumlu provider yok. Desteklenmeyen paketler yine de ayrı ayrı indirilebilir."
+        } else {
+            "No additional compatible providers can be enabled for this filter. Unsupported packages can still be downloaded individually."
+        }
     val update: String =
         if (turkish) "Güncelle" else "Update"
     val reinstall: String =
@@ -605,6 +609,20 @@ private class CloudStreamSettingsCopy private constructor(
         } else {
             "The update has no repository-supplied SHA-256 hash. The previously verified package was preserved."
         }
+    val repositoryAlreadyAddedFailure: String =
+        if (turkish) "Bu CloudStream repository zaten eklenmiş." else "This CloudStream repository has already been added."
+    val profileChangedFailure: String =
+        if (turkish) "İşlem sırasında aktif profil değişti. Lütfen işlemi yeniden başlatın." else "The active profile changed during the operation. Please try again."
+    val packageHashMismatchFailure: String =
+        if (turkish) "İndirilen CS3 paketinin SHA-256 özeti repository ile eşleşmiyor. Paket yüklenmedi." else "The downloaded CS3 package SHA-256 does not match the repository. The package was not installed."
+    val invalidPackageFailure: String =
+        if (turkish) "CS3 paketi geçersiz veya desteklenmeyen bir ZIP yapısına sahip. Paket yüklenmedi." else "The CS3 package is invalid or uses an unsupported ZIP structure. It was not installed."
+    val packageTooLargeFailure: String =
+        if (turkish) "CS3 paketi izin verilen 50 MB sınırını aşıyor." else "The CS3 package exceeds the 50 MB size limit."
+    val packageHttpFailure: String =
+        if (turkish) "CS3 paketi indirilemedi. Repository sunucusu HTTP hatası döndürdü." else "The CS3 package could not be downloaded. The repository server returned an HTTP error."
+    val genericFailure: String =
+        if (turkish) "İşlem tamamlanamadı. Lütfen repository bağlantısını ve ağ erişimini kontrol edip yeniden deneyin." else "The operation could not be completed. Check the repository URL and network connection, then try again."
 
     fun repositoryCount(count: Int): String =
         if (turkish) "$count repository" else "$count repositories"
@@ -721,22 +739,42 @@ private class CloudStreamSettingsCopy private constructor(
     }
 }
 
-private fun String.localizedCloudStreamFailure(copy: CloudStreamSettingsCopy): String =
-    when (this) {
-        "Accept the third-party plugin security warning before installation",
-        "Accept the third-party plugin security warning.",
-        "Üçüncü taraf eklenti güvenlik uyarısını kabul edin." -> copy.acceptSecurityWarningFailure
-        "CloudStream plugin was not found",
-        "Plugin was not found.",
-        "Eklenti bulunamadı." -> copy.pluginNotFoundFailure
-        "This CloudStream plugin is marked as down",
-        "This plugin appears to be down.",
-        "Bu eklenti şu anda kapalı görünüyor." -> copy.pluginDownFailure
-        "The package was installed, but could not be enabled because verification or compatibility checks failed.",
-        "Paket kuruldu ama doğrulama/uyumluluk şartları nedeniyle aktif edilemedi." -> copy.packageEnableFailure
-        "This repository does not provide a SHA-256 hash. The previously verified package was preserved; this update cannot be installed safely." -> copy.verifiedPackagePreservedFailure
-        else -> this
+private fun String.localizedCloudStreamFailure(copy: CloudStreamSettingsCopy): String {
+    val failure = trim()
+    return when {
+        failure in setOf(
+            "Accept the third-party plugin security warning before installation",
+            "Accept the third-party plugin security warning.",
+            "Üçüncü taraf eklenti güvenlik uyarısını kabul edin.",
+        ) -> copy.acceptSecurityWarningFailure
+        failure in setOf("CloudStream plugin was not found", "Plugin was not found.", "Eklenti bulunamadı.") ->
+            copy.pluginNotFoundFailure
+        failure in setOf(
+            "This CloudStream plugin is marked as down",
+            "This plugin appears to be down.",
+            "Bu eklenti şu anda kapalı görünüyor.",
+        ) -> copy.pluginDownFailure
+        failure in setOf(
+            "The package was installed, but could not be enabled because verification or compatibility checks failed.",
+            "Paket kuruldu ama doğrulama/uyumluluk şartları nedeniyle aktif edilemedi.",
+        ) -> copy.packageEnableFailure
+        failure == "CloudStream repository is already added" -> copy.repositoryAlreadyAddedFailure
+        failure.startsWith("Active profile changed") -> copy.profileChangedFailure
+        failure.contains("SHA-256 hash mismatch", ignoreCase = true) -> copy.packageHashMismatchFailure
+        failure.contains("50 MB", ignoreCase = true) || failure.contains("too large", ignoreCase = true) ->
+            copy.packageTooLargeFailure
+        failure.startsWith("CloudStream package download failed with HTTP") -> copy.packageHttpFailure
+        failure.startsWith("This repository does not provide a SHA-256 hash.") ->
+            copy.verifiedPackagePreservedFailure
+        failure.contains(".cs3", ignoreCase = true) ||
+            failure.contains("ZIP", ignoreCase = true) ||
+            failure.contains("manifest.json", ignoreCase = true) ||
+            failure.contains("classes.dex", ignoreCase = true) ||
+            failure.contains("archive", ignoreCase = true) -> copy.invalidPackageFailure
+        failure.isBlank() -> copy.genericFailure
+        else -> copy.genericFailure
     }
+}
 
 @Composable
 private fun CloudStreamFilterChip(
