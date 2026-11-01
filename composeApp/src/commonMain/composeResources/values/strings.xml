@@ -2640,4 +2640,16 @@
     <string name="settings_merged_rows_sort_oldest">Oldest</string>
     <string name="settings_merged_rows_hide_included">Hide included source rows from Home</string>
     <string name="settings_merged_rows_hide_without_posters">Hide titles without usable posters</string>
+
+    <string name="settings_custom_poster_mode">Custom poster source mode</string>
+    <string name="settings_custom_poster_mode_off">Off</string>
+    <string name="settings_custom_poster_mode_off_description">Use original posters and leave existing catalog metadata unchanged.</string>
+    <string name="settings_custom_poster_mode_tags_only">Tags only</string>
+    <string name="settings_custom_poster_mode_tags_description">Keep original poster artwork. Ratings and popularity metadata continue to come from the catalogs.</string>
+    <string name="settings_custom_poster_mode_posters_tags">Posters + tags</string>
+    <string name="settings_custom_poster_mode_posters_description">Use the custom poster URL pattern. Any ratings or trending artwork baked into its returned image are shown with that poster.</string>
+    <string name="profile_custom_background_url">Custom background URL</string>
+    <string name="profile_custom_background_url_description">Paste an image or GIF link to use behind the profile selection screen.</string>
+    <string name="profile_custom_background_url_placeholder">https://example.com/background.gif</string>
+    <string name="profile_custom_background_url_invalid">Enter a valid HTTP or HTTPS image URL.</string>
 </resources>
