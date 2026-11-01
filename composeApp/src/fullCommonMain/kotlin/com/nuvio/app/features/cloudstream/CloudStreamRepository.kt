@@ -90,6 +90,7 @@ actual object CloudStreamRepository {
                     AddCloudStreamRepositoryResult.Success(repository)
                 },
                 onFailure = { error ->
+                    if (error is CancellationException) throw error
                     log.w(error) { "CloudStream repository install failed url=$manifestUrl" }
                     AddCloudStreamRepositoryResult.Error(error.message ?: "Could not load CloudStream repository")
                 },
@@ -114,6 +115,7 @@ actual object CloudStreamRepository {
                     .fold(
                         onSuccess = { (repository, plugins) -> applyRepositoryRefresh(repository, plugins) },
                         onFailure = { error ->
+                            if (error is CancellationException) throw error
                             log.w(error) { "CloudStream repository refresh failed url=$normalizedUrl" }
                             _uiState.update { current ->
                                 current.copy(
@@ -394,6 +396,7 @@ actual object CloudStreamRepository {
             runCatching {
                 CloudStreamRepositoryParser.parseRepository(candidate, httpGetText(candidate))
             }.onFailure { error ->
+                if (error is CancellationException) throw error
                 lastManifestError = error
                 log.w(error) { "CloudStream repository manifest failed url=$candidate" }
             }.getOrNull()
@@ -406,6 +409,7 @@ actual object CloudStreamRepository {
             }.onSuccess {
                 loadedListCount += 1
             }.onFailure { error ->
+                if (error is CancellationException) throw error
                 log.w(error) { "CloudStream plugin list failed url=$pluginListUrl" }
             }.getOrNull()
         }
