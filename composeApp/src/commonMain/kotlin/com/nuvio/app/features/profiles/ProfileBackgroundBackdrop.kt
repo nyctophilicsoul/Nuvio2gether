@@ -63,7 +63,7 @@ fun ProfileBackgroundBackdrop(
                         background.landscapeImageBytes
                     }
                 }
-            is ProfileBackgroundSelection.Custom -> backgroundSelection.url
+            is ProfileBackgroundSelection.Custom -> backgroundSelection.url.takeIf { it.isValidAvatarUrl() }
             null -> null
         }
 
