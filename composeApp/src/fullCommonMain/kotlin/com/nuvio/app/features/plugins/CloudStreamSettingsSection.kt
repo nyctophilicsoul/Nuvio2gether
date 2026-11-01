@@ -33,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.CancellationException
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -181,21 +182,28 @@ internal fun CloudStreamSettingsSection() {
                 isAddingRepository = true
                 message = null
                 scope.launch {
-                    if (previous != null && requested == previous) {
-                        CloudStreamRepository.refreshRepository(previous)
-                        message = copy.repositoryRefreshing
-                    } else {
-                        when (val result = CloudStreamRepository.addRepository(requested)) {
-                            is AddCloudStreamRepositoryResult.Success -> {
-                                previous?.let(CloudStreamRepository::removeRepository)
-                                repositoryUrl = ""
-                                editingRepositoryUrl = null
-                                message = copy.repositoryAdded(result.repository.name)
+                    try {
+                        if (previous != null && requested == previous) {
+                            CloudStreamRepository.refreshRepository(previous)
+                            message = copy.repositoryRefreshing
+                        } else {
+                            when (val result = CloudStreamRepository.addRepository(requested)) {
+                                is AddCloudStreamRepositoryResult.Success -> {
+                                    previous?.let(CloudStreamRepository::removeRepository)
+                                    repositoryUrl = ""
+                                    editingRepositoryUrl = null
+                                    message = copy.repositoryAdded(result.repository.name)
+                                }
+                                is AddCloudStreamRepositoryResult.Error -> message = result.message
                             }
-                            is AddCloudStreamRepositoryResult.Error -> message = result.message
                         }
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        message = error.message ?: copy.repositoryAddFailed
+                    } finally {
+                        isAddingRepository = false
                     }
-                    isAddingRepository = false
                 }
             },
         )
@@ -293,12 +301,15 @@ internal fun CloudStreamSettingsSection() {
                     bulkInstallMessage = null
                     message = null
                     scope.launch {
-                        bulkInstallMessage = runCatching {
-                            CloudStreamRepository.installAndEnablePlugins(targetIds).toUserMessage(copy)
-                        }.getOrElse { error ->
-                            error.message ?: copy.bulkInstallFailed
+                        try {
+                            bulkInstallMessage = CloudStreamRepository.installAndEnablePlugins(targetIds).toUserMessage(copy)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (error: Exception) {
+                            bulkInstallMessage = error.message ?: copy.bulkInstallFailed
+                        } finally {
+                            isBulkInstalling = false
                         }
-                        isBulkInstalling = false
                     }
                 },
             ) {
@@ -436,7 +447,7 @@ private fun CloudStreamPluginCard(
                         }
                         onMessage(
                             when (result) {
-                                is CloudStreamInstallResult.Success -> copy.pluginInstalled(result.plugin.metadata.name)
+                                is CloudStreamInstallResult.Success -> copy.pluginInstalled(result.plugin)
                                 is CloudStreamInstallResult.Error -> result.message.localizedCloudStreamFailure(copy)
                             },
                         )
@@ -508,6 +519,8 @@ private class CloudStreamSettingsCopy private constructor(
         if (turkish) "Repository ekle" else "Add repository"
     val repositoryRefreshing: String =
         if (turkish) "Repository yenileniyor." else "Refreshing repository."
+    val repositoryAddFailed: String =
+        if (turkish) "Repository eklenemedi." else "Repository could not be added."
     val editRepositoryContentDescription: String =
         if (turkish) "Repository düzenle" else "Edit repository"
     val refreshRepositoryContentDescription: String =
@@ -651,8 +664,23 @@ private class CloudStreamSettingsCopy private constructor(
             }
         }
 
-    fun pluginInstalled(name: String): String =
-        if (turkish) "$name paketi denetlendi ve kuruldu." else "$name package was checked and installed."
+    fun pluginInstalled(plugin: CloudStreamPluginItem): String = when {
+        plugin.verified -> if (turkish) {
+            "${plugin.metadata.name} paketi SHA-256 ile doğrulandı ve indirildi."
+        } else {
+            "${plugin.metadata.name} package was SHA-256 verified and downloaded."
+        }
+        plugin.metadata.fileHash == null -> if (turkish) {
+            "${plugin.metadata.name} paketi indirildi ve arşiv yapısı incelendi; repository SHA-256 sağlamadığı için doğrulanamadı ve etkinleştirilemez."
+        } else {
+            "${plugin.metadata.name} package was downloaded and its archive inspected, but the repository supplied no SHA-256 hash. It remains unverified and cannot be enabled."
+        }
+        else -> if (turkish) {
+            "${plugin.metadata.name} paketi indirildi ancak SHA-256 doğrulaması tamamlanmadı; etkinleştirilemez."
+        } else {
+            "${plugin.metadata.name} package was downloaded, but SHA-256 verification did not complete. It cannot be enabled."
+        }
+    }
 
     companion object {
         fun forLanguage(language: AppLanguage, supportsAndroidDex: Boolean): CloudStreamSettingsCopy =
