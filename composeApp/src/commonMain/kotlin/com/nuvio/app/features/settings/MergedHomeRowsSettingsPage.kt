@@ -63,6 +63,10 @@ import nuvio.composeapp.generated.resources.settings_merged_rows_save
 import nuvio.composeapp.generated.resources.settings_merged_rows_select_sources
 import nuvio.composeapp.generated.resources.settings_merged_rows_source_limit
 import nuvio.composeapp.generated.resources.settings_merged_rows_title
+import nuvio.composeapp.generated.resources.settings_merged_rows_type
+import nuvio.composeapp.generated.resources.settings_merged_rows_type_all
+import nuvio.composeapp.generated.resources.settings_merged_rows_type_movies
+import nuvio.composeapp.generated.resources.settings_merged_rows_type_series
 import nuvio.composeapp.generated.resources.settings_merged_rows_unavailable_source
 import nuvio.composeapp.generated.resources.settings_merged_rows_blend
 import nuvio.composeapp.generated.resources.settings_merged_rows_blend_interleave
