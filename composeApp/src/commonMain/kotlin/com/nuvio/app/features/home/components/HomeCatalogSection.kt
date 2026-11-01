@@ -26,6 +26,7 @@ import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.features.home.HomeCatalogSection
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.stableKey
+import com.nuvio.app.features.home.cleanMergedSourceTabTitle
 import com.nuvio.app.features.watching.application.WatchingState
 
 @Composable
@@ -111,7 +112,7 @@ private fun HomeCatalogRowSectionContent(
                     FilterChip(
                         selected = tab.key == selectedTab?.key,
                         onClick = { selectedTabKey = tab.key },
-                        label = { Text(tab.title) },
+                        label = { Text(cleanMergedSourceTabTitle(tab.title)) },
                     )
                 }
             }
