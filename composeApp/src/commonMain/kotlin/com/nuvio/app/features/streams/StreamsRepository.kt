@@ -16,6 +16,7 @@ import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.plugins.pluginContentId
 import com.nuvio.app.features.plugins.PluginsUiState
 import com.nuvio.app.features.servers.ServerStreams
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -523,39 +524,50 @@ object StreamsRepository {
                 val includeScraperNameInSubtitle = false
                 providerGroup.scrapers.forEach { scraper ->
                     launch {
-                        val completion = PluginRepository.executeScraper(
-                            scraper = scraper,
-                            tmdbId = pluginContentId(
-                                videoId = videoId,
+                        val completion = try {
+                            PluginRepository.executeScraper(
+                                scraper = scraper,
+                                tmdbId = pluginContentId(
+                                    videoId = videoId,
+                                    season = season,
+                                    episode = episode,
+                                ),
+                                mediaType = type,
                                 season = season,
                                 episode = episode,
-                            ),
-                            mediaType = type,
-                            season = season,
-                            episode = episode,
-                        ).fold(
-                            onSuccess = { results ->
-                                StreamLoadCompletion.PluginScraper(
-                                    addonId = providerGroup.addonId,
-                                    streams = results.map { result ->
-                                        result.toStreamItem(
-                                            scraper = scraper,
-                                            addonName = providerGroup.addonName,
-                                            addonId = providerGroup.addonId,
-                                            includeScraperNameInSubtitle = includeScraperNameInSubtitle,
-                                        )
-                                    },
-                                    error = null,
-                                )
-                            },
-                            onFailure = { error ->
-                                StreamLoadCompletion.PluginScraper(
-                                    addonId = providerGroup.addonId,
-                                    streams = emptyList(),
-                                    error = error.message ?: getString(Res.string.streams_failed_to_load_scraper, scraper.name),
-                                )
-                            },
-                        )
+                            ).fold(
+                                onSuccess = { results ->
+                                    StreamLoadCompletion.PluginScraper(
+                                        addonId = providerGroup.addonId,
+                                        streams = results.map { result ->
+                                            result.toStreamItem(
+                                                scraper = scraper,
+                                                addonName = providerGroup.addonName,
+                                                addonId = providerGroup.addonId,
+                                                includeScraperNameInSubtitle = includeScraperNameInSubtitle,
+                                            )
+                                        },
+                                        error = null,
+                                    )
+                                },
+                                onFailure = { error ->
+                                    StreamLoadCompletion.PluginScraper(
+                                        addonId = providerGroup.addonId,
+                                        streams = emptyList(),
+                                        error = error.message ?: getString(Res.string.streams_failed_to_load_scraper, scraper.name),
+                                    )
+                                },
+                            )
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (error: Exception) {
+                            log.w(error) { "Plugin provider ${scraper.name} failed before publishing its result" }
+                            StreamLoadCompletion.PluginScraper(
+                                addonId = providerGroup.addonId,
+                                streams = emptyList(),
+                                error = error.message ?: getString(Res.string.streams_failed_to_load_scraper, scraper.name),
+                            )
+                        }
                         publishCompletion(completion)
                     }
                 }
