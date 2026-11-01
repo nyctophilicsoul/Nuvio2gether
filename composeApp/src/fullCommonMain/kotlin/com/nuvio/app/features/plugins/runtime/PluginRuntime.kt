@@ -1,5 +1,6 @@
 package com.nuvio.app.features.plugins.runtime
 
+import co.touchlab.kermit.Logger
 import com.nuvio.app.features.plugins.PluginRuntimeResult
 import com.nuvio.app.features.plugins.PluginStorage
 import com.nuvio.app.features.plugins.runtime.crypto.CryptoBridge
@@ -41,6 +42,7 @@ internal const val MAX_CONCURRENT_PLUGINS = 10
 internal const val PLUGIN_TIMEOUT_MS = 60_000L
 
 internal object PluginRuntime {
+    private val log = Logger.withTag("PluginRuntime")
     private val json = Json { ignoreUnknownKeys = true }
     private val scraperSemaphore = Semaphore(MAX_CONCURRENT_PLUGINS)
     private val searchPaused = MutableStateFlow(false)
@@ -167,7 +169,12 @@ internal object PluginRuntime {
                 evaluateCached({ JsRuntime.callBytecode(this) }, JsBindings.staticCallCode)
                 deferred.await()
             }
-            return parseJsonResults(deferred.await())
+            val rawResults = deferred.await()
+            val results = parseJsonResults(rawResults, scraperId)
+            if (results.isEmpty()) {
+                log.d { "Plugin provider $scraperId completed without usable stream results" }
+            }
+            results
         } finally {
             domBridge.clear()
         }
@@ -193,7 +200,7 @@ internal object PluginRuntime {
         }
     }
 
-    private fun parseJsonResults(rawJson: String): List<PluginRuntimeResult> {
+    private fun parseJsonResults(rawJson: String, scraperId: String): List<PluginRuntimeResult> {
         return runCatching {
             val array = json.parseToJsonElement(rawJson) as? JsonArray ?: return emptyList()
             array.mapNotNull { element ->
@@ -246,7 +253,10 @@ internal object PluginRuntime {
                     subtitles = subtitles,
                 )
             }.filter { it.url.isNotBlank() }
-        }.getOrElse { emptyList() }
+        }.getOrElse { error ->
+            log.w(error) { "Could not parse stream results returned by plugin provider $scraperId" }
+            emptyList()
+        }
     }
 
     private fun JsonObject.stringOrNull(key: String): String? =
