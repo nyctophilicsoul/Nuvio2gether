@@ -399,10 +399,9 @@ private fun CloudStreamPluginCard(
             plugin.metadata.rawTvTypes.forEach { NuvioInfoBadge(text = it) }
             NuvioInfoBadge(
                 text = when {
-                    plugin.metadata.fileHash != null && plugin.verified -> copy.sha256Verified
-                    plugin.metadata.fileHash != null -> copy.hashUnverified
-                    plugin.verified -> copy.packageChecked
-                    else -> copy.packageUnchecked
+                    plugin.verified -> copy.sha256Verified
+                    plugin.metadata.fileHash == null -> copy.hashMissing
+                    else -> copy.hashUnverified
                 },
             )
             NuvioInfoBadge(
@@ -539,10 +538,8 @@ private class CloudStreamSettingsCopy private constructor(
         if (turkish) "SHA-256 doğrulandı" else "SHA-256 verified"
     val hashUnverified: String =
         if (turkish) "Hash doğrulanmadı" else "Hash unverified"
-    val packageChecked: String =
-        if (turkish) "Paket denetlendi" else "Package checked"
-    val packageUnchecked: String =
-        if (turkish) "Paket denetlenmedi" else "Package unchecked"
+    val hashMissing: String =
+        if (turkish) "SHA-256 özeti yok" else "No SHA-256 hash supplied"
     val androidAndIosCompatible: String =
         if (turkish) "Android + iOS uyumlu" else "Android + iOS compatible"
     val androidCompatible: String =
