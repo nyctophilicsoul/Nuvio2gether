@@ -53,6 +53,7 @@ import com.nuvio.app.core.ui.NuvioSurfaceCard
 import com.nuvio.app.features.cloudstream.AddCloudStreamRepositoryResult
 import com.nuvio.app.features.cloudstream.CloudStreamBulkInstallResult
 import com.nuvio.app.features.cloudstream.CloudStreamInstallResult
+import com.nuvio.app.features.cloudstream.CloudStreamPlatformRuntime
 import com.nuvio.app.features.cloudstream.CloudStreamPlatformSupport
 import com.nuvio.app.features.cloudstream.CloudStreamPluginItem
 import com.nuvio.app.features.cloudstream.CloudStreamRepository
@@ -69,7 +70,9 @@ internal fun CloudStreamSettingsSection() {
     }
     val state by CloudStreamRepository.uiState.collectAsStateWithLifecycle()
     val selectedAppLanguage by ThemeSettingsRepository.selectedAppLanguage.collectAsStateWithLifecycle()
-    val copy = remember(selectedAppLanguage) { CloudStreamSettingsCopy.forLanguage(selectedAppLanguage) }
+    val copy = remember(selectedAppLanguage, CloudStreamPlatformRuntime.supportsAndroidDex) {
+        CloudStreamSettingsCopy.forLanguage(selectedAppLanguage, CloudStreamPlatformRuntime.supportsAndroidDex)
+    }
     val scope = rememberCoroutineScope()
     var repositoryUrl by rememberSaveable { mutableStateOf("") }
     var editingRepositoryUrl by rememberSaveable { mutableStateOf<String?>(null) }
@@ -377,7 +380,7 @@ private fun CloudStreamPluginCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Switch(
                     checked = plugin.enabled,
-                    enabled = plugin.isInstalled && plugin.verified && plugin.compatibility.isRunnable,
+                    enabled = plugin.isInstalled && plugin.verified && plugin.compatibility.isRunnable && plugin.metadata.status.canInstall,
                     onCheckedChange = { CloudStreamRepository.setPluginEnabled(plugin.metadata.id.value, it) },
                 )
             }
@@ -424,7 +427,7 @@ private fun CloudStreamPluginCard(
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(
                 modifier = Modifier.weight(1f),
-                enabled = securityWarningAccepted && !plugin.isInstalling,
+                enabled = securityWarningAccepted && !plugin.isInstalling && plugin.compatibility.isRunnable && plugin.metadata.status.canInstall,
                 onClick = {
                     scope.launch {
                         val result = if (plugin.hasUpdate) {
@@ -464,6 +467,7 @@ private fun CloudStreamPluginCard(
 
 private class CloudStreamSettingsCopy private constructor(
     private val turkish: Boolean,
+    private val supportsAndroidDex: Boolean,
 ) {
     val sectionTitle: String =
         if (turkish) "CloudStream / CS3" else "CloudStream / CS3"
@@ -472,10 +476,16 @@ private class CloudStreamSettingsCopy private constructor(
     val providersSectionTitle: String =
         if (turkish) "CS3 providerları" else "CS3 providers"
     val sectionDescription: String =
-        if (turkish) {
-            "Standart .cs3 paketleri indirilen üçüncü taraf kodudur. Bu derleme şu anda yalnızca Nuvio içine derlenmiş ve incelenmiş adaptörleri çalıştırır; rastgele .cs3 DEX kodu çalıştırılmaz. Yalnızca güvendiğiniz depoları ve paketleri kurun."
+        if (supportsAndroidDex) {
+            if (turkish) {
+                "Standart .cs3 paketleri üçüncü taraf Android DEX kodu içerebilir. Android Full derlemeleri uyumlu paketleri uygulama süreci içinde çalıştırır; bu kod Nuvio tarafından sandbox içine alınmaz. Yalnızca güvendiğiniz depoları ve eklentileri kurun."
+            } else {
+                "Standard .cs3 packages can contain third-party Android DEX code. Android Full builds execute compatible packages inside the app process; this code is not sandboxed by Nuvio. Install only repositories and plugins you trust."
+            }
+        } else if (turkish) {
+            "Standart .cs3 paketleri üçüncü taraf Android DEX kodu içerebilir ve iOS üzerinde çalışmaz. Bu derleme yalnızca uygulamaya dahil edilmiş, incelenmiş çapraz platform adaptörlerini çalıştırabilir. Yalnızca güvendiğiniz depoları kurun."
         } else {
-            "Standard .cs3 packages are downloaded third-party code. This build currently runs only reviewed adapters compiled into Nuvio; arbitrary .cs3 DEX execution is not enabled. Only install repositories and packages you trust."
+            "Standard .cs3 packages can contain third-party Android DEX code and cannot run on iOS. This build can run only reviewed cross-platform adapters bundled with the app. Install only repositories you trust."
         }
     val securityWarningTitle: String =
         if (turkish) "Üçüncü taraf kod güvenlik uyarısı" else "Third-party code security warning"
@@ -617,16 +627,22 @@ private class CloudStreamSettingsCopy private constructor(
         when (platformSupport) {
             CloudStreamPlatformSupport.AndroidAndIos -> {
                 if (turkish) {
-                    "Bu provider, Nuvio Enhanced içine derlenmiş incelenmiş çapraz platform adaptörü kullanır."
+                    "Bu provider, uygulamaya dahil edilmiş ve incelenmiş çapraz platform adaptörünü kullanır."
                 } else {
-                    "This provider has a reviewed cross-platform adapter compiled into Nuvio Enhanced."
+                    "This provider uses a reviewed cross-platform adapter bundled with the app."
                 }
             }
             CloudStreamPlatformSupport.AndroidOnly -> {
-                if (turkish) {
-                    "Bu standart CloudStream .cs3 paketi Android DEX kodu içerir. İndirme ve doğrulama desteklenir, ancak bu derlemede rastgele DEX kodu çalıştırılmaz."
+                if (supportsAndroidDex) {
+                    if (turkish) {
+                        "Bu standart .cs3 paketi Android DEX kodu içerir ve Android Full derlemesinde uygulama süreci içinde çalıştırılır. Kod sandbox içinde çalışmaz; yalnızca güvendiğiniz paketleri kurun."
+                    } else {
+                        "This standard .cs3 package contains Android DEX code and is executed in-process by Android Full builds. It is not sandboxed; install only packages you trust."
+                    }
+                } else if (turkish) {
+                    "Bu provider Android DEX kodu içerir ve bu platformda çalıştırılamaz."
                 } else {
-                    "This standard CloudStream .cs3 package contains Android DEX code. Downloading and verifying it is supported, but executing arbitrary DEX is not enabled in this build."
+                    "This provider contains Android DEX code and cannot be executed on this platform."
                 }
             }
             CloudStreamPlatformSupport.Unsupported -> {
@@ -642,8 +658,11 @@ private class CloudStreamSettingsCopy private constructor(
         if (turkish) "$name paketi denetlendi ve kuruldu." else "$name package was checked and installed."
 
     companion object {
-        fun forLanguage(language: AppLanguage): CloudStreamSettingsCopy =
-            CloudStreamSettingsCopy(turkish = language == AppLanguage.TURKISH)
+        fun forLanguage(language: AppLanguage, supportsAndroidDex: Boolean): CloudStreamSettingsCopy =
+            CloudStreamSettingsCopy(
+                turkish = language == AppLanguage.TURKISH,
+                supportsAndroidDex = supportsAndroidDex,
+            )
     }
 }
 
