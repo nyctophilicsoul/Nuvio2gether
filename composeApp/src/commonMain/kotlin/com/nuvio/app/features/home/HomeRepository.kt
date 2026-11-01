@@ -222,7 +222,7 @@ object HomeRepository {
                     ?.withPosterOverlay()
                     ?.withReleaseFilter()
                 ?: return@mapNotNull null
-            if (section.items.isEmpty()) return@mapNotNull null
+            if (section.items.isEmpty() && !section.hasMore) return@mapNotNull null
             val customTitle = preferences[definition.key]?.customTitle.orEmpty()
             definition.key to section.copy(
                 title = customTitle.ifBlank { definition.titleFor(snapshot.showCatalogType) },
@@ -247,7 +247,10 @@ object HomeRepository {
                     contentType = contentType,
                     hideTitlesWithoutPosters = mergedRow.hideTitlesWithoutPosters,
                 )
-                if (mergedItems.isEmpty()) return@mapNotNull null
+                val hasMore = sourceSections.any(HomeCatalogSection::hasMore)
+                // Keep the home entry reachable when the preview page has no items matching
+                // the row's filter but one or more source catalogs can still provide more pages.
+                if (mergedItems.isEmpty() && !hasMore) return@mapNotNull null
 
                 val sourceTabs = when (displayMode) {
                     MergedHomeRowDisplayMode.SOURCE_TABS -> buildList {
@@ -257,7 +260,7 @@ object HomeRepository {
                                 title = "All",
                                 items = mergedItems,
                                 availableItemCount = mergedItems.size,
-                                hasMore = sourceSections.any(HomeCatalogSection::hasMore),
+                                hasMore = hasMore,
                             ),
                         )
                         sourceSections.forEach { source ->
