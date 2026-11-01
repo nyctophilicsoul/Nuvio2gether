@@ -726,6 +726,7 @@ private fun HomescreenSummaryCard(
 }
 
 @Composable
+@Composable
 private fun HomeScreenBackgroundUrlSettings(isTablet: Boolean) {
     ThemeSettingsRepository.ensureLoaded()
     val savedUrl by ThemeSettingsRepository.homeBackgroundUrl.collectAsStateWithLifecycle()
