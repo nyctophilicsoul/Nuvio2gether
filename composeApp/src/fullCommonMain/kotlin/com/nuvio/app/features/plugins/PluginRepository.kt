@@ -13,6 +13,7 @@ import io.github.jan.supabase.postgrest.rpc
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -375,13 +376,12 @@ actual object PluginRepository {
         episode: Int?,
         respectSearchPause: Boolean,
     ): Result<List<PluginRuntimeResult>> {
-        val resolvedTmdbId = resolvePluginTmdbId(
-            tmdbId = tmdbId,
-            mediaType = mediaType,
-        )
-
-        return runCatching {
-            PluginRuntime.executePlugin(
+        return try {
+            val resolvedTmdbId = resolvePluginTmdbId(
+                tmdbId = tmdbId,
+                mediaType = mediaType,
+            )
+            val results = PluginRuntime.executePlugin(
                 code = scraper.code,
                 tmdbId = resolvedTmdbId,
                 mediaType = normalizePluginType(mediaType),
@@ -390,6 +390,15 @@ actual object PluginRepository {
                 scraperId = scraper.id,
                 respectSearchPause = respectSearchPause,
             )
+            log.d { "Plugin provider ${scraper.name} completed with ${results.size} stream(s)" }
+            Result.success(results)
+        } catch (cancelled: CancellationException) {
+            // Cancellation is control flow (search stopped/profile changed), not
+            // a provider failure. Never turn it into an ordinary empty result.
+            throw cancelled
+        } catch (error: Throwable) {
+            log.w(error) { "Plugin provider ${scraper.name} failed for $mediaType:$tmdbId" }
+            Result.failure(error)
         }
     }
 
