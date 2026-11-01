@@ -64,6 +64,9 @@ import nuvio.composeapp.generated.resources.settings_merged_rows_unavailable_sou
 import nuvio.composeapp.generated.resources.settings_merged_rows_blend
 import nuvio.composeapp.generated.resources.settings_merged_rows_blend_interleave
 import nuvio.composeapp.generated.resources.settings_merged_rows_blend_smart
+import nuvio.composeapp.generated.resources.settings_merged_rows_blend_interleave_description
+import nuvio.composeapp.generated.resources.settings_merged_rows_blend_smart_description
+import nuvio.composeapp.generated.resources.settings_merged_rows_sort_description
 import nuvio.composeapp.generated.resources.settings_merged_rows_sort
 import nuvio.composeapp.generated.resources.settings_merged_rows_sort_off
 import nuvio.composeapp.generated.resources.settings_merged_rows_sort_popularity
@@ -296,6 +299,17 @@ private fun MergedHomeRowsEditor(
                             Text(stringResource(label), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                         }
                     }
+                    Text(
+                        text = stringResource(
+                            if (draftBlendMode == MergedHomeRowBlendMode.INTERLEAVE) {
+                                Res.string.settings_merged_rows_blend_interleave_description
+                            } else {
+                                Res.string.settings_merged_rows_blend_smart_description
+                            },
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
 
                     Text(stringResource(Res.string.settings_merged_rows_sort), style = MaterialTheme.typography.titleSmall)
                     listOf(
@@ -310,6 +324,11 @@ private fun MergedHomeRowsEditor(
                             Text(stringResource(label), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                         }
                     }
+                    Text(
+                        text = stringResource(Res.string.settings_merged_rows_sort_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = draftHideIncludedRows, onCheckedChange = { draftHideIncludedRows = it })
