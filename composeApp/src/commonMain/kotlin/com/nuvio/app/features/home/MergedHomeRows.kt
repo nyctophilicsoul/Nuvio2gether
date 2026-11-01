@@ -395,7 +395,11 @@ internal fun cleanMergedSourceTabTitle(rawTitle: String): String {
         .replace(Regex("\\s+"), " ")
         .trim()
     if (cleaned.isBlank()) return "Unnamed Source"
-    val words = cleaned.split(' ')
+    val normalizedLabel = cleaned.replace(
+        Regex("\\bfor you\\b", RegexOption.IGNORE_CASE),
+        "Picks",
+    )
+    val words = normalizedLabel.split(' ')
         .filter { it.isNotBlank() && it.lowercase() !in setOf("movie", "movies", "series", "tv", "all", "catalog", "catalogs") }
     if (words.isEmpty()) return "Unnamed Source"
     val shortWords = when {
