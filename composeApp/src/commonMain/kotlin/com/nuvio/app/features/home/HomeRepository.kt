@@ -242,15 +242,12 @@ object HomeRepository {
                     maxItems = HOME_MERGED_ROW_ITEM_LIMIT,
                     blendMode = mergedRow.resolvedBlendMode(),
                     sortMode = mergedRow.resolvedSortMode(),
-                    contentType = mergedRow.resolvedContentType(),
                     hideTitlesWithoutPosters = mergedRow.hideTitlesWithoutPosters,
                 )
                 if (mergedItems.isEmpty()) return@mapNotNull null
 
-                val sourceTabs = if (
-                    mergedRow.resolvedDisplayMode() == MergedHomeRowDisplayMode.SOURCE_TABS
-                ) {
-                    buildList {
+                val sourceTabs = when (mergedRow.resolvedDisplayMode()) {
+                    MergedHomeRowDisplayMode.SOURCE_TABS -> buildList {
                         add(
                             HomeCatalogTab(
                                 key = "all",
@@ -261,27 +258,57 @@ object HomeRepository {
                             ),
                         )
                         sourceSections.forEach { source ->
+                            val sourceItems = filterMergedHomeItems(
+                                items = source.items,
+                                contentType = MergedHomeRowContentType.ALL,
+                                hideTitlesWithoutPosters = mergedRow.hideTitlesWithoutPosters,
+                            )
                             add(
                                 HomeCatalogTab(
                                     key = source.key,
                                     title = cleanMergedSourceTabTitle(source.title),
-                                    items = filterMergedHomeItems(
-                                        items = source.items,
-                                        contentType = mergedRow.resolvedContentType(),
-                                        hideTitlesWithoutPosters = mergedRow.hideTitlesWithoutPosters,
-                                    ),
-                                    availableItemCount = filterMergedHomeItems(
-                                        items = source.items,
-                                        contentType = mergedRow.resolvedContentType(),
-                                        hideTitlesWithoutPosters = mergedRow.hideTitlesWithoutPosters,
-                                    ).size,
+                                    items = sourceItems,
+                                    availableItemCount = sourceItems.size,
                                     hasMore = source.hasMore,
                                 ),
                             )
                         }
                     }
-                } else {
-                    emptyList()
+                    MergedHomeRowDisplayMode.TYPE_TABS -> buildList {
+                        add(
+                            HomeCatalogTab(
+                                key = "all",
+                                title = "All",
+                                items = mergedItems,
+                                availableItemCount = mergedItems.size,
+                                hasMore = sourceSections.any(HomeCatalogSection::hasMore),
+                            ),
+                        )
+                        listOf(
+                            MergedHomeRowContentType.MOVIES to "Movies",
+                            MergedHomeRowContentType.SERIES to "Series",
+                        ).forEach { (type, title) ->
+                            val items = mergeHomeRowItems(
+                                sourceItems = sourceSections.map(HomeCatalogSection::items),
+                                deduplicate = mergedRow.deduplicate,
+                                maxItems = HOME_MERGED_ROW_ITEM_LIMIT,
+                                blendMode = mergedRow.resolvedBlendMode(),
+                                sortMode = mergedRow.resolvedSortMode(),
+                                contentType = type,
+                                hideTitlesWithoutPosters = mergedRow.hideTitlesWithoutPosters,
+                            )
+                            add(
+                                HomeCatalogTab(
+                                    key = type.storageValue,
+                                    title = title,
+                                    items = items,
+                                    availableItemCount = items.size,
+                                    hasMore = sourceSections.any(HomeCatalogSection::hasMore),
+                                ),
+                            )
+                        }
+                    }
+                    MergedHomeRowDisplayMode.UNIFIED_CAROUSEL -> emptyList()
                 }
                 val customTitle = preferences[rowKey]?.customTitle.orEmpty()
                 HomeCatalogSection(
