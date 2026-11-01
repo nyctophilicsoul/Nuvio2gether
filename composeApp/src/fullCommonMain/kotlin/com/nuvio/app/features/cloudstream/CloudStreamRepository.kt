@@ -464,10 +464,22 @@ actual object CloudStreamRepository {
         providerId: String?,
     ): List<Result<List<CloudStreamSearchItem>>> {
         initialize()
+        val expectedProfileGeneration = profileGenerationSnapshot()
         val activeIds = runnableProviderIds().filter { providerId == null || it == providerId }
         return activeIds.map { id ->
-            providerResult(id) {
-                search(query.trim()).also { items -> CloudStreamSearchRouteIndex.remember(id, query, items) }
+            val result = providerResult(id) { search(query.trim()) }
+            when {
+                !isProfileGenerationCurrent(expectedProfileGeneration) ->
+                    Result.failure<List<CloudStreamSearchItem>>(
+                        IllegalStateException("Active profile changed while searching CloudStream providers"),
+                    )
+                id !in runnableProviderIds() ->
+                    Result.failure<List<CloudStreamSearchItem>>(
+                        IllegalStateException("CloudStream provider was disabled while its search was running"),
+                    )
+                else -> result.onSuccess { items ->
+                    CloudStreamSearchRouteIndex.remember(id, query, items)
+                }
             }
         }
     }
