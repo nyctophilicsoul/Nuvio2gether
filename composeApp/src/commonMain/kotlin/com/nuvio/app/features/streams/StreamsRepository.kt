@@ -11,7 +11,6 @@ import com.nuvio.app.features.debrid.DebridSettingsRepository
 import com.nuvio.app.features.debrid.DebridStreamPresentation
 import com.nuvio.app.features.debrid.LocalDebridAvailabilityService
 import com.nuvio.app.features.details.MetaDetailsRepository
-import com.nuvio.app.features.cloudstream.CloudStreamRepository
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.plugins.pluginContentId
@@ -95,10 +94,7 @@ object StreamsRepository {
             manualSelection = manualSelection,
             qualitySelectionMode = qualitySelectionMode,
         )
-        val cloudStreamState = if (AppFeaturePolicy.pluginsEnabled) {
-            CloudStreamRepository.initialize()
-            CloudStreamRepository.uiState.value
-        } else null
+        val requestKey = "$requestToken::pluginsGrouped=${pluginUiState.groupStreamsByRepository}"
         val requestKey = "$requestToken::pluginsGrouped=${pluginUiState.groupStreamsByRepository}" +
             "::cloudstream=${cloudStreamState?.registryRevision ?: 0L}"
         val currentState = _uiState.value
@@ -192,15 +188,7 @@ object StreamsRepository {
             repositories = pluginUiState.repositories,
             groupByRepository = pluginUiState.groupStreamsByRepository,
         )
-        val cloudStreamSearchRequest = buildCloudStreamSearchRequest(
-            type = type, videoId = videoId, parentMetaId = parentMetaId, parentMetaType = null,
-            season = season, episode = episode, searchTitle = null,
-        )
-        val cloudStreamProviderGroups = if (AppFeaturePolicy.pluginsEnabled && !isNativeServerRequest && cloudStreamSearchRequest != null) {
-            cloudStreamProviderGroupsForRequest(type, cloudStreamSearchRequest)
-        } else emptyList()
-
-        if (installedAddons.isEmpty() && pluginProviderGroups.isEmpty() && cloudStreamProviderGroups.isEmpty() && serverSources.isEmpty()) {
+        if (installedAddons.isEmpty() && pluginProviderGroups.isEmpty() && serverSources.isEmpty()) {
             _uiState.value = StreamsUiState(
                 requestToken = requestToken,
                 isAnyLoading = false,
@@ -224,7 +212,7 @@ object StreamsRepository {
 
         log.d { "Found ${streamAddons.size} addons for stream type=$type id=$videoId" }
 
-        if (streamAddons.isEmpty() && pluginProviderGroups.isEmpty() && cloudStreamProviderGroups.isEmpty() && serverSources.isEmpty()) {
+        if (streamAddons.isEmpty() && pluginProviderGroups.isEmpty() && serverSources.isEmpty()) {
             _uiState.value = StreamsUiState(
                 requestToken = requestToken,
                 isAnyLoading = false,
@@ -250,8 +238,7 @@ object StreamsRepository {
                 streams = emptyList(),
                 isLoading = true,
             )
-        } + cloudStreamProviderGroups.map { providerGroup ->
-            AddonStreamGroup(addonName = providerGroup.addonName, addonId = providerGroup.addonId, streams = emptyList(), isLoading = true)
+        } + serverSources.map { it.loadingGroup() }, installedAddonOrder, preferredGroupIds)
         } + serverSources.map { it.loadingGroup() }, installedAddonOrder, preferredGroupIds)
         val isInitiallyLoading = initialGroups.any { it.isLoading }
         _uiState.value = StreamsUiState(
@@ -273,7 +260,6 @@ object StreamsRepository {
             val pluginFirstErrorByAddonId = mutableMapOf<String, String>()
             val totalTasks = streamAddons.size +
                 pluginProviderGroups.sumOf { it.scrapers.size } +
-                cloudStreamProviderGroups.size +
                 serverSources.size
 
             val installedAddonNames = installedAddonOrder.toSet()
@@ -534,20 +520,6 @@ object StreamsRepository {
 
             serverSources.forEach { source ->
                 launch { publishCompletion(StreamLoadCompletion.Addon(source.load())) }
-            }
-
-            cloudStreamProviderGroups.forEach { providerGroup ->
-                launch {
-                    val group = try {
-                        resolveCloudStreamProviderStreams(providerGroup, cloudStreamSearchRequest)
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (error: Exception) {
-                        log.w(error) { "CloudStream provider ${providerGroup.addonName} failed before publishing its result" }
-                        AddonStreamGroup(addonName = providerGroup.addonName, addonId = providerGroup.addonId, streams = emptyList(), isLoading = false, error = error.message ?: "CloudStream provider failed")
-                    }
-                    publishCompletion(StreamLoadCompletion.Addon(group))
-                }
             }
 
             pluginProviderGroups.forEach { providerGroup ->
