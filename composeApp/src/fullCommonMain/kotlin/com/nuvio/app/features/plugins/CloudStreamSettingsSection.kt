@@ -585,6 +585,12 @@ private class CloudStreamSettingsCopy private constructor(
         } else {
             "The package was installed, but could not be enabled because verification or compatibility checks failed."
         }
+    val verifiedPackagePreservedFailure: String =
+        if (turkish) {
+            "Repository SHA-256 sağlamadığı için güncelleme doğrulanamadı. Önceden doğrulanmış paket korundu."
+        } else {
+            "The update has no repository-supplied SHA-256 hash. The previously verified package was preserved."
+        }
 
     fun repositoryCount(count: Int): String =
         if (turkish) "$count repository" else "$count repositories"
@@ -704,6 +710,7 @@ private fun String.localizedCloudStreamFailure(copy: CloudStreamSettingsCopy): S
         "Bu eklenti şu anda kapalı görünüyor." -> copy.pluginDownFailure
         "The package was installed, but could not be enabled because verification or compatibility checks failed.",
         "Paket kuruldu ama doğrulama/uyumluluk şartları nedeniyle aktif edilemedi." -> copy.packageEnableFailure
+        "This repository does not provide a SHA-256 hash. The previously verified package was preserved; this update cannot be installed safely." -> copy.verifiedPackagePreservedFailure
         else -> this
     }
 
