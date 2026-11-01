@@ -134,7 +134,11 @@ internal fun LazyListScope.homescreenSettingsContent(
     val selectedHeroSourceCount = items.count { it.heroSourceEnabled }
     val enabledCatalogCount = items.count { it.isVisible }
 
-    // Keep the merged-row editor entry visible at the top of Home Layout.
+    // Keep the custom start-screen background control immediately visible at the top.
+    item(key = "homescreen_background_url_settings") {
+        HomeScreenBackgroundUrlSettings(isTablet = isTablet)
+    }
+    // Keep the merged-row editor entry visible near the top of Home Layout.
     item(key = "merged_rows_settings_entry") {
         Button(
             onClick = onMergedRowsClick,
@@ -150,9 +154,6 @@ internal fun LazyListScope.homescreenSettingsContent(
             totalCatalogCount = items.size,
             selectedHeroSourceCount = selectedHeroSourceCount,
         )
-    }
-    item {
-        HomeScreenBackgroundUrlSettings(isTablet = isTablet)
     }
     item {
         SettingsSection(
