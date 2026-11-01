@@ -499,10 +499,7 @@ actual object CloudStreamRepository {
             val committed = commitForProfile(expectedProfileGeneration) {
                 val currentItem = _uiState.value.plugins.firstOrNull { it.metadata.id.value == pluginId }
                     ?: error("CloudStream plugin was removed before installation completed")
-                check(
-                    currentItem.metadata.packageUrl == item.metadata.packageUrl &&
-                        currentItem.metadata.version == item.metadata.version
-                ) {
+                check(currentItem.metadata == item.metadata) {
                     "CloudStream plugin metadata changed during installation; retry the installation"
                 }
                 CloudStreamPlatformRuntime.unload(pluginId)
