@@ -533,7 +533,7 @@ actual object CloudStreamRepository {
             }
             CloudStreamPackageInspector.inspect(bytes)
             val expectedHash = item.metadata.fileHash
-            val verified = expectedHash?.matches(bytes) ?: true
+            val verified = expectedHash?.matches(bytes) == true
             if (expectedHash != null) require(verified) { ".cs3 SHA-256 hash mismatch" }
 
             var installed: CloudStreamPluginItem? = null
@@ -747,8 +747,15 @@ actual object CloudStreamRepository {
                 compatibility = compatibility,
                 installedVersion = plugin.installedVersion.takeIf { packageExists },
                 installedAtEpochMs = plugin.installedAtEpochMs.takeIf { packageExists } ?: 0L,
-                enabled = plugin.enabled && packageExists && plugin.verified && compatibility.isRunnable && metadata.status.canInstall,
-                verified = plugin.verified && packageExists,
+                enabled = plugin.enabled && packageExists && plugin.verified &&
+                    CloudStreamFileHash.parse(plugin.installedFileHash ?: plugin.fileHash.takeIf {
+                        plugin.installedVersion == plugin.availableVersion
+                    }) != null && compatibility.isRunnable && metadata.status.canInstall,
+                verified = plugin.verified && packageExists && CloudStreamFileHash.parse(
+                    plugin.installedFileHash ?: plugin.fileHash.takeIf {
+                        plugin.installedVersion == plugin.availableVersion
+                    },
+                ) != null,
                 installedFileHash = plugin.installedFileHash
                     ?: plugin.fileHash.takeIf { plugin.installedVersion == plugin.availableVersion && packageExists },
             )
