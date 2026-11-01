@@ -108,8 +108,10 @@ actual object CloudStreamRepository {
 
     actual fun acceptSecurityWarning() {
         initialize()
-        _uiState.update { it.copy(securityWarningAccepted = true) }
-        persist()
+        synchronized(profileLock) {
+            _uiState.update { it.copy(securityWarningAccepted = true) }
+            persist()
+        }
     }
 
     actual suspend fun addRepository(rawUrl: String): AddCloudStreamRepositoryResult {
@@ -160,63 +162,68 @@ actual object CloudStreamRepository {
         initialize()
         val expectedProfileGeneration = profileGenerationSnapshot()
         val normalizedUrl = runCatching { normalizeCloudStreamRepositoryUrl(manifestUrl) }.getOrNull() ?: return
-        lateinit var job: Job
-        job = scope.launch(start = CoroutineStart.LAZY) {
-            try {
-                val refreshed = try {
-                    fetchRepository(normalizedUrl)
-                } catch (error: CancellationException) {
-                    commitForProfile(expectedProfileGeneration) {
-                        if (refreshJobs[normalizedUrl] === job) {
-                            _uiState.update { current ->
-                                current.copy(
-                                    repositories = current.repositories.map { item ->
-                                        if (item.manifest.sourceUrl == normalizedUrl) item.copy(isRefreshing = false) else item
-                                    },
-                                )
-                            }
-                        }
-                    }
-                    throw error
-                } catch (error: Throwable) {
-                    log.w(error) { "CloudStream repository refresh failed url=$normalizedUrl" }
-                    commitForProfile(expectedProfileGeneration) {
-                        if (refreshJobs[normalizedUrl] === job) {
-                            _uiState.update { current ->
-                                current.copy(
-                                    repositories = current.repositories.map { item ->
-                                        if (item.manifest.sourceUrl == normalizedUrl) {
-                                            item.copy(isRefreshing = false, errorMessage = error.message ?: "Refresh failed")
-                                        } else item
-                                    },
-                                )
-                            }
-                        }
-                    }
-                    return@launch
-                }
+        var jobToStart: Job? = null
 
-                commitForProfile(expectedProfileGeneration) {
-                    if (
-                        refreshJobs[normalizedUrl] === job &&
-                        _uiState.value.repositories.any { it.manifest.sourceUrl == normalizedUrl }
-                    ) {
-                        applyRepositoryRefresh(refreshed.first, refreshed.second)
-                        persist()
-                    }
-                }
-            } finally {
-                commitForProfile(expectedProfileGeneration) {
-                    if (refreshJobs[normalizedUrl] === job) refreshJobs.remove(normalizedUrl)
-                }
-            }
-        }
-
-        var shouldStart = false
-        val registered = commitForProfile(expectedProfileGeneration) {
+        commitForProfile(expectedProfileGeneration) {
             val existingJob = refreshJobs[normalizedUrl]
             if (existingJob == null || existingJob.isCompleted) {
                 if (_uiState.value.repositories.any { it.manifest.sourceUrl == normalizedUrl }) {
+                    lateinit var job: Job
+                    job = scope.launch(start = CoroutineStart.LAZY) {
+                        try {
+                            val refreshed = try {
+                                fetchRepository(normalizedUrl)
+                            } catch (error: CancellationException) {
+                                commitForProfile(expectedProfileGeneration) {
+                                    if (refreshJobs[normalizedUrl] === job) {
+                                        _uiState.update { current ->
+                                            current.copy(
+                                                repositories = current.repositories.map { item ->
+                                                    if (item.manifest.sourceUrl == normalizedUrl) {
+                                                        item.copy(isRefreshing = false)
+                                                    } else item
+                                                },
+                                            )
+                                        }
+                                    }
+                                }
+                                throw error
+                            } catch (error: Throwable) {
+                                log.w(error) { "CloudStream repository refresh failed url=$normalizedUrl" }
+                                commitForProfile(expectedProfileGeneration) {
+                                    if (refreshJobs[normalizedUrl] === job) {
+                                        _uiState.update { current ->
+                                            current.copy(
+                                                repositories = current.repositories.map { item ->
+                                                    if (item.manifest.sourceUrl == normalizedUrl) {
+                                                        item.copy(
+                                                            isRefreshing = false,
+                                                            errorMessage = error.message ?: "Refresh failed",
+                                                        )
+                                                    } else item
+                                                },
+                                            )
+                                        }
+                                    }
+                                }
+                                return@launch
+                            }
+
+                            commitForProfile(expectedProfileGeneration) {
+                                if (
+                                    refreshJobs[normalizedUrl] === job &&
+                                    _uiState.value.repositories.any { it.manifest.sourceUrl == normalizedUrl }
+                                ) {
+                                    applyRepositoryRefresh(refreshed.first, refreshed.second)
+                                    persist()
+                                }
+                            }
+                        } finally {
+                            commitForProfile(expectedProfileGeneration) {
+                                if (refreshJobs[normalizedUrl] === job) refreshJobs.remove(normalizedUrl)
+                            }
+                        }
+                    }
                     refreshJobs[normalizedUrl] = job
                     _uiState.update { current ->
                         current.copy(
@@ -227,11 +234,11 @@ actual object CloudStreamRepository {
                             },
                         )
                     }
-                    shouldStart = true
+                    jobToStart = job
                 }
             }
         }
-        if (registered && shouldStart) job.start()
+        jobToStart?.start()
     }
 
     actual fun refreshAll() {
