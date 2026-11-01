@@ -156,6 +156,34 @@ internal fun mergeHomeRowItems(
     return sortMergedItems(blended, sortMode).take(maxItems)
 }
 
+internal fun buildMergedHomeTypeTabs(
+    sourceItems: List<List<MetaPreview>>,
+    allItems: List<MetaPreview>,
+    deduplicate: Boolean,
+    blendMode: MergedHomeRowBlendMode,
+    sortMode: MergedHomeRowSortMode,
+    hideTitlesWithoutPosters: Boolean,
+    hasMore: Boolean,
+    maxItems: Int = HOME_MERGED_ROW_ITEM_LIMIT,
+): List<HomeCatalogTab> = buildList {
+    add(HomeCatalogTab("all", "All", allItems, allItems.size, hasMore))
+    listOf(
+        MergedHomeRowContentType.MOVIES to "Movies",
+        MergedHomeRowContentType.SERIES to "Series",
+    ).forEach { (type, title) ->
+        val items = mergeHomeRowItems(
+            sourceItems = sourceItems,
+            deduplicate = deduplicate,
+            maxItems = maxItems,
+            blendMode = blendMode,
+            sortMode = sortMode,
+            contentType = type,
+            hideTitlesWithoutPosters = hideTitlesWithoutPosters,
+        )
+        add(HomeCatalogTab(type.storageValue, title, items, items.size, hasMore))
+    }
+}
+
 private fun interleaveMergedSources(
     sourceItems: List<List<MetaPreview>>,
     deduplicate: Boolean,
