@@ -12,6 +12,7 @@ import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.HomeCatalogTab
 import com.nuvio.app.features.home.MergedHomeRowDisplayMode
 import com.nuvio.app.features.home.MergedHomeRowContentType
+import com.nuvio.app.features.home.contentTypeForDisplay
 import com.nuvio.app.features.home.buildMergedHomeTypeTabs
 import com.nuvio.app.features.home.ResolvedMergedHomeRowSource
 import com.nuvio.app.features.home.filterReleasedItems
@@ -306,12 +307,14 @@ object CatalogRepository {
     }
 
     private fun publishMergedSession(session: MergedCatalogSession, isLoading: Boolean) {
+        val contentType = session.definition.contentTypeForDisplay()
         val mergedItems = mergeHomeRowItems(
             sourceItems = session.sources.map { it.items },
             deduplicate = session.definition.deduplicate,
             maxItems = Int.MAX_VALUE,
             blendMode = session.definition.resolvedBlendMode(),
             sortMode = session.definition.resolvedSortMode(),
+            contentType = contentType,
             hideTitlesWithoutPosters = session.definition.hideTitlesWithoutPosters,
         )
         val hasMore = session.sources.any { it.nextSkip != null }
@@ -324,7 +327,7 @@ object CatalogRepository {
                 session.sources.forEach { source ->
                     val items = com.nuvio.app.features.home.filterMergedHomeItems(
                         items = source.items,
-                        contentType = MergedHomeRowContentType.ALL,
+                        contentType = contentType,
                         hideTitlesWithoutPosters = session.definition.hideTitlesWithoutPosters,
                     )
                     add(
