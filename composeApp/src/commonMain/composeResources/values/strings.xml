@@ -2624,4 +2624,20 @@
     <string name="settings_merged_rows_cancel">Cancel</string>
     <string name="settings_merged_rows_unavailable_source">Some saved sources are currently unavailable. Remove them or choose available catalogs below.</string>
     <string name="settings_merged_rows_duplicate">Duplicate</string>
+
+    <string name="settings_merged_rows_type">Type</string>
+    <string name="settings_merged_rows_type_all">All</string>
+    <string name="settings_merged_rows_type_movies">Movies</string>
+    <string name="settings_merged_rows_type_series">Series</string>
+    <string name="settings_merged_rows_blend">Blend</string>
+    <string name="settings_merged_rows_blend_interleave">Interleave</string>
+    <string name="settings_merged_rows_blend_smart">Smart Freshness &amp; Popularity</string>
+    <string name="settings_merged_rows_sort">Sort</string>
+    <string name="settings_merged_rows_sort_off">Off</string>
+    <string name="settings_merged_rows_sort_popularity">Popularity</string>
+    <string name="settings_merged_rows_sort_top_rated">Top rated</string>
+    <string name="settings_merged_rows_sort_newest">Newest</string>
+    <string name="settings_merged_rows_sort_oldest">Oldest</string>
+    <string name="settings_merged_rows_hide_included">Hide included source rows from Home</string>
+    <string name="settings_merged_rows_hide_without_posters">Hide titles without usable posters</string>
 </resources>
