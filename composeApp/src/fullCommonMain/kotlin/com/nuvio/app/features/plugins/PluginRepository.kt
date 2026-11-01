@@ -678,19 +678,24 @@ actual object PluginRepository {
     private fun ensureStateLoadedForProfile(profileId: Int) {
         var profileChanged = false
         var requiresMigration = false
-        synchronized(profileLock) {
-            if (initialized && currentProfileId == profileId) return
-            if (currentProfileId != profileId) {
-                persistenceGeneration.incrementAndGet()
-                profileChanged = true
-            }
+        val loaded = synchronized(profileLock) {
+            if (initialized && currentProfileId == profileId) {
+                false
+            } else {
+                if (currentProfileId != profileId) {
+                    persistenceGeneration.incrementAndGet()
+                    profileChanged = true
+                }
 
-            currentProfileId = profileId
-            val loadedState = loadStateAsUiState(profileId)
-            _uiState.value = loadedState.state
-            initialized = true
-            requiresMigration = loadedState.requiresMigration
+                currentProfileId = profileId
+                val loadedState = loadStateAsUiState(profileId)
+                _uiState.value = loadedState.state
+                initialized = true
+                requiresMigration = loadedState.requiresMigration
+                true
+            }
         }
+        if (!loaded) return
         if (profileChanged) cancelActiveRefreshes()
         if (requiresMigration) persist()
     }
