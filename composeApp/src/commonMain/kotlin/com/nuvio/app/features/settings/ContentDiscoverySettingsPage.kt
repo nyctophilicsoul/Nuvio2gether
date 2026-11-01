@@ -23,8 +23,10 @@ import org.jetbrains.compose.resources.stringResource
 internal fun LazyListScope.contentDiscoveryContent(
     isTablet: Boolean,
     showPluginsEntry: Boolean,
+    showCloudStreamEntry: Boolean,
     onAddonsClick: () -> Unit,
     onPluginsClick: () -> Unit,
+    onCloudStreamClick: () -> Unit,
     onMediaServersClick: () -> Unit,
 ) {
     item {
@@ -79,6 +81,15 @@ internal fun LazyListScope.contentDiscoveryContent(
                         description = stringResource(Res.string.settings_content_discovery_plugins_description),
                         isTablet = isTablet,
                         onClick = onPluginsClick,
+                    )
+                }
+                if (showCloudStreamEntry) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.compose_settings_page_cloudstream),
+                        description = stringResource(Res.string.settings_content_discovery_cloudstream_description),
+                        isTablet = isTablet,
+                        onClick = onCloudStreamClick,
                     )
                 }
             }
