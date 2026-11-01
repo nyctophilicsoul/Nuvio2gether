@@ -58,8 +58,17 @@ internal actual object CloudStreamPlatformStorage {
 
     actual fun packageExists(storageKey: String): Boolean {
         val manager = NSFileManager.defaultManager
-        val destination = "${packagesDirectory()}/$storageKey.cs3"
-        if (manager.fileExistsAtPath(destination)) return true
+        val directory = packagesDirectory()
+        val destination = "$directory/$storageKey.cs3"
+        val backup = "$directory/$storageKey.backup"
+        if (manager.fileExistsAtPath(destination)) {
+            manager.removeItemAtPath(backup, error = null)
+            return true
+        }
+        // Recover the previous package if the app was terminated during replacement.
+        if (manager.fileExistsAtPath(backup) && manager.moveItemAtPath(backup, destination, error = null)) {
+            return true
+        }
         val legacy = "${packagesRootDirectory()}/$storageKey.cs3"
         return manager.fileExistsAtPath(legacy) && manager.copyItemAtPath(legacy, destination, error = null)
     }
