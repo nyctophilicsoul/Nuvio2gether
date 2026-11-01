@@ -53,6 +53,22 @@ class MergedHomeRowsTest {
         assertTrue(tabs.all { it.hasMore })
     }
 
+    @Test
+    fun mergedSourceLabelsAreShortAndRemoveRedundantCatalogTypes() {
+        assertEquals("Kisskh", cleanMergedSourceTabTitle("Kisskh (other) - Other"))
+        assertEquals("Marvel", cleanMergedSourceTabTitle("Marvel (other) - Other"))
+        assertEquals("MovieBox", cleanMergedSourceTabTitle("MovieBoxIN (other) - Other"))
+        assertEquals("Movies4u", cleanMergedSourceTabTitle("Movies4u (other) - Other"))
+        assertEquals("Prime Video", cleanMergedSourceTabTitle("Prime Video (other) - Other"))
+        assertEquals("Revenge Action", cleanMergedSourceTabTitle("Revenge Action - Movies"))
+        assertEquals("Romance Remake", cleanMergedSourceTabTitle("Romance Remake - Movies"))
+        assertEquals("BanglaPlex 2026", cleanMergedSourceTabTitle("BanglaPlex · 2026 - Movies"))
+        assertEquals("BanglaPlex Latest", cleanMergedSourceTabTitle("BanglaPlex · Latest - Movies"))
+        assertEquals("Anime Mix", cleanMergedSourceTabTitle("Anime - Mixed"))
+        assertEquals("Global Releases", cleanMergedSourceTabTitle("Latest Releases Global - Mixed"))
+        assertEquals("Indian Releases", cleanMergedSourceTabTitle("New Indian Releases - Mixed"))
+    }
+
     private fun item(id: String, type: String = "movie", name: String = id) =
         MetaPreview(id = id, type = type, name = name)
 
