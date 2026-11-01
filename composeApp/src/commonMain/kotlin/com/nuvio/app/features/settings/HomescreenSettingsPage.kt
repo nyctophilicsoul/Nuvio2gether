@@ -119,7 +119,6 @@ import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
 
-@Composable
 internal fun LazyListScope.homescreenSettingsContent(
     isTablet: Boolean,
     heroEnabled: Boolean,
@@ -726,7 +725,6 @@ private fun HomescreenSummaryCard(
 }
 
 @Composable
-@Composable
 private fun HomeScreenBackgroundUrlSettings(isTablet: Boolean) {
     ThemeSettingsRepository.ensureLoaded()
     val savedUrl by ThemeSettingsRepository.homeBackgroundUrl.collectAsStateWithLifecycle()
@@ -797,6 +795,7 @@ private fun HomeScreenBackgroundUrlSettings(isTablet: Boolean) {
     }
 }
 
+@Composable
 private fun HomescreenCatalogList(
     isTablet: Boolean,
     items: List<HomeCatalogSettingsItem>,
