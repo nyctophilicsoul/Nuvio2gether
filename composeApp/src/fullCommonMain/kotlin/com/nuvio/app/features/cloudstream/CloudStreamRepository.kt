@@ -100,7 +100,7 @@ actual object CloudStreamRepository {
                 CloudStreamPlatformStorage.clearAllState()
             }
         }
-        jobsToCancel.forEach(Job::cancel)
+        jobsToCancel.forEach { it.cancel() }
     }
 
     actual fun acceptSecurityWarning() {
@@ -404,26 +404,31 @@ actual object CloudStreamRepository {
 
     actual fun removePlugin(pluginId: String) {
         initialize()
-        val plugin = _uiState.value.plugins.firstOrNull { it.metadata.id.value == pluginId } ?: return
-        CloudStreamPlatformRuntime.unload(pluginId)
-        CloudStreamPlatformStorage.deletePackage(plugin.metadata.id.storageKey)
-        _uiState.update { current ->
-            current.copy(
-                plugins = current.plugins.map { item ->
-                    if (item.metadata.id.value == pluginId) {
-                        item.copy(
-                            installedVersion = null,
-                            installedAtEpochMs = 0L,
-                            enabled = false,
-                            verified = false,
-                            errorMessage = null,
-                        )
-                    } else item
-                },
-                registryRevision = current.registryRevision + 1,
-            )
+        val expectedProfileGeneration = profileGenerationSnapshot()
+        commitForProfile(expectedProfileGeneration) {
+            val plugin = _uiState.value.plugins.firstOrNull { it.metadata.id.value == pluginId }
+                ?: return@commitForProfile
+            CloudStreamPlatformRuntime.unload(pluginId)
+            CloudStreamPlatformStorage.deletePackage(plugin.metadata.id.storageKey)
+            _uiState.update { current ->
+                current.copy(
+                    plugins = current.plugins.map { item ->
+                        if (item.metadata.id.value == pluginId) {
+                            item.copy(
+                                installedVersion = null,
+                                installedAtEpochMs = 0L,
+                                enabled = false,
+                                verified = false,
+                                isInstalling = false,
+                                errorMessage = null,
+                            )
+                        } else item
+                    },
+                    registryRevision = current.registryRevision + 1,
+                )
+            }
+            persist()
         }
-        persist()
     }
 
     actual suspend fun getMainPage(
@@ -476,8 +481,19 @@ actual object CloudStreamRepository {
         if (!item.metadata.status.canInstall) {
             return CloudStreamInstallResult.Error("This CloudStream plugin is marked as down")
         }
-        if (!commitForProfile(expectedProfileGeneration) { markInstalling(pluginId, true, null) }) {
+        var installationStarted = false
+        val startCommitted = commitForProfile(expectedProfileGeneration) {
+            val latest = _uiState.value.plugins.firstOrNull { it.metadata.id.value == pluginId }
+            if (latest != null && !latest.isInstalling && latest.metadata == item.metadata) {
+                markInstalling(pluginId, true, null)
+                installationStarted = true
+            }
+        }
+        if (!startCommitted) {
             return CloudStreamInstallResult.Error("Active profile changed before installation started")
+        }
+        if (!installationStarted) {
+            return CloudStreamInstallResult.Error("CloudStream plugin is already being installed or has changed")
         }
 
         return runCatching {
@@ -512,8 +528,8 @@ actual object CloudStreamRepository {
             val committed = commitForProfile(expectedProfileGeneration) {
                 val currentItem = _uiState.value.plugins.firstOrNull { it.metadata.id.value == pluginId }
                     ?: error("CloudStream plugin was removed before installation completed")
-                check(currentItem.metadata == item.metadata) {
-                    "CloudStream plugin metadata changed during installation; retry the installation"
+                check(currentItem.metadata == item.metadata && currentItem.isInstalling) {
+                    "CloudStream plugin was removed, changed, or its installation was cancelled"
                 }
                 CloudStreamPlatformRuntime.unload(pluginId)
                 CloudStreamPlatformStorage.savePackageAtomically(item.metadata.id.storageKey, bytes)
@@ -634,6 +650,7 @@ actual object CloudStreamRepository {
                     metadata = metadata,
                     compatibility = compatibility,
                     enabled = previousItem.enabled && metadata.status.canInstall && compatibility.isRunnable,
+                    isInstalling = false,
                     errorMessage = null,
                 ) ?: newPluginItem(metadata)
             }
