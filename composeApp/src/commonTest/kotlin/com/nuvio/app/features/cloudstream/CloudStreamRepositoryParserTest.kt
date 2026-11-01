@@ -36,6 +36,7 @@ class CloudStreamRepositoryParserTest {
     fun normalizesGithubRepositoryAndCloudStreamScheme() {
         val expected = "https://raw.githubusercontent.com/Kraptor123/cs-kraptor/master/repo.json"
         assertEquals(expected, normalizeCloudStreamRepositoryUrl("https://github.com/Kraptor123/cs-kraptor"))
+        assertEquals(expected, normalizeCloudStreamRepositoryUrl("https://github.com/Kraptor123/cs-kraptor/tree/master"))
         assertEquals(expected, normalizeCloudStreamRepositoryUrl("cloudstreamrepo://github.com/Kraptor123/cs-kraptor"))
         assertEquals(
             expected,
@@ -192,7 +193,11 @@ class CloudStreamRepositoryParserTest {
     @Test
     fun handlesStatusAndVersionTransitions() {
         assertFalse(CloudStreamPluginStatus.fromWireValue(0).canInstall)
+        assertFalse(CloudStreamPluginStatus.fromWireValue(null).canInstall)
+        assertFalse(CloudStreamPluginStatus.fromWireValue(99).canInstall)
         assertTrue(CloudStreamPluginStatus.fromWireValue(1).canInstall)
+        assertTrue(CloudStreamPluginStatus.fromWireValue(2).canInstall)
+        assertTrue(CloudStreamPluginStatus.fromWireValue(3).canInstall)
         assertEquals(CloudStreamPluginStatus.Unknown, CloudStreamPluginStatus.fromWireValue(99))
     }
 
