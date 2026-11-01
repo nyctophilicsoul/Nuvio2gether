@@ -38,6 +38,7 @@ import java.io.File
 import java.lang.ref.WeakReference
 import java.util.Collections
 import java.util.zip.ZipFile
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -288,6 +289,7 @@ private class AndroidDexCloudStreamProvider(
                         if (items.isNotEmpty()) sections += title to items
                     }
                 }.onFailure { error ->
+                    if (error is CancellationException) throw error
                     synchronized(sections) { lastError = error }
                     log.w(error) { "CloudStream main page failed api=${api.name}" }
                 }
@@ -325,6 +327,7 @@ private class AndroidDexCloudStreamProvider(
                 results += items.map { it.toNuvioSearchItem(api) }
             }
                 .onFailure { error ->
+                    if (error is CancellationException) throw error
                     lastError = error
                     log.w(error) { "CloudStream search failed api=${api.name}" }
                 }
@@ -348,6 +351,7 @@ private class AndroidDexCloudStreamProvider(
                     api.load(url)
                 }?.toNuvioLoadItem(api)
             }.onFailure { error ->
+                if (error is CancellationException) throw error
                 log.w(error) { "CloudStream external-id load failed api=${api.name} id=$externalId" }
             }.getOrNull()
         }
