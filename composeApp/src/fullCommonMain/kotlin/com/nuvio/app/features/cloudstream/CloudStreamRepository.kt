@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -26,38 +28,79 @@ actual object CloudStreamRepository {
     private val _uiState = MutableStateFlow(CloudStreamUiState())
     actual val uiState: StateFlow<CloudStreamUiState> = _uiState.asStateFlow()
 
+    private val profileLock = SynchronizedObject()
+    private var profileGeneration = 0L
     private var initialized = false
     private var currentProfileId = 1
     private val refreshJobs = mutableMapOf<String, Job>()
 
+    private fun profileGenerationSnapshot(): Long = synchronized(profileLock) { profileGeneration }
+
+    /**
+     * All profile-scoped commits are serialized with profile switches. Network and
+     * package downloads happen outside this lock; only the short state/storage commit
+     * is guarded, so an old request cannot write its result into the newly active profile.
+     */
+    private fun commitForProfile(expectedGeneration: Long, action: () -> Unit): Boolean =
+        synchronized(profileLock) {
+            if (profileGeneration != expectedGeneration) {
+                false
+            } else {
+                action()
+                true
+            }
+        }
+
     actual fun initialize() {
-        val profileId = ProfileRepository.activeProfileId.coerceAtLeast(1)
-        if (initialized && currentProfileId == profileId) return
-        currentProfileId = profileId
-        CloudStreamPlatformStorage.setActiveProfile(profileId)
-        initialized = true
-        _uiState.value = restoreState(profileId)
+        val jobsToCancel = mutableListOf<Job>()
+        synchronized(profileLock) {
+            val profileId = ProfileRepository.activeProfileId.coerceAtLeast(1)
+            if (!initialized || currentProfileId != profileId) {
+                if (initialized && currentProfileId != profileId) {
+                    profileGeneration += 1
+                    jobsToCancel += refreshJobs.values
+                    refreshJobs.clear()
+                    CloudStreamPlatformRuntime.clear()
+                }
+                currentProfileId = profileId
+                CloudStreamPlatformStorage.setActiveProfile(profileId)
+                initialized = true
+                _uiState.value = restoreState(profileId)
+            }
+        }
+        jobsToCancel.forEach(Job::cancel)
     }
 
     actual fun onProfileChanged(profileId: Int) {
-        refreshJobs.values.forEach { it.cancel() }
-        refreshJobs.clear()
-        CloudStreamPlatformRuntime.clear()
-        currentProfileId = profileId.coerceAtLeast(1)
-        CloudStreamPlatformStorage.setActiveProfile(currentProfileId)
-        initialized = false
-        _uiState.value = CloudStreamUiState()
+        val jobsToCancel = synchronized(profileLock) {
+            profileGeneration += 1
+            refreshJobs.values.toList().also {
+                refreshJobs.clear()
+                CloudStreamPlatformRuntime.clear()
+                currentProfileId = profileId.coerceAtLeast(1)
+                CloudStreamPlatformStorage.setActiveProfile(currentProfileId)
+                initialized = false
+                _uiState.value = CloudStreamUiState()
+            }
+        }
+        jobsToCancel.forEach(Job::cancel)
     }
 
     actual fun clearLocalState() {
-        refreshJobs.values.forEach { it.cancel() }
-        refreshJobs.clear()
-        initialized = false
-        currentProfileId = 1
-        _uiState.value = CloudStreamUiState()
-        CloudStreamPlatformRuntime.clear()
-        CloudStreamPlatformStorage.clearPackages()
-        CloudStreamPlatformStorage.clearAllState()
+        val jobsToCancel = synchronized(profileLock) {
+            profileGeneration += 1
+            refreshJobs.values.toList().also {
+                refreshJobs.clear()
+                initialized = false
+                currentProfileId = 1
+                _uiState.value = CloudStreamUiState()
+                CloudStreamPlatformRuntime.clear()
+                CloudStreamPlatformStorage.setActiveProfile(1)
+                CloudStreamPlatformStorage.clearPackages()
+                CloudStreamPlatformStorage.clearAllState()
+            }
+        }
+        jobsToCancel.forEach(Job::cancel)
     }
 
     actual fun acceptSecurityWarning() {
