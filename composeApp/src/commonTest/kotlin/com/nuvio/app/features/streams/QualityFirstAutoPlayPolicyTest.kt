@@ -157,6 +157,49 @@ class QualityFirstAutoPlayPolicyTest {
     }
 
     @Test
+    fun `best quality metadata wins when addons report the same direct URL`() {
+        val lowerQuality = stream("A", "https://same/video.mp4", "Movie 720p")
+        val higherQuality = stream("B", "https://same/video.mp4", "Movie 1080p")
+
+        val ranked = QualityFirstAutoPlayPolicy.rankCandidates(
+            listOf(lowerQuality, higherQuality),
+            StreamAutoPlayPreferredQuality.ANY,
+            debridEnabled = true,
+        )
+
+        assertEquals(listOf("B"), ranked.map { it.addonName })
+        assertEquals(1080, QualityFirstAutoPlayPolicy.detectQualityHeight(ranked.single()))
+    }
+
+    @Test
+    fun `same direct URL with different request headers remains distinct`() {
+        val first = StreamItem(
+            name = "Source A",
+            url = "https://same/video.m3u8",
+            addonName = "A",
+            addonId = "addon:a",
+            behaviorHints = StreamBehaviorHints(
+                proxyHeaders = StreamProxyHeaders(request = mapOf("Referer" to "https://a.example")),
+            ),
+        )
+        val second = first.copy(
+            addonName = "B",
+            addonId = "addon:b",
+            behaviorHints = StreamBehaviorHints(
+                proxyHeaders = StreamProxyHeaders(request = mapOf("Referer" to "https://b.example")),
+            ),
+        )
+
+        val ranked = QualityFirstAutoPlayPolicy.rankCandidates(
+            listOf(first, second),
+            StreamAutoPlayPreferredQuality.ANY,
+            debridEnabled = true,
+        )
+
+        assertEquals(listOf("A", "B"), ranked.map { it.addonName })
+    }
+
+    @Test
     fun `filename quality takes precedence over conflicting description metadata`() {
         val stream = StreamItem(
             name = "Movie 1080p BluRay",
