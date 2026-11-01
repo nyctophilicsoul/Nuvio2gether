@@ -14,6 +14,7 @@ import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTes
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 import java.net.URL
 import java.security.MessageDigest
+import java.util.Properties
 
 abstract class DownloadCloudStreamRuntimeTask : DefaultTask() {
     @get:Input
@@ -66,7 +67,6 @@ abstract class DownloadCloudStreamRuntimeTask : DefaultTask() {
         }
     }
 }
-import java.util.Properties
 
 abstract class GenerateRuntimeConfigsTask : DefaultTask() {
     @get:OutputDirectory
