@@ -1675,6 +1675,7 @@
     <string name="profile_remove_pin_for">Remove PIN for %1$s</string>
     <string name="profile_remove_pin_lock">Remove PIN Lock</string>
     <string name="profile_saving">Saving...</string>
+    <string name="profile_save_failed">Couldn't save the profile. Check your connection and try again.</string>
     <string name="profile_security">Security</string>
     <string name="profile_security_pin_disabled">Add a PIN if you want this profile locked before switching into it.</string>
     <string name="profile_security_pin_enabled">This profile is protected with a PIN.</string>
