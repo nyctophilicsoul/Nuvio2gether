@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -67,7 +68,8 @@ fun ProfileBackgroundBackdrop(
             null -> null
         }
 
-        if (backgroundModel == null) {
+        var backgroundImageFailed by remember(backgroundModel) { mutableStateOf(false) }
+        if (backgroundModel == null || backgroundImageFailed) {
             ProfileMeshBackground(
                 profileColor = profileColor,
                 modifier = Modifier.fillMaxSize(),
@@ -78,6 +80,7 @@ fun ProfileBackgroundBackdrop(
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
+                onError = { backgroundImageFailed = true },
             )
             Box(
                 modifier = Modifier
