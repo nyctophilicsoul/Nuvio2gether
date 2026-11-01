@@ -393,20 +393,20 @@ internal fun cleanMergedSourceTabTitle(rawTitle: String): String {
     val hasMixedType = raw.contains("mixed", ignoreCase = true)
     val cleaned = raw
         .replace(
-            Regex("""\\s*\\((?:other|movie|movies|series|tv|mixed)\\)""", RegexOption.IGNORE_CASE),
+            Regex("""\s*\((?:other|movie|movies|series|tv|mixed)\)""", RegexOption.IGNORE_CASE),
             " ",
         )
         .replace(
-            Regex("""\\s*[-–—]\\s*(?:other|movie|movies|series|tv|mixed)\\s*$""", RegexOption.IGNORE_CASE),
+            Regex("""\s*[-–—]\s*(?:other|movie|movies|series|tv|mixed)\s*$""", RegexOption.IGNORE_CASE),
             " ",
         )
         .replace(
-            Regex("""\\b(?:other|movie|movies|series|tv|mixed)/[A-Za-z0-9_.:-]+""", RegexOption.IGNORE_CASE),
+            Regex("""\b(?:other|movie|movies|series|tv|mixed)/[A-Za-z0-9_.:-]+""", RegexOption.IGNORE_CASE),
             " ",
         )
         .replace(Regex("""[·•|]+"""), " ")
         .replace(Regex("""[-–—]+"""), " ")
-        .replace(Regex("""\\s+"""), " ")
+        .replace(Regex("""\s+"""), " ")
         .trim()
     if (cleaned.isBlank()) return "Unnamed Source"
 
@@ -417,7 +417,7 @@ internal fun cleanMergedSourceTabTitle(rawTitle: String): String {
         cleaned.equals("movieboxin", ignoreCase = true) -> "MovieBox"
         else -> cleaned
     }.replace(
-        Regex("""\\bfor you\\b""", RegexOption.IGNORE_CASE),
+        Regex("""\bfor you\b""", RegexOption.IGNORE_CASE),
         "Picks",
     )
 
