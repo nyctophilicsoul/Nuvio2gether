@@ -57,8 +57,18 @@ internal actual object CloudStreamPlatformStorage {
     }
 
     actual fun packageExists(storageKey: String): Boolean {
-        val scoped = File(packagesDirectory(), "$storageKey.cs3")
-        if (scoped.isFile) return true
+        val directory = packagesDirectory()
+        val scoped = File(directory, "$storageKey.cs3")
+        val backup = File(directory, "$storageKey.backup")
+        if (scoped.isFile) {
+            // A process may have been killed after the new package was committed but
+            // before its backup was removed.
+            backup.delete()
+            return true
+        }
+        // Recover the previous known-good package if the process died between moving
+        // the old package aside and committing the replacement.
+        if (backup.isFile && backup.renameTo(scoped)) return true
         val legacy = legacyPackage(storageKey)
         return legacy.isFile && legacy.copyTo(scoped, overwrite = false).isFile
     }
