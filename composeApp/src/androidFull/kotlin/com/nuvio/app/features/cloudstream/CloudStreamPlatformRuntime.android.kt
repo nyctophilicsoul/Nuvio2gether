@@ -126,6 +126,13 @@ internal actual object CloudStreamPlatformRuntime {
                 json.decodeFromString<CloudStreamCs3Manifest>(reader.readText())
             }
         }
+        item.installedVersion?.let { installedVersion ->
+            manifest.version?.let { packageVersion ->
+                require(packageVersion == installedVersion) {
+                    "Installed CloudStream package version $packageVersion does not match recorded version $installedVersion"
+                }
+            }
+        }
         val pluginClassName = manifest.pluginClassName?.takeIf(String::isNotBlank)
             ?: error("CloudStream manifest has no pluginClassName")
         val loader = PathClassLoader(file.absolutePath, context.classLoader)
