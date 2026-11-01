@@ -225,7 +225,7 @@ fun ProfileEditScreen(
                             backgrounds = backgroundCatalog,
                             selectedBackgroundId = selectedBackgroundId,
                             selectedBackgroundUrl = selectedBackgroundUrl,
-                            customBackgroundUrl = selectedBackgroundUrl,
+                            customBackgroundUrl = selectedBackgroundUrl?.takeIf { it.isValidAvatarUrl() },
                             standardBackgroundColor = previewAccent,
                             onSelectionChange = { id, url ->
                                 selectedBackgroundId = id
