@@ -425,6 +425,7 @@ actual object CloudStreamRepository {
 
     private suspend fun installOrUpdate(pluginId: String): CloudStreamInstallResult {
         initialize()
+        val expectedProfileGeneration = profileGenerationSnapshot()
         if (!_uiState.value.securityWarningAccepted) {
             return CloudStreamInstallResult.Error("Accept the third-party plugin security warning before installation")
         }
@@ -433,7 +434,10 @@ actual object CloudStreamRepository {
         if (!item.metadata.status.canInstall) {
             return CloudStreamInstallResult.Error("This CloudStream plugin is marked as down")
         }
-        markInstalling(pluginId, true, null)
+        if (!commitForProfile(expectedProfileGeneration) { markInstalling(pluginId, true, null) }) {
+            return CloudStreamInstallResult.Error("Active profile changed before installation started")
+        }
+
         return runCatching {
             val response = httpRequestRaw(
                 method = "GET",
@@ -461,33 +465,50 @@ actual object CloudStreamRepository {
             val expectedHash = item.metadata.fileHash
             val verified = expectedHash?.matches(bytes) ?: true
             if (expectedHash != null) require(verified) { ".cs3 SHA-256 hash mismatch" }
-            CloudStreamPlatformRuntime.unload(pluginId)
-            CloudStreamPlatformStorage.savePackageAtomically(item.metadata.id.storageKey, bytes)
-            val installed = item.copy(
-                installedVersion = item.metadata.version,
-                installedAtEpochMs = currentEpochMillis(),
-                enabled = item.enabled && verified && item.compatibility.isRunnable,
-                verified = verified,
-                isInstalling = false,
-                errorMessage = null,
-            )
-            _uiState.update { current ->
-                current.copy(
-                    plugins = current.plugins.map { if (it.metadata.id.value == pluginId) installed else it },
-                    registryRevision = current.registryRevision + 1,
+
+            var installed: CloudStreamPluginItem? = null
+            val committed = commitForProfile(expectedProfileGeneration) {
+                val currentItem = _uiState.value.plugins.firstOrNull { it.metadata.id.value == pluginId }
+                    ?: error("CloudStream plugin was removed before installation completed")
+                check(
+                    currentItem.metadata.packageUrl == item.metadata.packageUrl &&
+                        currentItem.metadata.version == item.metadata.version
+                ) {
+                    "CloudStream plugin metadata changed during installation; retry the installation"
+                }
+                CloudStreamPlatformRuntime.unload(pluginId)
+                CloudStreamPlatformStorage.savePackageAtomically(item.metadata.id.storageKey, bytes)
+                installed = currentItem.copy(
+                    installedVersion = currentItem.metadata.version,
+                    installedAtEpochMs = currentEpochMillis(),
+                    enabled = currentItem.enabled && verified && currentItem.compatibility.isRunnable,
+                    verified = verified,
+                    isInstalling = false,
+                    errorMessage = null,
                 )
+                _uiState.update { current ->
+                    current.copy(
+                        plugins = current.plugins.map { plugin ->
+                            if (plugin.metadata.id.value == pluginId) installed!! else plugin
+                        },
+                        registryRevision = current.registryRevision + 1,
+                    )
+                }
+                persist()
             }
-            persist()
-            installed
+            check(committed) { "Active profile changed during installation; no package was committed" }
+            requireNotNull(installed)
         }.fold(
             onSuccess = { CloudStreamInstallResult.Success(it) },
             onFailure = { error ->
                 if (error is CancellationException) {
-                    markInstalling(pluginId, false, null)
+                    commitForProfile(expectedProfileGeneration) { markInstalling(pluginId, false, null) }
                     throw error
                 }
                 log.w(error) { "CloudStream plugin installation failed id=$pluginId" }
-                markInstalling(pluginId, false, error.message ?: "Plugin installation failed")
+                commitForProfile(expectedProfileGeneration) {
+                    markInstalling(pluginId, false, error.message ?: "Plugin installation failed")
+                }
                 CloudStreamInstallResult.Error(error.message ?: "Plugin installation failed")
             },
         )
