@@ -48,7 +48,12 @@ fun ProfileBackgroundBackdrop(
                 ProfileBackgroundRepository.loadSelectedAndPreload(selectedId, isPortrait)
             }
         }
-        val backgroundModel: Any? = when (backgroundSelection) {
+        // User-supplied image/GIF URLs are independent from the supporter background catalogue.
+        // Validate before passing them to Coil so malformed values fall back to the built-in backdrop.
+        val directCustomBackgroundUrl = profile?.profileBackgroundUrl
+            ?.trim()
+            ?.takeIf { it.isValidAvatarUrl() }
+        val backgroundModel: Any? = directCustomBackgroundUrl ?: when (backgroundSelection) {
             is ProfileBackgroundSelection.Catalog -> backgroundCatalog
                 .firstOrNull { it.id == backgroundSelection.id }
                 ?.let { background ->
