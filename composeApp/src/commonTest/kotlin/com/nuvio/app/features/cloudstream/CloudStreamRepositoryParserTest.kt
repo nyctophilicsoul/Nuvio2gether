@@ -101,6 +101,26 @@ class CloudStreamRepositoryParserTest {
     }
 
     @Test
+    fun rejectsMalformedDeclaredPackageHashesButAllowsMissingHashes() {
+        val plugins = CloudStreamRepositoryParser.parsePluginList(
+            repositoryManifestUrl = "https://example.com/repo.json",
+            pluginListUrl = "https://example.com/plugins.json",
+            payload = """
+                [
+                  {"url":"BadAlgorithm.cs3","internalName":"BadAlgorithm","fileHash":"md5-deadbeef"},
+                  {"url":"BadDigest.cs3","internalName":"BadDigest","fileHash":"sha256-not-a-digest"},
+                  {"url":"NoHash.cs3","internalName":"NoHash"},
+                  {"url":"GoodHash.cs3","internalName":"GoodHash","fileHash":"sha256-60c0dc079c6929347fbf7d6e273d14507712775f4631d15e430065d50d374f6a"}
+                ]
+            """.trimIndent(),
+        )
+
+        assertEquals(listOf("GoodHash", "NoHash"), plugins.map { it.internalName })
+        assertTrue(plugins.first { it.internalName == "GoodHash" }.fileHash != null)
+        assertNull(plugins.first { it.internalName == "NoHash" }.fileHash)
+    }
+
+    @Test
     fun acceptsNullableCloudStreamListFields() {
         val plugins = CloudStreamRepositoryParser.parsePluginList(
             repositoryManifestUrl = "https://example.com/repo.json",
