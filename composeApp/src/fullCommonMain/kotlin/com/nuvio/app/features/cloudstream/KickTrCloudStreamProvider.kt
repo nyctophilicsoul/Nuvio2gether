@@ -275,3 +275,13 @@ private fun String.percentEncode(): String = buildString {
         }
     }
 }
+
+
+/** Built-in, reviewed providers shipped with Nuvio; never loads downloaded code. */
+internal object CloudStreamProviderRegistry {
+    private val providers: Map<String, CloudStreamProvider> = mapOf(
+        KickTrCloudStreamProvider.id to KickTrCloudStreamProvider,
+    )
+
+    fun find(providerId: String): CloudStreamProvider? = providers[providerId]
+}
