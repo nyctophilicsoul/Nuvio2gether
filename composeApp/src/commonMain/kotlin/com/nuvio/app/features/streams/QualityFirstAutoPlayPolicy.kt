@@ -38,7 +38,7 @@ object QualityFirstAutoPlayPolicy {
         val candidates = streams
             .filter { p2pEnabled || !it.isTorrentStream }
             .filter { it.isSelectableForPlayback(debridEnabled) }
-            .distinctBy(::identityKey)
+            .distinctBy(::candidateIdentityKey
             .filter { stream ->
                 val height = detectQualityHeight(stream)
                 targetHeight == null || height == targetHeight
@@ -181,10 +181,25 @@ object QualityFirstAutoPlayPolicy {
         }
     }
 
-    private fun identityKey(stream: StreamItem): String {
+    /**
+     * Rebuilds the not-yet-tried fallback queue as more providers finish fetching.
+     * The in-flight candidate stays first, already failed candidates stay excluded,
+     * and newly discovered links follow the current quality/source ranking.
+     */
+    internal fun refreshedFallbackCandidates(
+        current: StreamItem?,
+        discovered: List<StreamItem>,
+        attemptedKeys: Set<String>,
+    ): List<StreamItem> = buildList {
+        current?.let(::add)
+        addAll(discovered)
+    }.filterNot { candidateIdentityKey(it) in attemptedKeys }
+        .distinctBy(::candidateIdentityKey)
+
+    internal fun candidateIdentityKey(stream: StreamItem): String {
         stream.playableDirectUrl?.let { return "url:$it" }
         stream.p2pInfoHash?.let { return "p2p:${it.lowercase()}:${stream.p2pFileIdx ?: -1}" }
-        stream.serverTarget?.let { return "server:${it.item.encode()}:${it.mediaSourceId.orEmpty()}" }
+        stream.serverTarget?.let { return "server:${it.item.encode()}:${stream.mediaSourceId.orEmpty()}" }
         return "stream:${stream.addonId}:${stream.streamLabel}:${stream.behaviorHints.filename.orEmpty()}"
     }
 }
