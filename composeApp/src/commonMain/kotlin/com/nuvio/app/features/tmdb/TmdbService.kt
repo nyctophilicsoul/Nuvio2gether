@@ -2,6 +2,7 @@ package com.nuvio.app.features.tmdb
 
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.httpGetText
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.SerialName
@@ -69,32 +70,33 @@ object TmdbService {
     private suspend fun imdbToTmdb(imdbId: String, mediaType: String, apiKey: String): String? {
         val normalizedType = normalizeMediaType(mediaType)
         val cacheKey = "$imdbId:$normalizedType"
-        cacheMutex.withLock {
-            imdbToTmdbCache[cacheKey]?.let { return it }
-        }
 
-        val body = fetch<TmdbFindResponse>(
-            endpoint = "find/$imdbId",
-            apiKey = apiKey,
-            query = mapOf("external_source" to "imdb_id"),
-        ) ?: return null
+        // Keep the cache check and lookup under the same mutex. Plugin searches
+        // invoke many providers concurrently for the same title; without this,
+        // every provider can issue an identical TMDB /find request.
+        return cacheMutex.withLock {
+            imdbToTmdbCache[cacheKey]?.let { return@withLock it }
 
-        val resultId = when (normalizedType) {
-            "movie" -> body.movieResults.firstOrNull()?.id
-            "tv" -> body.tvResults.firstOrNull()?.id
-            else -> body.movieResults.firstOrNull()?.id ?: body.tvResults.firstOrNull()?.id
-        }?.takeIf { it > 0 }?.toString()
+            val body = fetch<TmdbFindResponse>(
+                endpoint = "find/$imdbId",
+                apiKey = apiKey,
+                query = mapOf("external_source" to "imdb_id"),
+            ) ?: return@withLock null
 
-        if (resultId != null) {
-            cacheMutex.withLock {
+            val resultId = when (normalizedType) {
+                "movie" -> body.movieResults.firstOrNull()?.id
+                "tv" -> body.tvResults.firstOrNull()?.id
+                else -> body.movieResults.firstOrNull()?.id ?: body.tvResults.firstOrNull()?.id
+            }?.takeIf { it > 0 }?.toString()
+
+            if (resultId != null) {
                 imdbToTmdbCache[cacheKey] = resultId
                 tmdbToImdbCache["$resultId:$normalizedType"] = imdbId
+            } else {
+                log.d { "No TMDB ID found for $imdbId ($normalizedType)" }
             }
-        } else {
-            log.d { "No TMDB ID found for $imdbId ($normalizedType)" }
+            resultId
         }
-
-        return resultId
     }
 
     private suspend inline fun <reified T> fetch(
@@ -103,11 +105,14 @@ object TmdbService {
         query: Map<String, String> = emptyMap(),
     ): T? {
         val url = buildTmdbUrl(endpoint = endpoint, apiKey = apiKey, query = query)
-        return runCatching {
+        return try {
             json.decodeFromString<T>(httpGetText(url))
-        }.onFailure { error ->
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
             log.w { "TMDB request failed for $endpoint: ${error.message}" }
-        }.getOrNull()
+            null
+        }
     }
 
     internal fun normalizeMediaType(mediaType: String): String =
