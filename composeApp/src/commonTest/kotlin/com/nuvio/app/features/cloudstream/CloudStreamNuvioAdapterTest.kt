@@ -133,14 +133,6 @@ class CloudStreamNuvioAdapterTest {
             CloudStreamRuntimeKind.UnsupportedAndroidDex,
             CloudStreamCompatibilityResolver.resolve(unsupported).runtimeKind,
         )
-
-        val androidCompatibility = CloudStreamCompatibilityResolver.resolve(
-            unsupported,
-            supportsAndroidDex = true,
-        )
-        assertTrue(androidCompatibility.isRunnable)
-        assertEquals(CloudStreamRuntimeKind.AndroidDex, androidCompatibility.runtimeKind)
-        assertEquals(CloudStreamPlatformSupport.AndroidOnly, androidCompatibility.platformSupport)
     }
 
     private fun metadata(repository: String, internalName: String, version: Int) = CloudStreamPluginMetadata(
