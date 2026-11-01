@@ -106,20 +106,19 @@ class CloudStreamRepositoryParserTest {
     }
 
     @Test
-    fun skipsMalformedPluginWithoutBreakingValidEntries() {
-        val plugins = CloudStreamRepositoryParser.parsePluginList(
-            repositoryManifestUrl = "https://example.com/repo.json",
-            pluginListUrl = "https://example.com/plugins.json",
-            payload = """
-                [
-                  {"name":"Missing identity"},
-                  {"url":"Good.cs3","internalName":"Good","name":"Good","version":1,"status":2}
-                ]
-            """.trimIndent(),
-        )
-
-        assertEquals(1, plugins.size)
-        assertEquals(CloudStreamPluginStatus.Slow, plugins.single().status)
+    fun rejectsPartiallyMalformedPluginListsToPreventDestructiveRefreshes() {
+        assertFailsWith<IllegalArgumentException> {
+            CloudStreamRepositoryParser.parsePluginList(
+                repositoryManifestUrl = "https://example.com/repo.json",
+                pluginListUrl = "https://example.com/plugins.json",
+                payload = """
+                    [
+                      {"name":"Missing identity"},
+                      {"url":"Good.cs3","internalName":"Good","name":"Good","version":1,"status":2}
+                    ]
+                """.trimIndent(),
+            )
+        }
     }
 
     @Test
@@ -172,19 +171,19 @@ class CloudStreamRepositoryParserTest {
     }
 
     @Test
-    fun skipsEntryWithInvalidFieldTypeWithoutDroppingWholeList() {
-        val plugins = CloudStreamRepositoryParser.parsePluginList(
-            repositoryManifestUrl = "https://example.com/repo.json",
-            pluginListUrl = "https://example.com/plugins.json",
-            payload = """
-                [
-                  {"url":"Broken.cs3","internalName":"Broken","version":"not-a-number"},
-                  {"url":"Good.cs3","internalName":"Good","version":2}
-                ]
-            """.trimIndent(),
-        )
-
-        assertEquals(listOf("Good"), plugins.map { it.internalName })
+    fun rejectsPluginListsContainingEntriesWithInvalidFieldTypes() {
+        assertFailsWith<IllegalArgumentException> {
+            CloudStreamRepositoryParser.parsePluginList(
+                repositoryManifestUrl = "https://example.com/repo.json",
+                pluginListUrl = "https://example.com/plugins.json",
+                payload = """
+                    [
+                      {"url":"Broken.cs3","internalName":"Broken","version":"not-a-number"},
+                      {"url":"Good.cs3","internalName":"Good","version":2}
+                    ]
+                """.trimIndent(),
+            )
+        }
     }
 
     @Test
