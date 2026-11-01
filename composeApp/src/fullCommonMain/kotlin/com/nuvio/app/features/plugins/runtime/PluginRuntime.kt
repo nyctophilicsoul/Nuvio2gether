@@ -161,7 +161,7 @@ internal object PluginRuntime {
             addModule(domBridge)
         }
 
-        try {
+        return try {
             jsRuntime.use {
                 hostRegistry.registerAll(this)
                 evaluateCached({ JsRuntime.polyfillBytecode(this) }, JsBindings.staticPolyfillCode)
