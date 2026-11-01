@@ -36,6 +36,9 @@ actual object CloudStreamRepository {
 
     private fun profileGenerationSnapshot(): Long = synchronized(profileLock) { profileGeneration }
 
+    private fun isProfileGenerationCurrent(expectedGeneration: Long): Boolean =
+        synchronized(profileLock) { profileGeneration == expectedGeneration }
+
     /**
      * All profile-scoped commits are serialized with profile switches. Network and
      * package downloads happen outside this lock; only the short state/storage commit
@@ -114,9 +117,7 @@ actual object CloudStreamRepository {
         val expectedProfileGeneration = profileGenerationSnapshot()
         val manifestUrl = runCatching { resolveCloudStreamRepositoryInput(rawUrl) }
             .getOrElse { return AddCloudStreamRepositoryResult.Error(it.message ?: "Invalid repository URL") }
-        if (!commitForProfile(expectedProfileGeneration) {
-                // A profile switch invalidates this request before any state mutation.
-            }) {
+        if (!isProfileGenerationCurrent(expectedProfileGeneration)) {
             return AddCloudStreamRepositoryResult.Error("Active profile changed while resolving the repository link")
         }
         if (_uiState.value.repositories.any { it.manifest.sourceUrl == manifestUrl }) {
@@ -470,7 +471,7 @@ actual object CloudStreamRepository {
     ): CloudStreamInstallResult {
         initialize()
         val expectedProfileGeneration = expectedGeneration ?: profileGenerationSnapshot()
-        if (!commitForProfile(expectedProfileGeneration) {}) {
+        if (!isProfileGenerationCurrent(expectedProfileGeneration)) {
             return CloudStreamInstallResult.Error("Active profile changed before installation started")
         }
         if (!_uiState.value.securityWarningAccepted) {
