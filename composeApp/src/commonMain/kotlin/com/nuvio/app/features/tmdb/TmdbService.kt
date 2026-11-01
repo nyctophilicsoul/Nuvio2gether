@@ -3,6 +3,7 @@ package com.nuvio.app.features.tmdb
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.httpGetText
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.SerialName
@@ -15,6 +16,7 @@ object TmdbService {
     private val imdbToTmdbCache = linkedMapOf<String, String>()
     private val tmdbToImdbCache = linkedMapOf<String, String>()
     private val cacheMutex = Mutex()
+    private val imdbToTmdbInFlight = mutableMapOf<String, CompletableDeferred<String?>>()
 
     suspend fun ensureTmdbId(videoId: String, mediaType: String, fallbackImdbId: String? = null): String? {
         val apiKey = TmdbSettingsRepository.effectiveApiKey()
@@ -71,31 +73,61 @@ object TmdbService {
         val normalizedType = normalizeMediaType(mediaType)
         val cacheKey = "$imdbId:$normalizedType"
 
-        // Keep the cache check and lookup under the same mutex. Plugin searches
-        // invoke many providers concurrently for the same title; without this,
-        // every provider can issue an identical TMDB /find request.
-        return cacheMutex.withLock {
-            imdbToTmdbCache[cacheKey]?.let { return@withLock it }
+        // Coalesce concurrent requests for the same IMDb ID. One provider owns
+        // the network lookup; all other providers await the same result instead
+        // of serially repeating a failing or rate-limited TMDB request.
+        val (lookup, isOwner) = cacheMutex.withLock {
+            imdbToTmdbCache[cacheKey]?.let { return it }
+            val existing = imdbToTmdbInFlight[cacheKey]
+            if (existing != null) {
+                existing to false
+            } else {
+                CompletableDeferred<String?>().also {
+                    imdbToTmdbInFlight[cacheKey] = it
+                } to true
+            }
+        }
 
+        if (!isOwner) return lookup.await()
+
+        try {
             val body = fetch<TmdbFindResponse>(
                 endpoint = "find/$imdbId",
                 apiKey = apiKey,
                 query = mapOf("external_source" to "imdb_id"),
-            ) ?: return@withLock null
-
-            val resultId = when (normalizedType) {
-                "movie" -> body.movieResults.firstOrNull()?.id
-                "tv" -> body.tvResults.firstOrNull()?.id
-                else -> body.movieResults.firstOrNull()?.id ?: body.tvResults.firstOrNull()?.id
-            }?.takeIf { it > 0 }?.toString()
-
-            if (resultId != null) {
-                imdbToTmdbCache[cacheKey] = resultId
-                tmdbToImdbCache["$resultId:$normalizedType"] = imdbId
-            } else {
-                log.d { "No TMDB ID found for $imdbId ($normalizedType)" }
+            )
+            val resultId = body?.let {
+                when (normalizedType) {
+                    "movie" -> it.movieResults.firstOrNull()?.id
+                    "tv" -> it.tvResults.firstOrNull()?.id
+                    else -> it.movieResults.firstOrNull()?.id ?: it.tvResults.firstOrNull()?.id
+                }?.takeIf { id -> id > 0 }?.toString()
             }
-            resultId
+
+            cacheMutex.withLock {
+                if (resultId != null) {
+                    imdbToTmdbCache[cacheKey] = resultId
+                    tmdbToImdbCache["$resultId:$normalizedType"] = imdbId
+                } else {
+                    log.d { "No TMDB ID found for $imdbId ($normalizedType)" }
+                }
+                imdbToTmdbInFlight.remove(cacheKey)
+                lookup.complete(resultId)
+            }
+            return resultId
+        } catch (cancelled: CancellationException) {
+            cacheMutex.withLock {
+                imdbToTmdbInFlight.remove(cacheKey)
+                lookup.cancel(cancelled)
+            }
+            throw cancelled
+        } catch (error: Exception) {
+            log.w(error) { "TMDB ID lookup failed for $imdbId ($normalizedType)" }
+            cacheMutex.withLock {
+                imdbToTmdbInFlight.remove(cacheKey)
+                lookup.complete(null)
+            }
+            return null
         }
     }
 
