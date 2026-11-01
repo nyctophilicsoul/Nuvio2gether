@@ -340,14 +340,14 @@ internal fun cleanMergedSourceTabTitle(rawTitle: String): String {
         .replace(Regex("[-–—]+"), " ")
         .replace(Regex("\\s+"), " ")
         .trim()
-    if (cleaned.isBlank()) return rawTitle.trim().take(32)
+    if (cleaned.isBlank()) return "Unnamed Source"
     val words = cleaned.split(' ')
         .filter { it.isNotBlank() && it.lowercase() !in setOf("movie", "movies", "series", "tv", "all", "catalog", "catalogs") }
-    if (words.isEmpty()) return rawTitle.trim().take(32)
+    if (words.isEmpty()) return "Unnamed Source"
     val shortWords = when {
         words.size <= 3 -> words
         words.last().equals("next", ignoreCase = true) -> listOf(words.first(), words.last())
         else -> words.take(3)
     }
-    return shortWords.joinToString(" ")
+    return if (shortWords.size == 1) "${shortWords.first()} Feed" else shortWords.joinToString(" ")
 }
