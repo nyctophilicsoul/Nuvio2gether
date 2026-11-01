@@ -721,6 +721,12 @@
     <string name="settings_homescreen_section_catalogs">CATALOGS</string>
     <string name="settings_homescreen_section_catalogs_collections">CATALOGS &amp; COLLECTIONS</string>
     <string name="settings_homescreen_section_collections">COLLECTIONS</string>
+    <string name="settings_homescreen_background_title">HOME SCREEN BACKGROUND</string>
+    <string name="settings_homescreen_background_description">Use a custom image URL behind the Home screen. Leave blank to use the default background.</string>
+    <string name="settings_homescreen_background_url">Image URL</string>
+    <string name="settings_homescreen_background_save">Save</string>
+    <string name="settings_homescreen_background_clear">Clear</string>
+    <string name="settings_homescreen_background_invalid_url">Enter a valid HTTP or HTTPS image URL.</string>
     <string name="settings_homescreen_section_hero">HOME LAYOUT</string>
     <string name="settings_homescreen_section_hero_sources">HERO CATALOGS</string>
     <string name="settings_homescreen_selected_count">%1$d of %2$d selected</string>
