@@ -13,7 +13,7 @@ data class CloudStreamPluginItem(
     val compatibility: CloudStreamCompatibility,
     val installedVersion: Int? = null,
     val installedAtEpochMs: Long = 0L,
-    /** Hash verified against the bytes currently installed, not the latest repository metadata. */
+    /** Package passed structural inspection and any repository-declared checksum matched. */
     val installedFileHash: String? = null,
     val enabled: Boolean = false,
     val verified: Boolean = false,
@@ -34,7 +34,7 @@ data class CloudStreamPluginItem(
     val canDownloadPackage: Boolean
         get() = metadata.status.canInstall && !isInstalling
 
-    /** Only a verified package with a reviewed, supported runtime may be enabled. */
+    /** Only a validated package with a supported runtime may be enabled. */
     val canEnableProvider: Boolean
         get() = isInstalled && verified && compatibility.isRunnable && metadata.status.canInstall
 
