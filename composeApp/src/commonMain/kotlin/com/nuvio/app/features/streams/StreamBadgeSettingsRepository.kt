@@ -26,6 +26,7 @@ data class StreamBadgeSettingsUiState(
     val backgroundMode: StreamBackgroundMode = StreamBackgroundMode.Normal,
     val streamFormattingEnabled: Boolean = false,
     val streamFormatPreset: StreamFormatPreset = StreamFormatPreset.NUVIOEX_MODERN,
+    val streamFormattingScope: StreamFormattingScope = StreamFormattingScope(),
 )
 
 enum class StreamBackgroundMode {
@@ -58,6 +59,7 @@ object StreamBadgeSettingsRepository {
     private var backgroundMode = StreamBackgroundMode.Normal
     private var streamFormattingEnabled = false
     private var streamFormatPreset = StreamFormatPreset.NUVIOEX_MODERN
+    private var streamFormattingScope = StreamFormattingScope()
 
     fun ensureLoaded() {
         if (hasLoaded) return
@@ -79,6 +81,7 @@ object StreamBadgeSettingsRepository {
         backgroundMode = StreamBackgroundMode.Normal
         streamFormattingEnabled = false
         streamFormatPreset = StreamFormatPreset.NUVIOEX_MODERN
+        streamFormattingScope = StreamFormattingScope()
         _uiState.value = StreamBadgeSettingsUiState()
     }
 
@@ -208,6 +211,14 @@ object StreamBadgeSettingsRepository {
         StreamBadgeSettingsStorage.saveStreamFormatPreset(preset.name)
     }
 
+    fun setStreamFormattingScope(scope: StreamFormattingScope) {
+        ensureLoaded()
+        if (streamFormattingScope == scope) return
+        streamFormattingScope = scope
+        publish()
+        StreamBadgeSettingsStorage.saveStreamFormattingScope(json.encodeToString(scope))
+    }
+
     fun setBackgroundMode(mode: StreamBackgroundMode) {
         ensureLoaded()
         if (backgroundMode == mode) return
@@ -233,6 +244,9 @@ object StreamBadgeSettingsRepository {
         streamFormatPreset = StreamBadgeSettingsStorage.loadStreamFormatPreset()
             ?.let { stored -> StreamFormatPreset.entries.firstOrNull { it.name.equals(stored, ignoreCase = true) } }
             ?: StreamFormatPreset.NUVIOEX_MODERN
+        streamFormattingScope = StreamBadgeSettingsStorage.loadStreamFormattingScope()
+            ?.let { stored -> runCatching { json.decodeFromString<StreamFormattingScope>(stored) }.getOrNull() }
+            ?: StreamFormattingScope()
         backgroundMode = StreamBadgeSettingsStorage.loadStreamBackgroundMode()
             ?.let { storedMode -> StreamBackgroundMode.entries.firstOrNull { it.name.equals(storedMode, ignoreCase = true) } }
             ?: StreamBackgroundMode.Normal
@@ -261,6 +275,7 @@ object StreamBadgeSettingsRepository {
             backgroundMode = backgroundMode,
             streamFormattingEnabled = streamFormattingEnabled,
             streamFormatPreset = streamFormatPreset,
+            streamFormattingScope = streamFormattingScope,
         )
     }
 
