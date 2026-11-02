@@ -64,6 +64,7 @@ internal actual object CloudStreamPlatformRuntime {
         val androidContext = context as? Context ?: return
         appContext = androidContext.applicationContext
         activityReference = (androidContext as? Activity)?.let(::WeakReference)
+        activityReference?.get()?.let(CommonActivity::setActivityInstance)
     }
 
     actual suspend fun provider(plugin: CloudStreamPluginItem): CloudStreamProvider? {
@@ -116,10 +117,13 @@ internal actual object CloudStreamPlatformRuntime {
                 }
             }
         }
-        item.metadata.fileHash?.let { expectedHash ->
-            require(expectedHash.matches(file.readBytes())) {
-                "Installed CloudStream package SHA-256 no longer matches metadata"
-            }
+        val packageBytes = file.readBytes()
+        // Recheck the archive on every load and validate against the checksum that
+        // belongs to this installed version. Repository metadata may already describe
+        // a newer version whose checksum must not be applied to the older installed file.
+        CloudStreamPackageInspector.inspect(packageBytes)
+        require(matchesInstalledCloudStreamPackage(item.installedFileHash, packageBytes)) {
+            "Installed CloudStream package SHA-256 no longer matches its installed checksum"
         }
         require(file.setReadOnly() || !file.canWrite()) { "CloudStream package could not be made read-only" }
 
