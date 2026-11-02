@@ -265,6 +265,9 @@ object HomeRepository {
             if (todayIsoDate == null) this else filterReleasedItems(todayIsoDate)
         fun HomeCatalogSection.withPosterOverlay(): HomeCatalogSection =
             copy(items = items.reapplyCustomPosterUrls(posterPattern))
+        fun HomeCatalogSection.withGlobalPosterFilter(): HomeCatalogSection =
+            if (!snapshot.hideMergedTitlesWithoutPosters) this
+            else copy(items = items.filterNot { it.poster.isNullOrBlank() })
 
         val hiddenIncludedSourceKeys = snapshot.mergedRows
             .asSequence()
@@ -284,6 +287,7 @@ object HomeRepository {
                 val section = cachedSections[definition.cacheKey]
                     ?.withPosterOverlay()
                     ?.withReleaseFilter()
+                    ?.withGlobalPosterFilter()
                     ?: return@mapNotNull null
                 if (section.items.isEmpty()) return@mapNotNull null
                 val customTitle = preference?.customTitle.orEmpty()
@@ -302,6 +306,7 @@ object HomeRepository {
                 ?: cachedSections[definition.cacheKey]
                     ?.withPosterOverlay()
                     ?.withReleaseFilter()
+                    ?.withGlobalPosterFilter()
                 ?: return@mapNotNull null
             if (section.items.isEmpty() && !section.hasMore) return@mapNotNull null
             val customTitle = preferences[definition.key]?.customTitle.orEmpty()
@@ -326,7 +331,7 @@ object HomeRepository {
                     blendMode = mergedRow.resolvedBlendMode(),
                     sortMode = MergedHomeRowSortMode.OFF,
                     contentType = contentType,
-                    hideTitlesWithoutPosters = snapshot.hideMergedTitlesWithoutPosters,
+                    hideTitlesWithoutPosters = false,
                 )
                 val hasMore = sourceSections.any(HomeCatalogSection::hasMore)
                 // Keep the home entry reachable when the preview page has no items matching
@@ -348,7 +353,7 @@ object HomeRepository {
                             val sourceItems = filterMergedHomeItems(
                                 items = source.items,
                                 contentType = contentType,
-                                hideTitlesWithoutPosters = snapshot.hideMergedTitlesWithoutPosters,
+                                hideTitlesWithoutPosters = false,
                             )
                             add(
                                 HomeCatalogTab(
