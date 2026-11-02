@@ -1081,7 +1081,14 @@ fun HomeScreen(
                     }
                 }
 
-                !hasActiveAddons && !hasServerLibraries && !hasRenderableCollectionRows -> {
+                shouldShowHomeEmptyState(
+                    hasActiveAddons = hasActiveAddons,
+                    hasServerLibraries = hasServerLibraries,
+                    hasRenderableCollectionRows = hasRenderableCollectionRows,
+                    hasCloudStreamRows = homeUiState.sections.any { section ->
+                        section.key.startsWith("cloudstream:")
+                    },
+                ) -> {
                     homeContinueWatchingSections(
                         preferences = continueWatchingPreferences,
                         continueWatchingItems = continueWatchingItems,
