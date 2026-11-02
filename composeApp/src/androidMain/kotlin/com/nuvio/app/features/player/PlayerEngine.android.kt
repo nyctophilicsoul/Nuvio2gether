@@ -721,7 +721,9 @@ private fun ExoPlayerSurface(
 
         fun scheduleLiveReconnect(error: PlaybackException): Boolean {
             val recoverable = error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW ||
-                error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED
+                error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED ||
+                error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
+                error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
             if (!isLive || !recoverable || liveReconnectAttempts >= MAX_LIVE_RECONNECT_ATTEMPTS) return false
             if (liveReconnectJob.value?.isActive == true) return true
 
