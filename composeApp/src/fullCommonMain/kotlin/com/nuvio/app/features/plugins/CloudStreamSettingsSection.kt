@@ -143,6 +143,21 @@ internal fun CloudStreamSettingsSection() {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Spacer(Modifier.height(14.dp))
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Group providers by repository", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "Show one CloudStream source group per repository on the Streams screen. Fetching remains independent.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = state.groupStreamsByRepository,
+                onCheckedChange = CloudStreamRepository::setGroupStreamsByRepository,
+            )
+        }
     }
 
     if (!state.securityWarningAccepted) {
