@@ -32,6 +32,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 import kotlin.random.Random
@@ -169,8 +171,10 @@ object HomeRepository {
             // Plugins are independent. Fetch them concurrently so one slow extension
             // cannot hold every other CloudStream catalog behind it.
             val sections = coroutineScope {
+                val pluginSemaphore = Semaphore(3)
                 plugins.map { plugin ->
                     async {
+                        pluginSemaphore.withPermit {
                         try {
                             CloudStreamRepository.getMainPage(plugin.metadata.id.value, 1).getOrThrow()
                                 .mapNotNull { (sectionName, items) ->
@@ -193,6 +197,7 @@ object HomeRepository {
                         } catch (error: Throwable) {
                             log.w(error) { "CloudStream home catalog failed plugin=${plugin.metadata.name} id=${plugin.metadata.id.value}" }
                             emptyList()
+                        }
                         }
                     }
                 }.awaitAll().flatten()
