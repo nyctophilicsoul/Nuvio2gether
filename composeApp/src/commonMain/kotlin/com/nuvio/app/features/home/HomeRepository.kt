@@ -27,6 +27,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -165,30 +166,36 @@ object HomeRepository {
             plugin.isRunnable && plugin.metadata.id.value !in state.hiddenHomeCatalogProviderIds
         }
         cloudStreamHomeJob = scope.launch {
-            val sections = plugins.flatMap { plugin ->
-                try {
-                    CloudStreamRepository.getMainPage(plugin.metadata.id.value, 1).getOrThrow()
-                        .mapNotNull { (sectionName, items) ->
-                            if (items.isEmpty()) return@mapNotNull null
-                            val contentType = items.firstOrNull()?.type?.nuvioType ?: "other"
-                            HomeCatalogSection(
-                                key = "cloudstream:" + plugin.metadata.id.value + ":" + sectionName,
-                                title = sectionName,
-                                subtitle = plugin.metadata.name,
-                                addonName = plugin.metadata.name,
-                                target = CatalogTarget.CloudStream(plugin.metadata.id.value, sectionName, contentType),
-                                items = items.map { it.toMetaPreview() },
-                                availableItemCount = items.size,
-                                hasMore = false,
-                                supportsViewAll = true,
-                            )
+            // Plugins are independent. Fetch them concurrently so one slow extension
+            // cannot hold every other CloudStream catalog behind it.
+            val sections = coroutineScope {
+                plugins.map { plugin ->
+                    async {
+                        try {
+                            CloudStreamRepository.getMainPage(plugin.metadata.id.value, 1).getOrThrow()
+                                .mapNotNull { (sectionName, items) ->
+                                    if (items.isEmpty()) return@mapNotNull null
+                                    val contentType = items.firstOrNull()?.type?.nuvioType ?: "other"
+                                    HomeCatalogSection(
+                                        key = "cloudstream:" + plugin.metadata.id.value + ":" + sectionName,
+                                        title = sectionName,
+                                        subtitle = plugin.metadata.name,
+                                        addonName = plugin.metadata.name,
+                                        target = CatalogTarget.CloudStream(plugin.metadata.id.value, sectionName, contentType),
+                                        items = items.map { it.toMetaPreview() },
+                                        availableItemCount = items.size,
+                                        hasMore = false,
+                                        supportsViewAll = true,
+                                    )
+                                }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (error: Throwable) {
+                            log.w(error) { "CloudStream home catalog failed plugin=${plugin.metadata.name} id=${plugin.metadata.id.value}" }
+                            emptyList()
                         }
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (error: Throwable) {
-                    log.w(error) { "CloudStream home catalog failed plugin=${plugin.metadata.name} id=${plugin.metadata.id.value}" }
-                    emptyList()
-                }
+                    }
+                }.awaitAll().flatten()
             }
             cachedCloudStreamSections = sections
             publishCurrentState(isLoading = _uiState.value.isLoading, requestKey = currentRequestKey)
