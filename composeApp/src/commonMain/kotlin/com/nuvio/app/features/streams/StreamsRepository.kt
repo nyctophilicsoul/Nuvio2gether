@@ -723,12 +723,12 @@ object StreamsRepository {
                                     if (group.addonId != completion.addonId) {
                                         group
                                     } else {
-                                        val mergedStreams = if (presentedPluginStreams.isEmpty()) {
-                                            group.streams
+                                        val combinedStreams = group.streams + presentedPluginStreams
+                                        // Keep progressive results cheap; sort once when this provider group finishes.
+                                        val mergedStreams = if (remaining > 0) {
+                                            combinedStreams
                                         } else {
-                                            val combined = group.streams + presentedPluginStreams
-                                            // Keep progressive results cheap; sort once when this provider group finishes.
-                                            if (remaining > 0) combined else combined.sortedForGroupedDisplay()
+                                            combinedStreams.sortedForGroupedDisplay()
                                         }
                                         val stillLoading = remaining > 0
                                         val finalError = if (mergedStreams.isEmpty() && !stillLoading) {
