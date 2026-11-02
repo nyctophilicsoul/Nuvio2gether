@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.Groups
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Forward10
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
@@ -316,6 +317,7 @@ internal fun PlayerControlsShell(
                     onSpeedClick = onSpeedClick,
                     onSubtitleClick = onSubtitleClick,
                     onAudioClick = onAudioClick,
+                    onStreamInfoClick = onStreamInfoClick,
                     onSourcesClick = onSourcesClick,
                     onEpisodesClick = onEpisodesClick,
                     chapters = chapters,
@@ -691,6 +693,7 @@ private fun ProgressControls(
     onSpeedClick: () -> Unit,
     onSubtitleClick: () -> Unit,
     onAudioClick: () -> Unit,
+    onStreamInfoClick: () -> Unit = {},
     onSourcesClick: (() -> Unit)? = null,
     onEpisodesClick: (() -> Unit)? = null,
     chapters: List<PlayerChapter> = emptyList(),
@@ -754,6 +757,11 @@ private fun ProgressControls(
                         label = stringResource(Res.string.compose_player_audio),
                         painter = audioPainter,
                         onClick = onAudioClick,
+                    )
+                    PlayerActionPillButton(
+                        label = stringResource(Res.string.cd_stream_info),
+                        icon = Icons.Rounded.Info,
+                        onClick = onStreamInfoClick,
                     )
                     if (onChaptersClick != null) {
                         PlayerActionPillButton(
