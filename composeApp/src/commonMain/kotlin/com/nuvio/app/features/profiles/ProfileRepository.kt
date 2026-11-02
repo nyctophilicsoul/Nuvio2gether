@@ -136,7 +136,12 @@ object ProfileRepository {
         }
         try {
             val result = SupabaseProvider.client.postgrest.rpc("sync_pull_profiles")
-            val cachedProfiles = decodeStoredPayload()?.profiles.orEmpty().associateBy { it.profileIndex }
+            val currentUserId = (AuthRepository.state.value as? AuthState.Authenticated)?.userId
+            val cachedProfiles = decodeStoredPayload()
+                ?.takeIf { it.userId == currentUserId }
+                ?.profiles
+                .orEmpty()
+                .associateBy { it.profileIndex }
             val profiles = result.decodeList<NuvioProfile>().map { remoteProfile ->
                 val cachedProfile = cachedProfiles[remoteProfile.profileIndex]
                 // Keep custom backgrounds available on installations whose profile-sync
