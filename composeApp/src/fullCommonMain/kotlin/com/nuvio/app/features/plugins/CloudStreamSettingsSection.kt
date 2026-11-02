@@ -80,19 +80,22 @@ internal fun CloudStreamSettingsSection() {
     var editingRepositoryUrl by rememberSaveable { mutableStateOf<String?>(null) }
     var isAddingRepository by remember { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
-    var selectedLanguage by rememberSaveable { mutableStateOf<String?>(null) }
-    var selectedType by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedLanguages by rememberSaveable { mutableStateOf<Set<String>>(emptySet()) }
+    var selectedTypes by rememberSaveable { mutableStateOf<Set<String>>(emptySet()) }
+    var selectedRepositoryUrl by rememberSaveable { mutableStateOf<String?>(null) }
     var message by rememberSaveable { mutableStateOf<String?>(null) }
     var bulkInstallMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var isBulkInstalling by remember { mutableStateOf(false) }
 
     val languages = remember(state.plugins) {
-        state.plugins.mapNotNull { it.metadata.language }.distinct().sorted()
+        state.plugins.flatMap { item -> item.metadata.language.orEmpty().split(',', ';') }
+            .map(String::trim).filter(String::isNotBlank).distinctBy(String::uppercase).sorted()
     }
     val types = remember(state.plugins) {
-        state.plugins.flatMap { it.metadata.rawTvTypes }.distinct().sorted()
+        state.plugins.flatMap { item -> item.metadata.rawTvTypes.flatMap { it.split(',', ';') } }
+            .map(String::trim).filter(String::isNotBlank).distinctBy(String::lowercase).sorted()
     }
-    val visiblePlugins = remember(state.plugins, query, selectedLanguage, selectedType) {
+    val visiblePlugins = remember(state.plugins, query, selectedLanguages, selectedTypes, selectedRepositoryUrl) {
         val normalizedQuery = query.trim().lowercase()
         state.plugins.filter { item ->
             (normalizedQuery.isBlank() || listOf(
@@ -101,8 +104,9 @@ internal fun CloudStreamSettingsSection() {
                 item.metadata.description.orEmpty(),
                 item.metadata.authors.joinToString(" "),
             ).any { it.lowercase().contains(normalizedQuery) }) &&
-                (selectedLanguage == null || item.metadata.language == selectedLanguage) &&
-                (selectedType == null || selectedType in item.metadata.rawTvTypes)
+                (selectedLanguages.isEmpty() || item.metadata.language.orEmpty().split(',', ';').map(String::trim).any { it.equalsAnyIgnoreCase(selectedLanguages) }) &&
+                (selectedTypes.isEmpty() || item.metadata.rawTvTypes.flatMap { it.split(',', ';') }.map(String::trim).any { it.equalsAnyIgnoreCase(selectedTypes) }) &&
+                (selectedRepositoryUrl == null || item.metadata.repositoryManifestUrl == selectedRepositoryUrl)
         }
     }
     val bulkActionPlugins = remember(visiblePlugins) {
@@ -247,7 +251,9 @@ internal fun CloudStreamSettingsSection() {
         state.repositories.forEach { repository ->
             NuvioSurfaceCard {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        selectedRepositoryUrl = repository.manifest.sourceUrl.takeUnless { selectedRepositoryUrl == it }
+                    },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
@@ -297,10 +303,23 @@ internal fun CloudStreamSettingsSection() {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                CloudStreamFilterChip(copy.allLanguages, selectedLanguage == null) { selectedLanguage = null }
+                CloudStreamFilterChip("All repositories", selectedRepositoryUrl == null) { selectedRepositoryUrl = null }
+                state.repositories.forEach { repository ->
+                    CloudStreamFilterChip(repository.manifest.name, selectedRepositoryUrl == repository.manifest.sourceUrl) {
+                        selectedRepositoryUrl = repository.manifest.sourceUrl.takeUnless { selectedRepositoryUrl == it }
+                    }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                CloudStreamFilterChip(copy.allLanguages, selectedLanguages.isEmpty()) { selectedLanguages = emptySet() }
                 languages.forEach { language ->
-                    CloudStreamFilterChip(language.uppercase(), selectedLanguage == language) {
-                        selectedLanguage = language.takeUnless { selectedLanguage == language }
+                    val selected = selectedLanguages.any { it.equals(language, ignoreCase = true) }
+                    CloudStreamFilterChip(language.uppercase(), selected) {
+                        selectedLanguages = selectedLanguages.toggleIgnoreCase(language)
                     }
                 }
             }
@@ -310,10 +329,11 @@ internal fun CloudStreamSettingsSection() {
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    CloudStreamFilterChip(copy.allTypes, selectedType == null) { selectedType = null }
+                    CloudStreamFilterChip(copy.allTypes, selectedTypes.isEmpty()) { selectedTypes = emptySet() }
                     types.forEach { type ->
-                        CloudStreamFilterChip(type, selectedType == type) {
-                            selectedType = type.takeUnless { selectedType == type }
+                        val selected = selectedTypes.any { it.equals(type, ignoreCase = true) }
+                        CloudStreamFilterChip(type, selected) {
+                            selectedTypes = selectedTypes.toggleIgnoreCase(type)
                         }
                     }
                 }
@@ -381,7 +401,7 @@ internal fun CloudStreamSettingsSection() {
         CloudStreamPluginCard(
             plugin = plugin,
             securityWarningAccepted = state.securityWarningAccepted,
-            homeCatalogsHidden = plugin.metadata.id.value in state.hiddenHomeCatalogProviderIds,
+            homeCatalogsHidden = state.hideAllHomeCatalogs || plugin.metadata.id.value in state.hiddenHomeCatalogProviderIds,
             copy = copy,
             onMessage = { message = it },
         )
@@ -541,11 +561,13 @@ private fun CloudStreamPluginCard(
             )
         }
         Spacer(Modifier.height(10.dp))
-        Text(
-            text = copy.compatibilityReason(plugin.compatibility.platformSupport),
-            style = MaterialTheme.typography.bodySmall,
-            color = if (plugin.compatibility.isRunnable) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-        )
+        if (!plugin.compatibility.isRunnable) {
+            Text(
+                text = copy.compatibilityReason(plugin.compatibility.platformSupport),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
         plugin.errorMessage?.let {
             Spacer(Modifier.height(6.dp))
             Text(it.localizedCloudStreamFailure(copy), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
@@ -940,3 +962,9 @@ private fun CloudStreamFilterChip(
         )
     }
 }
+
+private fun String.equalsAnyIgnoreCase(values: Set<String>): Boolean = values.any { equals(it, ignoreCase = true) }
+
+private fun Set<String>.toggleIgnoreCase(value: String): Set<String> =
+    if (any { it.equals(value, ignoreCase = true) }) filterNot { it.equals(value, ignoreCase = true) }.toSet()
+    else this + value
