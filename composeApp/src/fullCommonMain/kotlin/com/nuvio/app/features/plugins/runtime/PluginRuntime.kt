@@ -170,6 +170,7 @@ internal object PluginRuntime {
                 deferred.await()
             }
             val rawResults = deferred.await()
+            throwIfPluginExecutionFailed(rawResults, scraperId)
             val results = parseJsonResults(rawResults, scraperId)
             if (results.isEmpty()) {
                 log.d { "Plugin provider $scraperId completed without usable stream results" }
@@ -198,6 +199,19 @@ internal object PluginRuntime {
         } else {
             evaluate<Any?>(source)
         }
+    }
+
+    private fun throwIfPluginExecutionFailed(rawResult: String, scraperId: String) {
+        val payload = runCatching { json.parseToJsonElement(rawResult) }.getOrNull() as? JsonObject
+            ?: return
+        val error = payload["__pluginRuntimeError"] as? JsonObject ?: return
+        val name = (error["name"] as? JsonPrimitive)?.contentOrNull
+            ?.takeIf { it.isNotBlank() } ?: "PluginExecutionError"
+        val message = (error["message"] as? JsonPrimitive)?.contentOrNull
+            ?.takeIf { it.isNotBlank() } ?: "Plugin scraper failed without an error message"
+        val stack = (error["stack"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+        log.w { "Plugin provider $scraperId execution failed: $name: $message" + if (stack.isNotBlank()) "\n$stack" else "" }
+        throw IllegalStateException("$name: $message")
     }
 
     private fun parseJsonResults(rawJson: String, scraperId: String): List<PluginRuntimeResult> {
