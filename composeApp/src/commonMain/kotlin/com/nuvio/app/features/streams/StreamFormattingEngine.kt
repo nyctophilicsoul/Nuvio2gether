@@ -34,9 +34,12 @@ data class StreamFormattingScope(
     /** When non-empty, only these provider IDs are formatted within enabled families. */
     val includedProviderIds: Set<String> = emptySet(),
 ) {
-    fun includes(providerId: String, family: StreamProviderFamily): Boolean {
-        if (providerId in excludedProviderIds) return false
-        if (includedProviderIds.isNotEmpty() && providerId !in includedProviderIds) return false
+    fun includes(providerId: String, family: StreamProviderFamily, providerName: String = ""): Boolean {
+        val keys = setOf(providerId.trim().lowercase(), providerName.trim().lowercase()).filter { it.isNotBlank() }.toSet()
+        val excluded = excludedProviderIds.map { it.trim().lowercase() }.toSet()
+        val included = includedProviderIds.map { it.trim().lowercase() }.toSet()
+        if (keys.any { it in excluded }) return false
+        if (included.isNotEmpty() && keys.none { it in included }) return false
         return when (family) {
             StreamProviderFamily.NUVIO_ADDON -> includeNuvioAddons
             StreamProviderFamily.CLOUDSTREAM_PLUGIN -> includeCloudstreamPlugins
@@ -87,7 +90,7 @@ object StreamFormattingEngine {
             stream.name, stream.title, stream.description, stream.behaviorHints.filename,
         ).joinToString(" ")
         if (!settings.enabled || preset == StreamFormatPreset.ORIGINAL ||
-            !settings.scope.includes(providerId, providerFamily) || hasExistingFormatting(stream)
+            !settings.scope.includes(providerId, providerFamily, stream.addonName) || hasExistingFormatting(stream)
         ) {
             return FormattedStreamPresentation(original, stream.description, emptyList(), original)
         }
