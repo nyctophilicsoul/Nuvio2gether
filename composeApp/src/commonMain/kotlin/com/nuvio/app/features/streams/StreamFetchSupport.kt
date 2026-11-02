@@ -92,7 +92,11 @@ internal fun cloudStreamProviderGroupsForRequest(
     request: CloudStreamSearchRequest?,
 ): List<CloudStreamProviderGroup> {
     CloudStreamRepository.initialize()
-    return CloudStreamRepository.uiState.value.plugins
+    val state = CloudStreamRepository.uiState.value
+    val repositoryNames = state.repositories.associate { repository ->
+        repository.manifest.sourceUrl to repository.manifest.name
+    }
+    return state.plugins
         .filter(CloudStreamPluginItem::isRunnable)
         .filter { plugin -> plugin.supportsCloudStreamRequest(type, request) }
         .sortedWith(
@@ -105,11 +109,24 @@ internal fun cloudStreamProviderGroupsForRequest(
             },
         )
         .map { plugin ->
-            CloudStreamProviderGroup(
-                addonId = cloudStreamAddonId(plugin.metadata.id.value),
-                addonName = plugin.metadata.name.ifBlank { plugin.metadata.internalName },
-                providerId = plugin.metadata.id.value,
-            )
+            val repositoryUrl = plugin.metadata.repositoryManifestUrl
+            val repositoryName = repositoryNames[repositoryUrl]
+                ?.takeIf { it.isNotBlank() }
+                ?: repositoryUrl.substringAfter("://", repositoryUrl).substringBefore('/').ifBlank { "CloudStream" }
+            val providerName = plugin.metadata.name.ifBlank { plugin.metadata.internalName }
+            if (state.groupStreamsByRepository) {
+                CloudStreamProviderGroup(
+                    addonId = "cloudstream-repo:${repositoryUrl.lowercase()}",
+                    addonName = repositoryName,
+                    providerId = plugin.metadata.id.value,
+                )
+            } else {
+                CloudStreamProviderGroup(
+                    addonId = cloudStreamAddonId(plugin.metadata.id.value),
+                    addonName = providerName,
+                    providerId = plugin.metadata.id.value,
+                )
+            }
         }
         .distinctBy { it.providerId }
 }
