@@ -201,66 +201,78 @@ internal object PluginRuntime {
     }
 
     private fun parseJsonResults(rawJson: String, scraperId: String): List<PluginRuntimeResult> {
-        return runCatching {
-            val array = json.parseToJsonElement(rawJson) as? JsonArray ?: return emptyList()
-            array.mapNotNull { element ->
-                val item = element as? JsonObject ?: return@mapNotNull null
+        val array = try {
+            json.parseToJsonElement(rawJson) as? JsonArray
+        } catch (error: Exception) {
+            log.w(error) { "Could not decode stream result array from plugin provider $scraperId" }
+            null
+        } ?: return emptyList()
+
+        fun JsonObject.stringValue(key: String): String? =
+            (this[key] as? JsonPrimitive)?.contentOrNull
+                ?.takeIf { it.isNotBlank() && !it.contains("[object") }
+
+        fun JsonObject.headersValue(key: String): Map<String, String>? =
+            (this[key] as? JsonObject)
+                ?.mapNotNull { (name, value) ->
+                    (value as? JsonPrimitive)?.contentOrNull?.let { name to it }
+                }
+                ?.toMap()
+                ?.takeIf { it.isNotEmpty() }
+
+        return array.mapIndexedNotNull { index, element ->
+            try {
+                val item = element as? JsonObject ?: return@mapIndexedNotNull null
                 val url = when (val urlValue = item["url"]) {
                     is JsonPrimitive -> urlValue.contentOrNull?.takeIf { it.isNotBlank() }
-                    is JsonObject -> urlValue["url"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+                    is JsonObject -> urlValue.stringValue("url")
                     else -> null
-                } ?: return@mapNotNull null
+                } ?: return@mapIndexedNotNull null
 
-                val headers = (item["headers"] as? JsonObject)
-                    ?.mapNotNull { (key, value) ->
-                        value.jsonPrimitive.contentOrNull?.let { key to it }
+                val subtitles = (item["subtitles"] as? JsonArray)
+                    ?.mapNotNull { subElement ->
+                        runCatching {
+                            val subtitle = subElement as? JsonObject ?: return@runCatching null
+                            val subtitleUrl = subtitle.stringValue("url") ?: return@runCatching null
+                            com.nuvio.app.features.plugins.PluginSubtitleResult(
+                                url = subtitleUrl,
+                                language = subtitle.stringValue("language") ?: "Unknown",
+                                name = subtitle.stringValue("name"),
+                                headers = subtitle.headersValue("headers"),
+                            )
+                        }.getOrNull()
                     }
-                    ?.toMap()
                     ?.takeIf { it.isNotEmpty() }
 
-                val subtitles = (item["subtitles"] as? JsonArray)?.mapNotNull { subElement ->
-                    val subObj = subElement as? JsonObject ?: return@mapNotNull null
-                    val subUrl = subObj["url"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-                    val subLang = subObj["language"]?.jsonPrimitive?.contentOrNull ?: "Unknown"
-                    val subName = subObj["name"]?.jsonPrimitive?.contentOrNull
-                    val subHeaders = (subObj["headers"] as? JsonObject)
-                        ?.mapNotNull { (key, value) ->
-                            value.jsonPrimitive.contentOrNull?.let { key to it }
-                        }
-                        ?.toMap()
-                        ?.takeIf { it.isNotEmpty() }
-                    com.nuvio.app.features.plugins.PluginSubtitleResult(
-                        url = subUrl,
-                        language = subLang,
-                        name = subName,
-                        headers = subHeaders
-                    )
-                }?.takeIf { it.isNotEmpty() }
-
                 PluginRuntimeResult(
-                    title = item.stringOrNull("title") ?: item.stringOrNull("name") ?: runBlocking { getString(Res.string.generic_unknown) },
-                    name = item.stringOrNull("name"),
+                    title = item.stringValue("title")
+                        ?: item.stringValue("name")
+                        ?: runBlocking { getString(Res.string.generic_unknown) },
+                    name = item.stringValue("name"),
                     url = url,
-                    quality = item.stringOrNull("quality"),
-                    size = item.stringOrNull("size"),
-                    language = item.stringOrNull("language"),
-                    provider = item.stringOrNull("provider"),
-                    type = item.stringOrNull("type"),
-                    seeders = item["seeders"]?.jsonPrimitive?.intOrNull,
-                    peers = item["peers"]?.jsonPrimitive?.intOrNull,
-                    infoHash = item.stringOrNull("infoHash"),
-                    headers = headers,
+                    quality = item.stringValue("quality"),
+                    size = item.stringValue("size"),
+                    language = item.stringValue("language"),
+                    provider = item.stringValue("provider"),
+                    type = item.stringValue("type"),
+                    seeders = (item["seeders"] as? JsonPrimitive)?.intOrNull,
+                    peers = (item["peers"] as? JsonPrimitive)?.intOrNull,
+                    infoHash = item.stringValue("infoHash"),
+                    headers = item.headersValue("headers"),
                     subtitles = subtitles,
                 )
-            }.filter { it.url.isNotBlank() }
-        }.getOrElse { error ->
-            log.w(error) { "Could not parse stream results returned by plugin provider $scraperId" }
-            emptyList()
+            } catch (error: Exception) {
+                log.w(error) {
+                    "Skipping malformed stream result at index=$index from plugin provider $scraperId"
+                }
+                null
+            }
+        }.also { results ->
+            if (results.isEmpty() && array.isNotEmpty()) {
+                log.w { "Plugin provider $scraperId returned no usable stream results (${array.size} entries)" }
+            }
         }
     }
-
-    private fun JsonObject.stringOrNull(key: String): String? =
-        this[key]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() && !it.contains("[object") }
 
     private suspend fun <T> runWhenSearchActive(block: suspend () -> T): T {
         while (true) {
