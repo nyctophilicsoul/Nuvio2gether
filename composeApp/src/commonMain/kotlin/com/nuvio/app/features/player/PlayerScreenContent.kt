@@ -27,6 +27,8 @@ import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_player_airs_prefix
 import nuvio.composeapp.generated.resources.compose_player_downloaded
 import nuvio.composeapp.generated.resources.compose_player_resize_fill
+import nuvio.composeapp.generated.resources.compose_player_resize_best_fit
+import nuvio.composeapp.generated.resources.compose_player_resize_16_9
 import nuvio.composeapp.generated.resources.compose_player_resize_fit
 import nuvio.composeapp.generated.resources.compose_player_resize_zoom
 import nuvio.composeapp.generated.resources.generic_unknown
