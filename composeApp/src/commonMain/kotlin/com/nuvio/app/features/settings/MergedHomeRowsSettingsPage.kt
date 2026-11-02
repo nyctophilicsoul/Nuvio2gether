@@ -73,13 +73,6 @@ import nuvio.composeapp.generated.resources.settings_merged_rows_blend_interleav
 import nuvio.composeapp.generated.resources.settings_merged_rows_blend_smart
 import nuvio.composeapp.generated.resources.settings_merged_rows_blend_interleave_description
 import nuvio.composeapp.generated.resources.settings_merged_rows_blend_smart_description
-import nuvio.composeapp.generated.resources.settings_merged_rows_sort_description
-import nuvio.composeapp.generated.resources.settings_merged_rows_sort
-import nuvio.composeapp.generated.resources.settings_merged_rows_sort_off
-import nuvio.composeapp.generated.resources.settings_merged_rows_sort_popularity
-import nuvio.composeapp.generated.resources.settings_merged_rows_sort_top_rated
-import nuvio.composeapp.generated.resources.settings_merged_rows_sort_newest
-import nuvio.composeapp.generated.resources.settings_merged_rows_sort_oldest
 import nuvio.composeapp.generated.resources.settings_merged_rows_hide_included
 import nuvio.composeapp.generated.resources.settings_merged_rows_hide_without_posters
 import org.jetbrains.compose.resources.stringResource
@@ -346,67 +339,9 @@ private fun MergedHomeRowsEditor(
                         MergedHomeRowBlendMode.RANDOM to "Random Blend",
                     ).forEach { (mode, label) ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = draftBlendMode == mode, onClick = { draftBlendMode = mode })
-                            Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                        }
-                    }
-                    Text(
-                        text = when (draftBlendMode) {
-                            MergedHomeRowBlendMode.INTERLEAVE -> "Take turns between providers in their configured order."
-                            MergedHomeRowBlendMode.SMART_FRESHNESS_POPULARITY -> "Balance freshness, popularity, ratings and provider diversity."
-                            MergedHomeRowBlendMode.FRESHNESS_WEIGHTED -> "Give newer releases more influence without strict chronological sorting."
-                            MergedHomeRowBlendMode.POPULARITY_WEIGHTED -> "Give popular titles more influence while retaining provider diversity."
-                            MergedHomeRowBlendMode.RATING_WEIGHTED -> "Give highly rated titles more influence while retaining provider diversity."
-                            MergedHomeRowBlendMode.PROVIDER_PRIORITY -> "Respect provider order and take turns between providers."
-                            MergedHomeRowBlendMode.RANDOM -> "Shuffle provider queues and interleave their results."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = draftBlendMode == mode, onClick = { draftBlendMode = mode })
-                            Text(stringResource(label), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                        }
-                    }
-                    Text(
-                        text = stringResource(
-                            if (draftBlendMode == MergedHomeRowBlendMode.INTERLEAVE) {
-                                Res.string.settings_merged_rows_blend_interleave_description
-                            } else {
-                                Res.string.settings_merged_rows_blend_smart_description
-                            },
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-
-                    Text(stringResource(Res.string.settings_merged_rows_sort), style = MaterialTheme.typography.titleSmall)
-                    listOf(
-                        MergedHomeRowSortMode.OFF to Res.string.settings_merged_rows_sort_off,
-                        MergedHomeRowSortMode.POPULARITY to Res.string.settings_merged_rows_sort_popularity,
-                        MergedHomeRowSortMode.TOP_RATED to Res.string.settings_merged_rows_sort_top_rated,
-                        MergedHomeRowSortMode.NEWEST to Res.string.settings_merged_rows_sort_newest,
-                        MergedHomeRowSortMode.OLDEST to Res.string.settings_merged_rows_sort_oldest,
-                    ).forEach { (mode, label) ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = draftSortMode == mode, onClick = { draftSortMode = mode })
-                            Text(stringResource(label), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                        }
-                    }
-                    Text(
-                        text = stringResource(Res.string.settings_merged_rows_sort_description),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = draftHideIncludedRows, onCheckedChange = { draftHideIncludedRows = it })
                         Text(stringResource(Res.string.settings_merged_rows_hide_included), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                    }
-
                     Text(stringResource(Res.string.settings_merged_rows_select_sources), style = MaterialTheme.typography.titleSmall)
                     Text(stringResource(Res.string.settings_merged_rows_source_limit), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
