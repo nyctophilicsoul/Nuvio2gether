@@ -228,6 +228,46 @@ class MergedHomeRowsTest {
     }
 
     @Test
+    fun allBlendModesReturnUniqueItemsAndRespectTheRequestedLimit() {
+        val sources = listOf(
+            listOf(
+                item("a1").copy(rawReleaseDate = "2026-01-01", popularity = 80.0, imdbRating = "8.5"),
+                item("a2").copy(rawReleaseDate = "2024-01-01", popularity = 20.0, imdbRating = "6.0"),
+            ),
+            listOf(
+                item("b1").copy(rawReleaseDate = "2025-01-01", popularity = 60.0, imdbRating = "9.0"),
+                item("b2").copy(rawReleaseDate = "2023-01-01", popularity = 10.0, imdbRating = "7.0"),
+            ),
+        )
+        MergedHomeRowBlendMode.entries.forEach { mode ->
+            val merged = mergeHomeRowItems(
+                sourceItems = sources,
+                deduplicate = true,
+                maxItems = 3,
+                blendMode = mode,
+                sortMode = MergedHomeRowSortMode.NEWEST,
+            )
+            assertEquals(3, merged.size, "mode=$mode")
+            assertEquals(3, merged.map { it.stableKey() }.toSet().size, "mode=$mode")
+        }
+    }
+
+    @Test
+    fun explicitSortModeNoLongerOverridesBlendOrder() {
+        val sources = listOf(
+            listOf(item("a1").copy(rawReleaseDate = "2023-01-01"), item("a2").copy(rawReleaseDate = "2026-01-01")),
+            listOf(item("b1").copy(rawReleaseDate = "2025-01-01")),
+        )
+        val merged = mergeHomeRowItems(
+            sourceItems = sources,
+            deduplicate = true,
+            blendMode = MergedHomeRowBlendMode.INTERLEAVE,
+            sortMode = MergedHomeRowSortMode.NEWEST,
+        )
+        assertEquals(listOf("a1", "b1", "a2"), merged.map { it.id })
+    }
+
+    @Test
     fun mergedContentTypeSeparatesMoviesAndSeries() {
         val merged = mergeHomeRowItems(
             sourceItems = listOf(
