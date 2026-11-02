@@ -220,7 +220,7 @@ object ProfileRepository {
             if (!pullProfiles() && AuthRepository.state.value is AuthState.Authenticated) {
                 applyPayloadsLocally(profiles)
             }
-            true
+            return true
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
         } catch (e: Throwable) {
