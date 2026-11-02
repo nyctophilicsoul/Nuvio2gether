@@ -102,6 +102,8 @@ internal class PlayerScreenRuntime(
     var resizeModeFitLabel: String = ""
     var resizeModeFillLabel: String = ""
     var resizeModeZoomLabel: String = ""
+    var resizeModeBestFitLabel: String = ""
+    var resizeMode16x9Label: String = ""
     var downloadedLabel: String = ""
     var airsPrefix: String = ""
     var tbaLabel: String = ""
