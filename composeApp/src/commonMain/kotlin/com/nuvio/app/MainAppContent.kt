@@ -140,7 +140,6 @@ import com.nuvio.app.features.player.recordExternalPlaybackProgress
 import com.nuvio.app.features.player.ExternalPlayerPlatform
 import com.nuvio.app.features.player.PlayerLaunch
 import com.nuvio.app.features.player.PlayerLaunchStore
-import com.nuvio.app.features.livetv.LiveTvChannel
 import com.nuvio.app.features.livetv.LiveTvRepository
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.player.SubtitleLanguageOption
@@ -658,6 +657,11 @@ internal fun MainAppContent(
                 }
             }
         }
+    }
+
+    LaunchedEffect(profileState.activeProfile?.profileIndex) {
+        if (!ownsAppRuntime) return@LaunchedEffect
+        LiveTvRepository.onProfileChanged()
     }
 
     LaunchedEffect(authState, profileState.activeProfile?.profileIndex) {
@@ -1404,7 +1408,7 @@ internal fun MainAppContent(
                                 onLibrarySectionViewAllClick = onLibrarySectionViewAllClick,
                                 onLiveTvChannelClick = { channel ->
                                     val launch = PlayerLaunch(
-                                        profileId = profileState.activeProfile?.profileIndex ?: ProfileRepository.activeProfileId,
+                                        profileId = activePlaybackProfileId,
                                         title = channel.name,
                                         sourceUrl = channel.streamUrl,
                                         sourceHeaders = channel.headers,

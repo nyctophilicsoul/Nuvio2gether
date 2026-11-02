@@ -144,11 +144,13 @@ object LiveTvRepository {
                 return@runCatching listOf(channel)
             }
 
-            val playlist = withContext(Dispatchers.Default) {
-                val playlistData = httpGetTextWithHeaders(
+            val playlistData = withContext(Dispatchers.IO) {
+                httpGetTextWithHeaders(
                     url = normalizedUrl,
                     headers = M3U_PLAYLIST_REQUEST_HEADERS,
                 )
+            }
+            val playlist = withContext(Dispatchers.Default) {
                 if (playlistData.looksLikeHlsManifest()) {
                     ParsedM3uPlaylist(
                         channels = listOf(directStreamChannel(normalizedUrl)),
@@ -268,7 +270,7 @@ object LiveTvRepository {
         )
 
         return runCatching {
-            val channels = withContext(Dispatchers.Default) {
+            val channels = withContext(Dispatchers.IO) {
                 fetchStalkerChannels(normalizedSettings)
             }
             require(channels.isNotEmpty()) { "Bu Stalker Portal içinde oynatılabilir kanal bulunamadı." }
@@ -319,7 +321,7 @@ object LiveTvRepository {
         )
 
         return runCatching {
-            val channels = withContext(Dispatchers.Default) {
+            val channels = withContext(Dispatchers.IO) {
                 fetchXtreamChannels(normalizedSettings)
             }
             require(channels.isNotEmpty()) { "No playable channels were found for this Xtream provider." }
@@ -458,19 +460,23 @@ object LiveTvRepository {
                         if (freshContent != null) return@repeat
                         loadContext.ensureActive()
                         try {
-                            val payload = httpGetBytesWithHeaders(
-                                url = epgUrl,
-                                headers = mapOf(
-                                    "Accept" to "application/xml,text/xml,application/gzip," +
-                                        "application/x-xz,application/octet-stream,*/*",
-                                ),
-                                maxResponseBodyBytes = maxLiveTvEpgDownloadBytes(epgUrl),
-                            )
-                            freshContent = decodeLiveTvEpgPayload(
-                                url = epgUrl,
-                                payload = payload,
-                                onProgress = { loadContext.ensureActive() },
-                            ).takeIf(::isValidXmlTvContent)
+                            val payload = withContext(Dispatchers.IO) {
+                                httpGetBytesWithHeaders(
+                                    url = epgUrl,
+                                    headers = mapOf(
+                                        "Accept" to "application/xml,text/xml,application/gzip," +
+                                            "application/x-xz,application/octet-stream,*/*",
+                                    ),
+                                    maxResponseBodyBytes = maxLiveTvEpgDownloadBytes(epgUrl),
+                                )
+                            }
+                            freshContent = withContext(Dispatchers.Default) {
+                                decodeLiveTvEpgPayload(
+                                    url = epgUrl,
+                                    payload = payload,
+                                    onProgress = { loadContext.ensureActive() },
+                                ).takeIf(::isValidXmlTvContent)
+                            }
                         } catch (error: CancellationException) {
                             throw error
                         } catch (_: Throwable) {
@@ -494,23 +500,35 @@ object LiveTvRepository {
                         continue
                     }
                     val schedule = try {
-                        val providerChannels = extractXmlTvChannelAliases(
-                            content = content,
-                            onProgress = { loadContext.ensureActive() },
-                        )
-                        resolvedChannels = resolveXmlTvChannelIds(resolvedChannels, providerChannels)
-                        val relevantChannelIds = resolvedChannels
-                            .mapNotNull(LiveTvChannel::tvgId)
-                            .map(String::trim)
-                            .filter(String::isNotBlank)
-                            .toSet()
-                        val retainedScheduleChannelIds = resolvedChannels
-                            .asSequence()
-                            .filter { channel -> channel.streamUrl in stateAtStart.favoriteUrls }
-                            .mapNotNull(LiveTvChannel::tvgId)
-                            .map(String::trim)
-                            .filter(String::isNotBlank)
-                            .toSet()
+                        val parsed = withContext(Dispatchers.Default) {
+                            val providerChannels = extractXmlTvChannelAliases(
+                                content = content,
+                                onProgress = { loadContext.ensureActive() },
+                            )
+                            val updatedChannels = resolveXmlTvChannelIds(resolvedChannels, providerChannels)
+                            val relevantChannelIds = updatedChannels
+                                .mapNotNull(LiveTvChannel::tvgId)
+                                .map(String::trim)
+                                .filter(String::isNotBlank)
+                                .toSet()
+                            val retainedScheduleChannelIds = updatedChannels
+                                .asSequence()
+                                .filter { channel -> channel.streamUrl in stateAtStart.favoriteUrls }
+                                .mapNotNull(LiveTvChannel::tvgId)
+                                .map(String::trim)
+                                .filter(String::isNotBlank)
+                                .toSet()
+                            loadContext.ensureActive()
+                            val parsedSchedule = parseXmlTvProgrammeSchedule(
+                                content = content,
+                                nowEpochMs = nowEpochMs,
+                                relevantChannelIds = relevantChannelIds,
+                                retainedScheduleChannelIds = retainedScheduleChannelIds,
+                                onProgress = { loadContext.ensureActive() },
+                            )
+                            updatedChannels to parsedSchedule
+                        }
+                        resolvedChannels = parsed.first
                         loadContext.ensureActive()
                         if (
                             epgLoadingActive &&
@@ -519,13 +537,7 @@ object LiveTvRepository {
                         ) {
                             mutableUiState.value = mutableUiState.value.copy(channels = resolvedChannels)
                         }
-                        val parsedSchedule = parseXmlTvProgrammeSchedule(
-                            content = content,
-                            nowEpochMs = nowEpochMs,
-                            relevantChannelIds = relevantChannelIds,
-                            retainedScheduleChannelIds = retainedScheduleChannelIds,
-                            onProgress = { loadContext.ensureActive() },
-                        )
+                        val parsedSchedule = parsed.second
                         if (freshContent != null) {
                             loadContext.ensureActive()
                             ensureActiveEpgLoad(sourceUrl, loadToken)

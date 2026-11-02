@@ -660,9 +660,6 @@ kotlin {
             implementation(libs.supabase.realtime)
             implementation(libs.reorderable)
         }
-        desktopMain.dependencies {
-            implementation("org.tukaani:xz:1.10")
-        }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${libs.versions.kotlinx.coroutines.get()}")
