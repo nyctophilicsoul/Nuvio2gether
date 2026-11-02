@@ -753,7 +753,11 @@ internal fun CloudStreamLoadItem.linkDataForCloudStreamRequest(
 
         // Unknown-season fallback is deliberately last and must independently prove
         // that this episode is safe; never cross an explicit season boundary.
-        sortedEpisodes.safeUnknownSeasonEpisodeMatch(request)?.data
+        return if (exactEpisodes.isEmpty()) {
+            sortedEpisodes.safeUnknownSeasonEpisodeMatch(request)?.data
+        } else {
+            null
+        }
     }
 
     if (request.episode != null) {
