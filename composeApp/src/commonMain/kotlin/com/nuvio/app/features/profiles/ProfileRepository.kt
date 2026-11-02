@@ -226,7 +226,7 @@ object ProfileRepository {
         } catch (e: Throwable) {
             if (AuthRepository.signOutIfSessionInvalid(e, "Profile push")) return false
             log.e(e) { "Failed to push profiles" }
-            false
+            return false
         }
     }
 
