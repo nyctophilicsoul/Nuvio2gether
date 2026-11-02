@@ -118,6 +118,17 @@ internal fun CloudStreamSettingsSection() {
 
     NuvioSectionLabel(copy.sectionTitle)
     NuvioSurfaceCard {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Hide all CloudStream home catalogs", style = MaterialTheme.typography.titleSmall)
+                Text("Does not disable plugins, search, or playback", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Switch(
+                checked = state.hideAllHomeCatalogs,
+                onCheckedChange = CloudStreamRepository::setHideAllHomeCatalogs,
+            )
+        }
+        Spacer(Modifier.height(10.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -355,6 +366,7 @@ internal fun CloudStreamSettingsSection() {
         CloudStreamPluginCard(
             plugin = plugin,
             securityWarningAccepted = state.securityWarningAccepted,
+            homeCatalogsHidden = plugin.metadata.id.value in state.hiddenHomeCatalogProviderIds,
             copy = copy,
             onMessage = { message = it },
         )
@@ -384,6 +396,7 @@ private fun CloudStreamBulkInstallResult.toUserMessage(copy: CloudStreamSettings
 private fun CloudStreamPluginCard(
     plugin: CloudStreamPluginItem,
     securityWarningAccepted: Boolean,
+    homeCatalogsHidden: Boolean,
     copy: CloudStreamSettingsCopy,
     onMessage: (String) -> Unit,
 ) {
@@ -453,6 +466,19 @@ private fun CloudStreamPluginCard(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Spacer(Modifier.height(8.dp))
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Show catalogs on Home", style = MaterialTheme.typography.bodyMedium)
+                Text("Only affects this plugin's home rows", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Switch(
+                checked = !homeCatalogsHidden,
+                onCheckedChange = { visible ->
+                    CloudStreamRepository.setPluginHomeCatalogsHidden(plugin.metadata.id.value, !visible)
+                },
+            )
+        }
         Spacer(Modifier.height(10.dp))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             NuvioInfoBadge(text = copy.currentVersion(plugin.metadata.version))
