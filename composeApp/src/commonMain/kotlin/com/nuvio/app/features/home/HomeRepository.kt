@@ -326,7 +326,7 @@ object HomeRepository {
                     blendMode = mergedRow.resolvedBlendMode(),
                     sortMode = MergedHomeRowSortMode.OFF,
                     contentType = contentType,
-                    hideTitlesWithoutPosters = snapshot.hideMergedTitlesWithoutPosters || mergedRow.hideTitlesWithoutPosters,
+                    hideTitlesWithoutPosters = snapshot.hideMergedTitlesWithoutPosters,
                 )
                 val hasMore = sourceSections.any(HomeCatalogSection::hasMore)
                 // Keep the home entry reachable when the preview page has no items matching
