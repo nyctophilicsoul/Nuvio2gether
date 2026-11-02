@@ -77,6 +77,28 @@ class StreamFormattingEngineTest {
     }
 
     @Test
+    fun preservesProviderFormattingWhenMultipleBadgesAlreadyExist() {
+        val item = stream(
+            name = "Allmovieland [English]",
+            badges = listOf(
+                StreamBadge(name = "FHD"),
+                StreamBadge(name = "WEB-DL"),
+            ),
+        )
+
+        assertTrue(StreamFormattingEngine.hasExistingFormatting(item))
+        val result = StreamFormattingEngine.format(
+            stream = item,
+            preset = StreamFormatPreset.NUVIOEX_MODERN,
+            providerId = item.addonId,
+            providerFamily = StreamProviderFamily.CLOUDSTREAM_PLUGIN,
+            settings = StreamFormattingSettings(),
+        )
+        assertEquals(item.name, result.title)
+        assertTrue(result.technicalDetails.isEmpty())
+    }
+
+    @Test
     fun preservesProviderFormattingWhenDescriptionAlreadyHasTechnicalSummary() {
         val item = stream(
             name = "Allmovieland [Hindi]",
