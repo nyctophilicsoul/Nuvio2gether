@@ -157,6 +157,14 @@ data class CloudStreamFileHash(
 
 internal fun CloudStreamFileHash?.verifies(bytes: ByteArray): Boolean = this?.matches(bytes) == true
 
+/**
+ * Checks the checksum recorded for the installed artifact, not the latest repository
+ * metadata. A null hash means the repository supplied no checksum; callers must still
+ * validate the CS3 archive structure before accepting the package.
+ */
+internal fun matchesInstalledCloudStreamPackage(installedFileHash: String?, bytes: ByteArray): Boolean =
+    installedFileHash == null || CloudStreamFileHash.parse(installedFileHash)?.matches(bytes) == true
+
 enum class CloudStreamRuntimeKind {
     PrecompiledCrossPlatformAdapter,
     AndroidDex,
