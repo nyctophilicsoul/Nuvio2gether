@@ -2677,9 +2677,9 @@ private fun libassOverlayMargins(
 private fun PlayerView.applyAspectRatioOverride(mode: PlayerResizeMode) {
     val contentFrame = findViewById<AspectRatioFrameLayout>(androidx.media3.ui.R.id.exo_content_frame)
         ?: return
-    if (mode == PlayerResizeMode.Ratio16x9) {
-        contentFrame.setAspectRatio(16f / 9f)
-    }
+    contentFrame.setAspectRatio(
+        if (mode == PlayerResizeMode.Ratio16x9) 16f / 9f else 0f,
+    )
 }
 
 private fun PlayerView.syncLibassOverlayGeometry() {
