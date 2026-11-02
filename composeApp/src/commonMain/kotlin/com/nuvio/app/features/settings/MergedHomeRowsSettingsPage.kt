@@ -339,6 +339,25 @@ private fun MergedHomeRowsEditor(
                         MergedHomeRowBlendMode.RANDOM to "Random Blend",
                     ).forEach { (mode, label) ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = draftBlendMode == mode, onClick = { draftBlendMode = mode })
+                            Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                    Text(
+                        text = when (draftBlendMode) {
+                            MergedHomeRowBlendMode.INTERLEAVE -> "Take turns between providers in configured order."
+                            MergedHomeRowBlendMode.SMART_FRESHNESS_POPULARITY -> "Balance freshness, popularity, ratings and provider diversity."
+                            MergedHomeRowBlendMode.FRESHNESS_WEIGHTED -> "Give newer releases more influence without strict chronological sorting."
+                            MergedHomeRowBlendMode.POPULARITY_WEIGHTED -> "Give popular titles more influence while retaining provider diversity."
+                            MergedHomeRowBlendMode.RATING_WEIGHTED -> "Give highly rated titles more influence while retaining provider diversity."
+                            MergedHomeRowBlendMode.PROVIDER_PRIORITY -> "Respect provider order and take turns between providers."
+                            MergedHomeRowBlendMode.RANDOM -> "Shuffle each provider queue, then interleave the results."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = draftHideIncludedRows, onCheckedChange = { draftHideIncludedRows = it })
                         Text(stringResource(Res.string.settings_merged_rows_hide_included), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                     }
