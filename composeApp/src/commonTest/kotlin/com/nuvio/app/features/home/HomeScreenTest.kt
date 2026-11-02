@@ -64,7 +64,7 @@ class HomeScreenTest {
                 hasActiveAddons = false,
                 hasServerLibraries = false,
                 hasRenderableCollectionRows = false,
-                hasCloudStreamRows = true,
+                hasRenderableHomeSections = true,
             ),
         )
     }
@@ -76,7 +76,7 @@ class HomeScreenTest {
                 hasActiveAddons = false,
                 hasServerLibraries = false,
                 hasRenderableCollectionRows = false,
-                hasCloudStreamRows = false,
+                hasRenderableHomeSections = false,
             ),
         )
         assertFalse(
@@ -84,7 +84,7 @@ class HomeScreenTest {
                 hasActiveAddons = true,
                 hasServerLibraries = false,
                 hasRenderableCollectionRows = false,
-                hasCloudStreamRows = false,
+                hasRenderableHomeSections = false,
             ),
         )
     }
