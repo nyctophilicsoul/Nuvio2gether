@@ -135,6 +135,11 @@ object StreamFormattingEngine {
      * A quality badge alone is not enough: raw titles may still need normalisation.
      */
     fun hasExistingFormatting(stream: StreamItem): Boolean {
+        // Multiple provider-authored badges are already a structured presentation.
+        // A lone quality badge (e.g. FHD) is insufficient to skip title normalisation.
+        val meaningfulBadgeCount = stream.badges.count { it.name.isNotBlank() || it.imageURL.isNotBlank() }
+        if (meaningfulBadgeCount >= 2) return true
+
         val description = stream.description.orEmpty()
         if (description.isBlank()) return false
         val hasQuality = Regex("(?i)\\b(?:2160p|1440p|1080p|720p|480p|4k|uhd)\\b").containsMatchIn(description)
