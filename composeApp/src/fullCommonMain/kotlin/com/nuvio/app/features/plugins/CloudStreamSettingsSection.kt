@@ -72,6 +72,11 @@ internal fun CloudStreamSettingsSection() {
     }
     val state by CloudStreamRepository.uiState.collectAsStateWithLifecycle()
     val selectedAppLanguage by ThemeSettingsRepository.selectedAppLanguage.collectAsStateWithLifecycle()
+    LaunchedEffect(state.repositories) {
+        if (selectedRepositoryUrl != null && state.repositories.none { it.manifest.sourceUrl == selectedRepositoryUrl }) {
+            selectedRepositoryUrl = null
+        }
+    }
     val copy = remember(selectedAppLanguage, CloudStreamPlatformRuntime.supportsAndroidDex) {
         CloudStreamSettingsCopy.forLanguage(selectedAppLanguage, CloudStreamPlatformRuntime.supportsAndroidDex)
     }
@@ -89,11 +94,11 @@ internal fun CloudStreamSettingsSection() {
 
     val languages = remember(state.plugins) {
         state.plugins.flatMap { item -> item.metadata.language.orEmpty().split(',', ';') }
-            .map(String::trim).filter(String::isNotBlank).distinctBy(String::uppercase).sorted()
+            .map(String::trim).filter(String::isNotBlank).distinctBy { it.uppercase() }.sorted()
     }
     val types = remember(state.plugins) {
         state.plugins.flatMap { item -> item.metadata.rawTvTypes.flatMap { it.split(',', ';') } }
-            .map(String::trim).filter(String::isNotBlank).distinctBy(String::lowercase).sorted()
+            .map(String::trim).filter(String::isNotBlank).distinctBy { it.lowercase() }.sorted()
     }
     val visiblePlugins = remember(state.plugins, query, selectedLanguages, selectedTypes, selectedRepositoryUrl) {
         val normalizedQuery = query.trim().lowercase()
