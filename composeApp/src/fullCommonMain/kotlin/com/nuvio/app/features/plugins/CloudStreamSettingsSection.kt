@@ -426,7 +426,8 @@ private fun CloudStreamPluginCard(
             plugin.metadata.rawTvTypes.forEach { NuvioInfoBadge(text = it) }
             NuvioInfoBadge(
                 text = when {
-                    plugin.verified -> copy.sha256Verified
+                    plugin.verified && plugin.metadata.fileHash != null -> copy.sha256Verified
+                    plugin.verified -> copy.archiveInspected
                     plugin.metadata.fileHash == null -> copy.hashMissing
                     else -> copy.hashUnverified
                 },
@@ -519,10 +520,16 @@ private class CloudStreamSettingsCopy private constructor(
     val securityWarningTitle: String =
         if (turkish) "Üçüncü taraf kod güvenlik uyarısı" else "Third-party code security warning"
     val securityWarningBody: String =
-        if (turkish) {
-            "Repository ve eklentiler Nuvio tarafından yönetilmez. Yalnızca güvendiğiniz kaynakları ekleyin. Provider yalnızca paket SHA-256 ile doğrulandığında ve incelenmiş bir Nuvio adaptörü bulunduğunda etkinleştirilebilir. İndirilen DEX kodu çalıştırılmaz."
+        if (supportsAndroidDex) {
+            if (turkish) {
+                "Repository ve eklentiler Nuvio tarafından yönetilmeyen üçüncü taraf kodudur. Android Full, uyumlu .cs3 DEX kodunu uygulama süreci içinde sandbox olmadan çalıştırır. Repository SHA-256 sağlarsa bu checksum zorunlu olarak doğrulanır; sağlamazsa yalnızca arşiv yapısı denetlenir. Yalnızca güvendiğiniz kaynaklardan kurun."
+            } else {
+                "Repositories and plugins are third-party code not managed by Nuvio. Android Full executes compatible .cs3 DEX code inside the app process without a sandbox. A repository-supplied SHA-256 is enforced; when no checksum is supplied, only the package archive structure is validated. Install only from sources you trust."
+            }
+        } else if (turkish) {
+            "Repository ve eklentiler Nuvio tarafından yönetilmeyen üçüncü taraf paketlerdir. Bu derleme standart Android .cs3 DEX kodunu çalıştırmaz; yalnızca desteklenen yerleşik adaptörler kullanılabilir. Sağlanan SHA-256 checksum doğrulanır; checksum yoksa yalnızca arşiv yapısı denetlenir. Yalnızca güvendiğiniz kaynakları ekleyin."
         } else {
-            "Repositories and plugins are not managed by Nuvio. Add only sources you trust. A provider can be enabled only when its package is SHA-256 verified and a reviewed Nuvio adapter is available. Downloaded DEX code is never executed."
+            "Repositories and plugins are third-party packages not managed by Nuvio. This build does not execute standard Android .cs3 DEX code; only supported built-in adapters can run. Any supplied SHA-256 is enforced; without one, only the archive structure is validated. Add only sources you trust."
         }
     val acceptSecurityWarning: String =
         if (turkish) "Uyarıyı okudum ve kabul ediyorum" else "I have read and accept the warning"
@@ -576,6 +583,8 @@ private class CloudStreamSettingsCopy private constructor(
         }
     val sha256Verified: String =
         if (turkish) "SHA-256 doğrulandı" else "SHA-256 verified"
+    val archiveInspected: String =
+        if (turkish) "Arşiv yapısı denetlendi" else "Archive inspected"
     val hashUnverified: String =
         if (turkish) "Hash doğrulanmadı" else "Hash unverified"
     val hashMissing: String =
@@ -724,25 +733,30 @@ private class CloudStreamSettingsCopy private constructor(
         }
 
     fun pluginInstalled(plugin: CloudStreamPluginItem): String = when {
-        !plugin.compatibility.isRunnable && plugin.verified -> if (turkish) {
-            "${plugin.metadata.name} paketi SHA-256 ile doğrulandı ve indirildi. Bu provider için henüz incelenmiş bir Nuvio adaptörü bulunmuyor; DEX kodu çalıştırılmayacak."
+        !plugin.compatibility.isRunnable && plugin.verified && plugin.metadata.fileHash != null -> if (turkish) {
+            "${plugin.metadata.name} paketi arşiv denetiminden ve SHA-256 doğrulamasından geçti; ancak bu derlemenin çalışma ortamı provider ile uyumlu değil. DEX kodu çalıştırılmayacak."
         } else {
-            "${plugin.metadata.name} package was SHA-256 verified and downloaded. No reviewed Nuvio adapter is available for this provider; its DEX will not be executed."
+            "${plugin.metadata.name} passed archive inspection and SHA-256 verification, but this build cannot run the provider. Its DEX will not be executed."
+        }
+        !plugin.compatibility.isRunnable && plugin.verified -> if (turkish) {
+            "${plugin.metadata.name} paketi arşiv denetiminden geçti ancak repository SHA-256 sağlamadı. Bu derlemenin çalışma ortamı provider ile uyumlu değil; DEX kodu çalıştırılmayacak."
+        } else {
+            "${plugin.metadata.name} passed archive inspection, but the repository supplied no SHA-256 checksum. This build cannot run the provider; its DEX will not be executed."
         }
         !plugin.compatibility.isRunnable -> if (turkish) {
-            "${plugin.metadata.name} paketi indirildi ancak SHA-256 doğrulanamadı. Provider uyumsuz ve DEX kodu çalıştırılmayacak."
+            "${plugin.metadata.name} paketi doğrulanamadı ve bu derlemede çalıştırılamaz."
         } else {
-            "${plugin.metadata.name} package was downloaded but could not be SHA-256 verified. The provider is unsupported and its DEX will not be executed."
+            "${plugin.metadata.name} could not be verified and cannot run on this build."
+        }
+        plugin.verified && plugin.metadata.fileHash != null -> if (turkish) {
+            "${plugin.metadata.name} paketi arşiv denetiminden ve SHA-256 doğrulamasından geçti."
+        } else {
+            "${plugin.metadata.name} passed archive inspection and repository SHA-256 verification."
         }
         plugin.verified -> if (turkish) {
-            "${plugin.metadata.name} paketi SHA-256 ile doğrulandı ve indirildi."
+            "${plugin.metadata.name} paketi arşiv denetiminden geçti ancak repository SHA-256 sağlamadı. Paketin kaynağının güvenilir olduğundan emin olun."
         } else {
-            "${plugin.metadata.name} package was SHA-256 verified and downloaded."
-        }
-        plugin.metadata.fileHash == null -> if (turkish) {
-            "${plugin.metadata.name} paketi indirildi ve arşiv yapısı incelendi; repository SHA-256 sağlamadığı için doğrulanamadı ve etkinleştirilemez."
-        } else {
-            "${plugin.metadata.name} package was downloaded and its archive inspected, but the repository supplied no SHA-256 hash. It remains unverified and cannot be enabled."
+            "${plugin.metadata.name} passed archive inspection, but the repository supplied no SHA-256 checksum. Make sure you trust the package source."
         }
         else -> if (turkish) {
             "${plugin.metadata.name} paketi indirildi ancak SHA-256 doğrulaması tamamlanmadı; etkinleştirilemez."
