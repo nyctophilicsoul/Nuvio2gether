@@ -1317,6 +1317,7 @@ object HomeCatalogSettingsRepository {
         return SyncHomeCatalogPayload(
             showCatalogType = showCatalogType,
             hideUnreleasedContent = hideUnreleasedContent,
+            hideMergedTitlesWithoutPosters = hideMergedTitlesWithoutPosters,
             items = items,
             addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS.storageValue,
             upcomingRowKeys = emptyList(),
@@ -1341,6 +1342,7 @@ object HomeCatalogSettingsRepository {
         ensureLoaded()
         showCatalogType = payload.showCatalogType
         hideUnreleasedContent = payload.hideUnreleasedContent
+        hideMergedTitlesWithoutPosters = payload.hideMergedTitlesWithoutPosters
         val remotePolicy = HomeAddonRowOrderPolicy.fromStorage(payload.addonRowOrderPolicy)
         hasPendingRowOrderChanges = false
         addonRowOrderPolicy = HomeAddonRowOrderPolicy.MOVE_UNPINNED_ROWS
