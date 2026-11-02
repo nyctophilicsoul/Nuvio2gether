@@ -370,6 +370,7 @@ internal fun MainAppContent(
     val downloadsTitle = stringResource(Res.string.compose_settings_root_downloads_title)
     val addonsSettingsTitle = stringResource(Res.string.compose_settings_page_addons)
     val pluginsSettingsTitle = stringResource(Res.string.compose_settings_page_plugins)
+    val cloudStreamSettingsTitle = stringResource(Res.string.compose_settings_page_cloudstream)
     val accountSettingsTitle = stringResource(Res.string.compose_settings_page_account)
     val supportersSettingsTitle = stringResource(Res.string.compose_settings_page_supporters_contributors)
     val licensesSettingsTitle = stringResource(Res.string.compose_settings_page_licenses_attributions)
@@ -1451,6 +1452,16 @@ internal fun MainAppContent(
                                 onPluginsSettingsClick = {
                                     if (AppFeaturePolicy.pluginsEnabled) {
                                         navController.navigate(PluginsSettingsRoute(pluginsSettingsTitle))
+                                    }
+                                },
+                                onCloudStreamSettingsClick = {
+                                    if (AppFeaturePolicy.pluginsEnabled) {
+                                        navController.navigate(
+                                            SettingsPageRoute(
+                                                pageName = SettingsPage.CloudStream.name,
+                                                title = cloudStreamSettingsTitle,
+                                            ),
+                                        )
                                     }
                                 },
                                 onAccountSettingsClick = { navController.navigate(AccountSettingsRoute(accountSettingsTitle)) },
