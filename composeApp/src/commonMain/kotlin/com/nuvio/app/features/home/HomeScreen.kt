@@ -101,6 +101,7 @@ import com.nuvio.app.features.watching.application.WatchingState
 import com.nuvio.app.features.watching.domain.WatchingContentRef
 import com.nuvio.app.features.watching.domain.isReleasedBy
 import com.nuvio.app.features.collection.CollectionRepository
+import com.nuvio.app.features.cloudstream.CloudStreamRepository
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.home.components.HomeCollectionRowSection
 import kotlinx.coroutines.Dispatchers
@@ -137,6 +138,11 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         AddonRepository.initialize()
         CollectionRepository.initialize()
+        // CloudStream plugins persist independently of Stremio add-ons. Restore their
+        // profile state and request their home catalogs on every Home entry, including
+        // installs where the user has no Stremio add-ons configured.
+        CloudStreamRepository.initialize()
+        HomeRepository.applyCurrentSettings()
         ContinueWatchingPreferencesRepository.ensureLoaded()
         WatchedRepository.ensureLoaded()
         WatchProgressRepository.ensureLoaded()
