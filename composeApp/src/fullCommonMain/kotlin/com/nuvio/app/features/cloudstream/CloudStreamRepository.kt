@@ -1,6 +1,7 @@
 package com.nuvio.app.features.cloudstream
 
 import co.touchlab.kermit.Logger
+import com.nuvio.app.features.home.HomeRepository
 import com.nuvio.app.features.addons.httpGetText
 import com.nuvio.app.features.addons.httpRequestRaw
 import com.nuvio.app.features.plugins.currentEpochMillis
@@ -399,6 +400,7 @@ actual object CloudStreamRepository {
             _uiState.update { it.copy(hideAllHomeCatalogs = hidden) }
             persist()
         }
+        HomeRepository.applyCurrentSettings()
     }
 
     actual fun setPluginHomeCatalogsHidden(pluginId: String, hidden: Boolean) {
@@ -412,6 +414,7 @@ actual object CloudStreamRepository {
             }
             persist()
         }
+        HomeRepository.applyCurrentSettings()
     }
 
     actual fun setPluginEnabled(pluginId: String, enabled: Boolean) {
@@ -419,6 +422,7 @@ actual object CloudStreamRepository {
         synchronized(profileLock) {
             setPluginEnabledForCurrentProfile(pluginId, enabled)
         }
+        HomeRepository.applyCurrentSettings()
     }
 
     private fun setPluginEnabledForCurrentProfile(pluginId: String, enabled: Boolean) {
@@ -471,6 +475,7 @@ actual object CloudStreamRepository {
             }
             persist()
         }
+        HomeRepository.applyCurrentSettings()
     }
 
     actual suspend fun getMainPage(
