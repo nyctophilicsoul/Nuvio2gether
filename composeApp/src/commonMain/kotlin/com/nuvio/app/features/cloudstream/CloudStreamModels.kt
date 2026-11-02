@@ -224,6 +224,7 @@ internal data class StoredCloudStreamState(
     val securityWarningAccepted: Boolean = false,
     val hideAllHomeCatalogs: Boolean = false,
     val hiddenHomeCatalogProviderIds: Set<String> = emptySet(),
+    val groupStreamsByRepository: Boolean = false,
 )
 
 @Serializable
