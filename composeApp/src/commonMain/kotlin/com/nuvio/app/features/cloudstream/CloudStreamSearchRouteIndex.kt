@@ -74,11 +74,12 @@ internal object CloudStreamSearchRouteIndex {
 
         // Without a requested year, cached routes for multiple releases are ambiguous.
         // Force a fresh provider search instead of silently trying the first cached URL.
-        if (year == null) {
-            val knownYears = candidates.mapNotNull { item ->
+        if (year == null && candidates.size > 1) {
+            val candidateYears = candidates.map { item ->
                 item.year ?: item.name.releaseYearFromRouteTitle()
-            }.distinct()
-            if (knownYears.size > 1) return emptyList()
+            }
+            val knownYears = candidateYears.filterNotNull().distinct()
+            if (knownYears.size > 1 || candidateYears.any { it == null }) return emptyList()
         }
 
         return candidates
