@@ -280,21 +280,34 @@ object HomeCatalogSettingsRepository {
 
     fun syncCloudStreamCatalogs(sections: List<HomeCatalogSection>) {
         ensureLoaded()
+        var nextOrder = (preferences.values.maxOfOrNull(StoredHomeCatalogPreference::order) ?: -1) + 1
+        val updatedPreferences = preferences.toMutableMap()
         val nextItems = sections.mapNotNull { section ->
-            val target = section.target as? com.nuvio.app.features.catalog.CatalogTarget.CloudStream ?: return@mapNotNull null
-            val preference = preferences[section.key]
+            val target = section.target as? com.nuvio.app.features.catalog.CatalogTarget.CloudStream
+                ?: return@mapNotNull null
+            val preference = updatedPreferences[section.key] ?: StoredHomeCatalogPreference(
+                key = section.key,
+                enabled = true,
+                heroSourceEnabled = false,
+                order = nextOrder++,
+            ).also { updatedPreferences[section.key] = it }
             HomeCatalogSettingsItem(
                 key = section.key,
                 defaultTitle = section.title,
                 addonName = section.addonName,
-                customTitle = preference?.customTitle.orEmpty(),
-                enabled = preference?.enabled ?: true,
+                customTitle = preference.customTitle,
+                enabled = preference.enabled,
                 heroSourceEnabled = false,
-                order = preference?.order ?: 0,
+                order = preference.order,
                 supportsHeroSource = false,
                 addonId = "cloudstream:${target.providerId}",
-                rowPlacement = HomeCatalogRowPlacement.fromStorage(preference?.rowPlacement),
+                rowPlacement = HomeCatalogRowPlacement.fromStorage(preference.rowPlacement),
             )
+        }
+        val preferencesChanged = updatedPreferences != preferences
+        if (preferencesChanged) {
+            preferences = updatedPreferences.toMap()
+            persist()
         }
         if (cloudStreamCatalogItems == nextItems) return
         cloudStreamCatalogItems = nextItems
