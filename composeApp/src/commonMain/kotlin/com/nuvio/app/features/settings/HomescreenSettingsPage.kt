@@ -716,6 +716,14 @@ private fun HomescreenSummaryCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Spacer(Modifier.height(10.dp))
+            SettingsSwitchRow(
+                title = "Hide titles without posters",
+                description = "Hide posterless titles in all merged home rows.",
+                checked = HomeCatalogSettingsRepository.uiState.value.hideMergedTitlesWithoutPosters,
+                isTablet = isTablet,
+                onCheckedChange = HomeCatalogSettingsRepository::setHideMergedTitlesWithoutPosters,
+            )
         }
     }
 }
