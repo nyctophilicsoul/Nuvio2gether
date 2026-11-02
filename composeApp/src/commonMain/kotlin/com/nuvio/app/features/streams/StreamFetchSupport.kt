@@ -734,7 +734,6 @@ internal fun CloudStreamLoadItem.linkDataForCloudStreamRequest(
         return sortedEpisodes.firstOrNull()?.data
     }
 
-    val titledEpisode = sortedEpisodes.bestEpisodeTitleMatch(request)
     if (request.season != null && request.episode != null) {
         val exactEpisodes = sortedEpisodes.filter { item ->
             item.season == request.season && item.episode == request.episode
@@ -766,7 +765,6 @@ internal fun CloudStreamLoadItem.linkDataForCloudStreamRequest(
         return uniqueEpisode
             ?.takeIf { it.hasNoSpecificEpisodeTitle(request) }
             ?.data
-            ?: titledEpisode?.data
     }
 
     if (request.season != null) {
