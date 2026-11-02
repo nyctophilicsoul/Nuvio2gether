@@ -222,6 +222,8 @@ internal data class StoredCloudStreamState(
     val repositories: List<StoredCloudStreamRepository> = emptyList(),
     val plugins: List<StoredCloudStreamPlugin> = emptyList(),
     val securityWarningAccepted: Boolean = false,
+    val hideAllHomeCatalogs: Boolean = false,
+    val hiddenHomeCatalogProviderIds: Set<String> = emptySet(),
 )
 
 @Serializable
