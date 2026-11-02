@@ -2013,23 +2013,25 @@ private class NuvioLibmpvView(
     fun applyResizeMode(resizeMode: PlayerResizeMode) {
         executeMpv {
             when (resizeMode) {
-                PlayerResizeMode.Fit -> {
+                PlayerResizeMode.Fit, PlayerResizeMode.BestFit -> {
+                    mpv.setPropertyBoolean("keepaspect", true)
                     mpv.setPropertyDouble("panscan", 0.0)
                     mpv.setPropertyString("video-aspect-override", "no")
                 }
                 PlayerResizeMode.Fill -> {
-                    mpv.setPropertyDouble("panscan", 1.0)
-                    mpv.setPropertyString("video-aspect-override", "no")
-                }
-                PlayerResizeMode.Zoom -> {
-                    mpv.setPropertyDouble("panscan", 0.5)
-                    mpv.setPropertyString("video-aspect-override", "no")
-                }
-                PlayerResizeMode.BestFit -> {
+                    // Fill the viewport by stretching the complete frame, without cropping.
+                    mpv.setPropertyBoolean("keepaspect", false)
                     mpv.setPropertyDouble("panscan", 0.0)
                     mpv.setPropertyString("video-aspect-override", "no")
                 }
+                PlayerResizeMode.Zoom -> {
+                    // Preserve the source aspect ratio and crop overflow to fill the viewport.
+                    mpv.setPropertyBoolean("keepaspect", true)
+                    mpv.setPropertyDouble("panscan", 1.0)
+                    mpv.setPropertyString("video-aspect-override", "no")
+                }
                 PlayerResizeMode.Ratio16x9 -> {
+                    mpv.setPropertyBoolean("keepaspect", true)
                     mpv.setPropertyDouble("panscan", 0.0)
                     mpv.setPropertyString("video-aspect-override", "16:9")
                 }
