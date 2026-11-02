@@ -183,7 +183,7 @@ object StreamFormattingEngine {
     private fun cleanTitle(value: String): String {
         var result = value.substringAfterLast('/').substringAfterLast('\\')
         result = result.replace(Regex("\\.(mkv|mp4|avi|mov|webm)$", RegexOption.IGNORE_CASE), "")
-        result = result.replace(Regex("(?i)[._-](2160p|1440p|1080p|720p|480p|WEB[- .]?DL|WEB[- .]?Rip|Blu[- .]?Ray|HEVC|x265|x264|AVC|HDR10\\+?|HDR|EAC3|DDP|AAC|DTS).*?$"), "")
+        result = result.replace(Regex("(?i)[\\s._-]+(2160p|1440p|1080p|720p|576p|480p|4k|uhd|WEB[- .]?DL|WEB[- .]?Rip|Blu[- .]?Ray|BDRip|BRRip|HDRip|HDTV|HEVC|x265|x264|AVC|AV1|HDR10\\+?|HDR|EAC3|DDP|AC3|AAC|DTS|ESub|ESubs).*?$"), "")
         result = result.replace(Regex("[._]+"), " ").replace(Regex("\\s+"), " ").trim(' ', '-', '_', '.')
         return result.ifBlank { value.replace(whitespace, " ").trim() }
     }
