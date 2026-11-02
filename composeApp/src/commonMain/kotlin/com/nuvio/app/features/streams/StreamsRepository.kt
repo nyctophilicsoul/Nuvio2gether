@@ -375,7 +375,7 @@ object StreamsRepository {
                 .eachCount()
                 .toMutableMap()
             val cloudStreamFirstErrorByAddonId = mutableMapOf<String, String>()
-            val seenPluginStreamIdentities = mutableSetOf<String>()
+            val seenStreamIdentities = mutableSetOf<String>()
             val totalTasks = streamAddons.size +
                 pluginProviderGroups.sumOf { it.scrapers.size } +
                 cloudStreamProviderGroups.size +
@@ -726,23 +726,30 @@ object StreamsRepository {
                         ) {
                             cloudStreamFirstErrorByAddonId[completion.addonId] = completion.error
                         }
+                        val uniqueCloudStreamItems = completion.streams.filter { stream ->
+                            seenStreamIdentities.add(crossProviderStreamIdentity(stream))
+                        }
                         _uiState.update { current ->
                             val updated = StreamAutoPlaySelector.orderAddonStreams(
                                 groups = current.groups.map { group ->
                                     if (group.addonId != completion.addonId) {
                                         group
                                     } else {
-                                        val mergedStreams = group.streams + completion.streams
+                                        val mergedStreams = group.streams + uniqueCloudStreamItems
                                         val stillLoading = remaining > 0
-                                        group.copy(
-                                            streams = if (stillLoading) mergedStreams else mergedStreams.sortedForGroupedDisplay(),
-                                            isLoading = stillLoading,
-                                            error = if (mergedStreams.isEmpty() && !stillLoading) {
-                                                cloudStreamFirstErrorByAddonId[completion.addonId]
-                                            } else {
-                                                null
-                                            },
+                                        val orderedStreams = if (stillLoading) mergedStreams else mergedStreams.sortedForGroupedDisplay()
+                                        val presented = presentStreamGroup(
+                                            group.copy(
+                                                streams = orderedStreams,
+                                                isLoading = stillLoading,
+                                                error = if (mergedStreams.isEmpty() && !stillLoading) {
+                                                    cloudStreamFirstErrorByAddonId[completion.addonId]
+                                                } else {
+                                                    null
+                                                },
+                                            ),
                                         )
+                                        presented
                                     }
                                 },
                                 installedOrder = installedAddonOrder,
@@ -760,7 +767,7 @@ object StreamsRepository {
 
                     is StreamLoadCompletion.PluginScraper -> {
                         val uniquePluginStreams = completion.streams.filter { stream ->
-                            seenPluginStreamIdentities.add(pluginStreamIdentity(stream))
+                            seenStreamIdentities.add(pluginStreamIdentity(stream))
                         }
                         val presentedPluginStreams = presentStreamGroup(
                             AddonStreamGroup(
