@@ -58,6 +58,38 @@ class HomeScreenTest {
     }
 
     @Test
+    fun `CloudStream-only home does not show the no-sources empty state`() {
+        assertFalse(
+            shouldShowHomeEmptyState(
+                hasActiveAddons = false,
+                hasServerLibraries = false,
+                hasRenderableCollectionRows = false,
+                hasCloudStreamRows = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `home shows no-sources empty state only when every source is absent`() {
+        assertTrue(
+            shouldShowHomeEmptyState(
+                hasActiveAddons = false,
+                hasServerLibraries = false,
+                hasRenderableCollectionRows = false,
+                hasCloudStreamRows = false,
+            ),
+        )
+        assertFalse(
+            shouldShowHomeEmptyState(
+                hasActiveAddons = true,
+                hasServerLibraries = false,
+                hasRenderableCollectionRows = false,
+                hasCloudStreamRows = false,
+            ),
+        )
+    }
+
+    @Test
     fun `home collapses hero space for terminal empty content`() {
         assertFalse(
             shouldShowHomeHeroSlot(
