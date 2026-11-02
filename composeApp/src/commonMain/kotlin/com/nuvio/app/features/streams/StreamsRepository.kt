@@ -364,6 +364,7 @@ object StreamsRepository {
                 .associate { it.addonId to it.scrapers.size }
                 .toMutableMap()
             val pluginFirstErrorByAddonId = mutableMapOf<String, String>()
+            val seenPluginStreamIdentities = mutableSetOf<String>()
             val totalTasks = streamAddons.size +
                 pluginProviderGroups.sumOf { it.scrapers.size } +
                 cloudStreamProviderGroups.size +
@@ -700,6 +701,16 @@ object StreamsRepository {
                     }
 
                     is StreamLoadCompletion.PluginScraper -> {
+                        val uniquePluginStreams = completion.streams.filter { stream ->
+                            seenPluginStreamIdentities.add(pluginStreamIdentity(stream))
+                        }
+                        val presentedPluginStreams = presentStreamGroup(
+                            AddonStreamGroup(
+                                addonName = completion.addonId,
+                                addonId = completion.addonId,
+                                streams = uniquePluginStreams,
+                            ),
+                        ).streams
                         val remaining = (pluginRemainingByAddonId[completion.addonId] ?: 1) - 1
                         pluginRemainingByAddonId[completion.addonId] = remaining.coerceAtLeast(0)
                         if (!completion.error.isNullOrBlank() && pluginFirstErrorByAddonId[completion.addonId].isNullOrBlank()) {
@@ -712,10 +723,10 @@ object StreamsRepository {
                                     if (group.addonId != completion.addonId) {
                                         group
                                     } else {
-                                        val mergedStreams = if (completion.streams.isEmpty()) {
+                                        val mergedStreams = if (presentedPluginStreams.isEmpty()) {
                                             group.streams
                                         } else {
-                                            (group.streams + completion.streams).sortedForGroupedDisplay()
+                                            (group.streams + presentedPluginStreams).sortedForGroupedDisplay()
                                         }
                                         val stillLoading = remaining > 0
                                         val finalError = if (mergedStreams.isEmpty() && !stillLoading) {
