@@ -854,7 +854,7 @@ actual object CloudStreamRepository {
         }
         return CloudStreamUiState(
             repositories = repositories,
-            plugins = plugins,
+            plugins = sortPluginsByRepository(plugins, repositories),
             registryRevision = 1,
             securityWarningAccepted = stored.securityWarningAccepted,
             hideAllHomeCatalogs = stored.hideAllHomeCatalogs,
