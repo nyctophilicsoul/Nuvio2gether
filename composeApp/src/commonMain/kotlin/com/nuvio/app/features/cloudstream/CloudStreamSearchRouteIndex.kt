@@ -56,17 +56,37 @@ internal object CloudStreamSearchRouteIndex {
             .toSet()
         if (normalizedTitles.isEmpty()) return emptyList()
 
-        return entries.value.asSequence()
+        val candidates = entries.value.asSequence()
             .filter { entry -> entry.providerId == providerId }
             .filter { entry -> normalizeRouteType(entry.item.type.nuvioType) == requestedType }
-            .filter { entry -> year == null || entry.item.year == null || entry.item.year == year }
+            .filter { entry ->
+                val candidateYear = entry.item.year
+                    ?: entry.item.name.releaseYearFromRouteTitle()
+                // A known requested year must never match a yearless cached route.
+                year == null || candidateYear == year
+            }
             .filter { entry ->
                 entry.item.name.canonicalRouteTitle() in normalizedTitles
             }
             .map(Entry::item)
             .distinctBy(CloudStreamSearchItem::data)
-            .take(MAX_MATCHES)
             .toList()
+
+        // Without a requested year, cached routes for multiple releases are ambiguous.
+        // Force a fresh provider search instead of silently trying the first cached URL.
+        if (year == null) {
+            val knownYears = candidates.mapNotNull { item ->
+                item.year ?: item.name.releaseYearFromRouteTitle()
+            }.distinct()
+            if (knownYears.size > 1) return emptyList()
+        }
+
+        return candidates
+            .sortedByDescending { item ->
+                val candidateYear = item.year ?: item.name.releaseYearFromRouteTitle()
+                year != null && candidateYear == year
+            }
+            .take(MAX_MATCHES)
     }
 
     private fun String.canonicalRouteTitle(): String {
@@ -84,6 +104,11 @@ internal object CloudStreamSearchRouteIndex {
             normalized.removeAt(0)
         }
         return normalized.joinToString(" ")
+    }
+
+    private fun String.releaseYearFromRouteTitle(): Int? {
+        val lastToken = trim().substringAfterLast(' ', "")
+        return lastToken.toIntOrNull()?.takeIf { it in 1900..2099 }
     }
 
     private fun normalizeRouteType(type: String): String = when (type.trim().lowercase()) {
