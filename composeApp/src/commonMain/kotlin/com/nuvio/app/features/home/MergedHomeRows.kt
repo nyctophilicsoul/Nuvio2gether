@@ -165,8 +165,10 @@ internal fun mergeHomeRowItems(
         filterMergedHomeItems(items, contentType, hideTitlesWithoutPosters)
     }
     val blended = when (blendMode) {
-        MergedHomeRowBlendMode.INTERLEAVE, MergedHomeRowBlendMode.PROVIDER_PRIORITY ->
+        MergedHomeRowBlendMode.INTERLEAVE ->
             interleaveMergedSources(filteredSources, deduplicate, maxItems)
+        MergedHomeRowBlendMode.PROVIDER_PRIORITY ->
+            providerPriorityMerge(filteredSources, deduplicate, maxItems)
         MergedHomeRowBlendMode.SMART_FRESHNESS_POPULARITY ->
             smartFreshnessPopularityMerge(filteredSources, deduplicate, maxItems)
         MergedHomeRowBlendMode.FRESHNESS_WEIGHTED ->
@@ -257,6 +259,22 @@ private fun weightedMerge(
             added = true
         }
         if (!added) break
+    }
+    return result
+}
+
+private fun providerPriorityMerge(
+    sourceItems: List<List<MetaPreview>>,
+    deduplicate: Boolean,
+    maxItems: Int,
+): List<MetaPreview> {
+    val result = ArrayList<MetaPreview>(maxItems)
+    val seen = mutableSetOf<String>()
+    for (source in sourceItems) {
+        for (item in source) {
+            if (!deduplicate || seen.add(item.stableKey())) result += item
+            if (result.size >= maxItems) return result
+        }
     }
     return result
 }
