@@ -417,6 +417,15 @@ private fun CloudStreamPluginCard(
 ) {
     val scope = rememberCoroutineScope()
     var isOpeningSettings by remember(plugin.metadata.id.value) { mutableStateOf(false) }
+    var hasPluginSettings by remember(plugin.metadata.id.value, plugin.installedVersion) { mutableStateOf(false) }
+
+    LaunchedEffect(plugin.metadata.id.value, plugin.installedVersion, plugin.isInstalled) {
+        hasPluginSettings = plugin.isInstalled &&
+            plugin.compatibility.runtimeKind == com.nuvio.app.features.cloudstream.CloudStreamRuntimeKind.AndroidDex &&
+            CloudStreamPlatformRuntime.supportsAndroidDex &&
+            CloudStreamPlatformRuntime.hasSettings(plugin)
+    }
+
     NuvioSurfaceCard {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             AsyncImage(
@@ -435,11 +444,7 @@ private fun CloudStreamPluginCard(
                 )
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (
-                    plugin.isInstalled &&
-                    plugin.compatibility.runtimeKind == com.nuvio.app.features.cloudstream.CloudStreamRuntimeKind.AndroidDex &&
-                    CloudStreamPlatformRuntime.supportsAndroidDex
-                ) {
+                if (hasPluginSettings) {
                     IconButton(
                         enabled = !isOpeningSettings,
                         onClick = {
