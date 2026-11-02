@@ -242,7 +242,7 @@ internal suspend fun resolveCloudStreamProviderStreams(
                         if (directSources != null) {
                             val directStreams = cloudStreamSourcesToStreamItems(
                                 providerId = providerGroup.providerId,
-                                providerName = providerGroup.addonName,
+                                providerName = providerGroup.providerName,
                                 sources = directSources,
                             )
                             if (directStreams.isNotEmpty()) return@runCatchingUnlessCancelled directStreams
