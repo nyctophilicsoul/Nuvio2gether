@@ -15,6 +15,7 @@ internal expect object CloudStreamPlatformRuntime {
     fun initialize(context: Any?)
     suspend fun provider(plugin: CloudStreamPluginItem): CloudStreamProvider?
     suspend fun openSettings(plugin: CloudStreamPluginItem): Boolean
+    suspend fun hasSettings(plugin: CloudStreamPluginItem): Boolean
     fun unload(pluginId: String)
     fun clear()
 }
