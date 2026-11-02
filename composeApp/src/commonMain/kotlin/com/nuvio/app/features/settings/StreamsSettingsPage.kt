@@ -261,6 +261,7 @@ internal fun LazyListScope.streamsSettingsContent(isTablet: Boolean) {
                 title = "Stream formatting preset",
                 message = "Choose how stream details are presented. Original preserves provider formatting.",
             ) {
+                val tokens = MaterialTheme.nuvio
                 val previewStream = remember(draftStreamFormatPreset) {
                     StreamItem(
                         name = "Example.Movie.2024.1080p.WEB-DL.HEVC.DDP5.1.HDR10.2GB",
