@@ -526,14 +526,9 @@ actual object CloudStreamRepository {
         // Downloading a .cs3 artifact does not make its DEX executable. Unsupported
         // packages may be retained and hash-verified for inspection/compatibility
         // tracking, but canEnableProvider remains false until a reviewed adapter exists.
-        // Never replace a locally verified package with an unverified update. The
-        // installed artifact may remain usable while the repository's new version
-        // is missing its checksum, but overwriting it would discard that guarantee.
-        if (item.isInstalled && item.verified && item.metadata.fileHash == null) {
-            return CloudStreamInstallResult.Error(
-                "This repository does not provide a SHA-256 hash. The previously verified package was preserved; this update cannot be installed safely.",
-            )
-        }
+        // CloudStream repositories do not universally publish fileHash. The package
+        // inspector validates the archive structure; a declared SHA-256 is always
+        // enforced below. The user must explicitly accept the third-party code warning.
         var installationStarted = false
         val startCommitted = commitForProfile(expectedProfileGeneration) {
             val latest = _uiState.value.plugins.firstOrNull { it.metadata.id.value == pluginId }
@@ -574,7 +569,7 @@ actual object CloudStreamRepository {
             }
             CloudStreamPackageInspector.inspect(bytes)
             val expectedHash = item.metadata.fileHash
-            val verified = expectedHash.verifies(bytes)
+            val verified = expectedHash?.matches(bytes) ?: true
             if (expectedHash != null) require(verified) { ".cs3 SHA-256 hash mismatch" }
 
             var installed: CloudStreamPluginItem? = null
