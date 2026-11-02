@@ -787,18 +787,15 @@ internal fun CloudStreamLoadItem.matchesCloudStreamExternalIdRequest(
     val titleMatches = requestedTitles.any { requested ->
         loadedTitle.matchesRequestedCloudStreamTitle(requested)
     }
-    if (titleMatches) {
-        val requestedYear = request.year
-        val loadedYear = year ?: loadedTitle.trailingCloudStreamReleaseYear()
-        return requestedYear == null || loadedYear == null || loadedYear == requestedYear
-    }
+    val requestedYear = request.year
+    val loadedYear = year ?: loadedTitle.trailingCloudStreamReleaseYear()
+    if (requestedYear != null && loadedYear != requestedYear) return false
+    if (titleMatches) return true
 
     // External-ID lookups may legitimately return a localized title, but the ID alone
     // is not trusted because third-party providers can implement this method incorrectly.
     // Require an independently matching year before accepting a non-matching title.
-    val requestedYear = request.year ?: return false
-    val loadedYear = year ?: loadedTitle.trailingCloudStreamReleaseYear()
-    return loadedYear == requestedYear
+    return requestedYear != null && loadedYear == requestedYear
 }
 
 private fun CloudStreamTvType.matchesCloudStreamType(type: String): Boolean =
