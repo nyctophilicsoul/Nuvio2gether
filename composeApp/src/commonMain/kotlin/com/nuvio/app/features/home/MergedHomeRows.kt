@@ -25,6 +25,7 @@ data class MergedHomeRowDefinition(
     @SerialName("hide_included_rows")
     val hideIncludedRows: Boolean = false,
     @SerialName("hide_titles_without_posters")
+    @Deprecated("Use the global Home Layout preference")
     val hideTitlesWithoutPosters: Boolean = false,
 ) {
     fun resolvedDisplayMode(): MergedHomeRowDisplayMode =
@@ -79,7 +80,12 @@ enum class MergedHomeRowContentType(val storageValue: String) {
  */
 enum class MergedHomeRowBlendMode(val storageValue: String) {
     INTERLEAVE("interleave"),
-    SMART_FRESHNESS_POPULARITY("smart_freshness_popularity");
+    SMART_FRESHNESS_POPULARITY("smart_freshness_popularity"),
+    FRESHNESS_WEIGHTED("freshness_weighted"),
+    POPULARITY_WEIGHTED("popularity_weighted"),
+    RATING_WEIGHTED("rating_weighted"),
+    PROVIDER_PRIORITY("provider_priority"),
+    RANDOM("random");
 
     companion object {
         fun fromStorage(value: String?): MergedHomeRowBlendMode =
@@ -159,12 +165,21 @@ internal fun mergeHomeRowItems(
         filterMergedHomeItems(items, contentType, hideTitlesWithoutPosters)
     }
     val blended = when (blendMode) {
-        MergedHomeRowBlendMode.INTERLEAVE ->
+        MergedHomeRowBlendMode.INTERLEAVE, MergedHomeRowBlendMode.PROVIDER_PRIORITY ->
             interleaveMergedSources(filteredSources, deduplicate, maxItems)
         MergedHomeRowBlendMode.SMART_FRESHNESS_POPULARITY ->
             smartFreshnessPopularityMerge(filteredSources, deduplicate, maxItems)
+        MergedHomeRowBlendMode.FRESHNESS_WEIGHTED ->
+            weightedMerge(filteredSources, deduplicate, maxItems, 0.80, 0.10, 0.10)
+        MergedHomeRowBlendMode.POPULARITY_WEIGHTED ->
+            weightedMerge(filteredSources, deduplicate, maxItems, 0.10, 0.80, 0.10)
+        MergedHomeRowBlendMode.RATING_WEIGHTED ->
+            weightedMerge(filteredSources, deduplicate, maxItems, 0.10, 0.10, 0.80)
+        MergedHomeRowBlendMode.RANDOM ->
+            interleaveMergedSources(filteredSources.map { it.shuffled() }, deduplicate, maxItems)
     }
-    return sortMergedItems(blended, sortMode).take(maxItems)
+    // Legacy sortMode remains readable for old saved rows, but no longer overrides blending.
+    return blended.take(maxItems)
 }
 
 internal fun buildMergedHomeTypeTabs(
@@ -193,6 +208,41 @@ internal fun buildMergedHomeTypeTabs(
         )
         add(HomeCatalogTab(type.storageValue, title, items, items.size, hasMore))
     }
+}
+
+private fun weightedMerge(
+    sourceItems: List<List<MetaPreview>>,
+    deduplicate: Boolean,
+    maxItems: Int,
+    freshnessWeight: Double,
+    popularityWeight: Double,
+    ratingWeight: Double,
+): List<MetaPreview> {
+    val unique = if (deduplicate) sourceItems.flatten().distinctBy { it.stableKey() } else sourceItems.flatten()
+    if (unique.isEmpty()) return emptyList()
+    val freshness = percentileStringScores(unique.map { it.releaseDateKey() }, true)
+    val popularity = percentileScores(unique.map { it.popularity }, true)
+    val ratings = percentileScores(unique.map { it.ratingValue() }, true)
+    val scores = unique.indices.map { i -> freshness[i] * freshnessWeight + popularity[i] * popularityWeight + ratings[i] * ratingWeight }
+    val ranked = unique.indices.sortedWith(compareByDescending<Int> { scores[it] }.thenBy { it })
+    // Rank within a stable round-robin provider schedule to avoid one provider monopolising the front.
+    val providerByKey = mutableMapOf<String, Int>()
+    sourceItems.forEachIndexed { provider, items -> items.forEach { providerByKey.putIfAbsent(it.stableKey(), provider) } }
+    val queues = sourceItems.indices.map { provider -> ranked.filter { providerByKey[unique[it].stableKey()] == provider }.iterator() }
+    val result = ArrayList<MetaPreview>(minOf(maxItems, unique.size))
+    val positions = IntArray(queues.size)
+    while (result.size < maxItems) {
+        var added = false
+        queues.indices.forEach { provider ->
+            val queue = queues[provider]
+            if (queue.hasNext() && result.size < maxItems) {
+                result += unique[queue.next()]
+                added = true
+            }
+        }
+        if (!added) break
+    }
+    return result
 }
 
 private fun interleaveMergedSources(
