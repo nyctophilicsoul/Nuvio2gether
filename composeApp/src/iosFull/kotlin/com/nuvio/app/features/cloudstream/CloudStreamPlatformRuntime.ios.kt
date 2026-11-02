@@ -5,6 +5,7 @@ internal actual object CloudStreamPlatformRuntime {
 
     actual fun initialize(context: Any?) = Unit
     actual suspend fun provider(plugin: CloudStreamPluginItem): CloudStreamProvider? = null
+    actual suspend fun openSettings(plugin: CloudStreamPluginItem): Boolean = false
     actual fun unload(pluginId: String) = Unit
     actual fun clear() = Unit
 }
