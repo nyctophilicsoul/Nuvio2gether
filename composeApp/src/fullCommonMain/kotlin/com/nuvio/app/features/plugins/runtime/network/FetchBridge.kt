@@ -16,7 +16,7 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 
 private const val MAX_FETCH_HEADER_VALUE_CHARS = 8 * 1024
 private const val FETCH_TRUNCATION_SUFFIX = "\n...[truncated]"
-private const val PLUGIN_FETCH_TIMEOUT_MS = 20_000L
+private const val PLUGIN_FETCH_TIMEOUT_MS = 25_000L
 private const val MAX_PLUGIN_FETCH_RESPONSE_BYTES = 4 * 1024 * 1024
 
 internal class FetchBridge : HostModule {
