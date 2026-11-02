@@ -385,6 +385,9 @@ actual object CloudStreamRepository {
             }
         }
 
+        // Installing/enabling a batch changes the providers eligible for home
+        // catalog loading. Refresh once after the batch, not once per provider.
+        HomeRepository.applyCurrentSettings()
         return CloudStreamBulkInstallResult(
             requestedCount = requestedIds.size,
             installedCount = installedCount,
