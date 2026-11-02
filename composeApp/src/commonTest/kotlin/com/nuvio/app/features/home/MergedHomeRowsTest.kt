@@ -313,7 +313,7 @@ class MergedHomeRowsTest {
     }
 
     @Test
-    fun newestSortOverridesBlendOrder() {
+    fun legacySortArgumentDoesNotOverrideInterleaveBlend() {
         val merged = mergeHomeRowItems(
             sourceItems = listOf(
                 listOf(
@@ -325,7 +325,7 @@ class MergedHomeRowsTest {
             sortMode = MergedHomeRowSortMode.NEWEST,
         )
 
-        assertEquals(listOf("newer", "older"), merged.map { it.id })
+        assertEquals(listOf("older", "newer"), merged.map { it.id })
     }
 
     @Test
