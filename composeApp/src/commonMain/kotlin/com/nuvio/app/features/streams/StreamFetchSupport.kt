@@ -193,7 +193,10 @@ internal suspend fun resolveCloudStreamProviderStreams(
                 year = searchRequest.year,
             )
             for (route in indexedRoutes) {
-                resolveMatch(route, allowProviderRankedFallback = true)?.let {
+                // A cached route was originally discovered by a title search. Do not
+                // downgrade it to provider-order matching: stale/ambiguous cache entries
+                // must pass the same title validation as fresh strict search results.
+                resolveMatch(route, allowProviderRankedFallback = false)?.let {
                     return@runCatchingUnlessCancelled it
                 }
             }
@@ -203,7 +206,7 @@ internal suspend fun resolveCloudStreamProviderStreams(
                     CloudStreamRepository.loadByExternalId(providerGroup.providerId, externalId).getOrThrow()
                 }.onFailure { error -> lastError = error }
                     .getOrNull()
-                if (loaded != null) {
+                if (loaded != null && loaded.matchesCloudStreamExternalIdRequest(searchRequest)) {
                     val linkData = loaded.linkDataForCloudStreamRequest(searchRequest)
                     if (linkData != null) {
                         val directSources = runCatchingUnlessCancelled {
@@ -682,8 +685,10 @@ internal fun CloudStreamLoadItem.linkDataForCloudStreamRequest(
 
     if (request.episode != null) {
         val episodeMatches = sortedEpisodes.filter { item -> item.episode == request.episode }
+        // Episode numbers repeat across seasons. Without an explicit season, only a
+        // title match or a unique candidate is safe; never silently choose the first.
         return episodeMatches.bestEpisodeTitleMatch(request)?.data
-            ?: episodeMatches.firstOrNull()?.data
+            ?: episodeMatches.singleOrNull()?.data
             ?: titledEpisode?.data
     }
 
@@ -759,7 +764,41 @@ internal fun CloudStreamLoadItem.matchesCloudStreamRequest(
         if (requestedType == "movie" && searchYear != requestedYear && loadedYear != requestedYear) return false
     }
 
-    return titleMatches || allowProviderRankedFallback
+    if (!titleMatches && allowProviderRankedFallback) {
+        // A provider's result order is not identity evidence. Permit a localized title
+        // only when the loaded response independently confirms the requested release
+        // year. Missing years must not turn an unrelated result into a valid match.
+        if (requestedYear == null || loadedYear != requestedYear) return false
+    }
+
+    return titleMatches
+}
+
+internal fun CloudStreamLoadItem.matchesCloudStreamExternalIdRequest(
+    request: CloudStreamSearchRequest,
+): Boolean {
+    val requestedType = normalizeCloudStreamNuvioType(request.type)
+    if (!type.matchesCloudStreamType(requestedType)) return false
+
+    val requestedTitles = request.titleCandidates
+        .map { it.normalizedCloudStreamSearchTitle() }
+        .filter(String::isNotBlank)
+    val loadedTitle = name.normalizedCloudStreamSearchTitle()
+    val titleMatches = requestedTitles.any { requested ->
+        loadedTitle.matchesRequestedCloudStreamTitle(requested)
+    }
+    if (titleMatches) {
+        val requestedYear = request.year
+        val loadedYear = year ?: loadedTitle.trailingCloudStreamReleaseYear()
+        return requestedYear == null || loadedYear == null || loadedYear == requestedYear
+    }
+
+    // External-ID lookups may legitimately return a localized title, but the ID alone
+    // is not trusted because third-party providers can implement this method incorrectly.
+    // Require an independently matching year before accepting a non-matching title.
+    val requestedYear = request.year ?: return false
+    val loadedYear = year ?: loadedTitle.trailingCloudStreamReleaseYear()
+    return loadedYear == requestedYear
 }
 
 private fun CloudStreamTvType.matchesCloudStreamType(type: String): Boolean =
