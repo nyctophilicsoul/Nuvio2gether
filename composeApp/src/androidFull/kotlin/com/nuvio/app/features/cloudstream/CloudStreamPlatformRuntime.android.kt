@@ -97,6 +97,7 @@ internal actual object CloudStreamPlatformRuntime {
             callback.invoke(context)
             true
         } catch (error: Throwable) {
+            if (error is kotlinx.coroutines.CancellationException) throw error
             log.e(error) { "Failed to open CloudStream settings id=${plugin.metadata.id.value}" }
             false
         }
