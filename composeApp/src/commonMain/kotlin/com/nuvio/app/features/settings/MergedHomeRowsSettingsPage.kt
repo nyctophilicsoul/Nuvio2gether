@@ -118,9 +118,7 @@ private fun MergedHomeRowsEditor(
     var draftMode by remember { mutableStateOf(MergedHomeRowDisplayMode.SOURCE_TABS) }
     var draftBlendMode by remember { mutableStateOf(MergedHomeRowBlendMode.SMART_FRESHNESS_POPULARITY) }
     var draftContentType by remember { mutableStateOf(MergedHomeRowContentType.ALL) }
-    var draftSortMode by remember { mutableStateOf(MergedHomeRowSortMode.OFF) }
     var draftHideIncludedRows by remember { mutableStateOf(false) }
-    var draftHideTitlesWithoutPosters by remember { mutableStateOf(false) }
     var draftDeduplicate by remember { mutableStateOf(true) }
     var deleteTarget by remember { mutableStateOf<MergedHomeRowDefinition?>(null) }
 
@@ -131,9 +129,7 @@ private fun MergedHomeRowsEditor(
         draftMode = MergedHomeRowDisplayMode.SOURCE_TABS
         draftContentType = MergedHomeRowContentType.ALL
         draftBlendMode = MergedHomeRowBlendMode.SMART_FRESHNESS_POPULARITY
-        draftSortMode = MergedHomeRowSortMode.OFF
         draftHideIncludedRows = false
-        draftHideTitlesWithoutPosters = false
         draftDeduplicate = true
         editorOpen = true
     }
@@ -149,9 +145,7 @@ private fun MergedHomeRowsEditor(
             row.resolvedContentType()
         }
         draftBlendMode = row.resolvedBlendMode()
-        draftSortMode = row.resolvedSortMode()
         draftHideIncludedRows = row.hideIncludedRows
-        draftHideTitlesWithoutPosters = row.hideTitlesWithoutPosters
         draftDeduplicate = row.deduplicate
         editorOpen = true
     }
@@ -341,12 +335,36 @@ private fun MergedHomeRowsEditor(
                         }
                     }
 
-                    Text(stringResource(Res.string.settings_merged_rows_blend), style = MaterialTheme.typography.titleSmall)
+                    Text("Blending method", style = MaterialTheme.typography.titleSmall)
                     listOf(
-                        MergedHomeRowBlendMode.INTERLEAVE to Res.string.settings_merged_rows_blend_interleave,
-                        MergedHomeRowBlendMode.SMART_FRESHNESS_POPULARITY to Res.string.settings_merged_rows_blend_smart,
+                        MergedHomeRowBlendMode.INTERLEAVE to "Interleave",
+                        MergedHomeRowBlendMode.SMART_FRESHNESS_POPULARITY to "Smart Blend",
+                        MergedHomeRowBlendMode.FRESHNESS_WEIGHTED to "Freshness Weighted",
+                        MergedHomeRowBlendMode.POPULARITY_WEIGHTED to "Popularity Weighted",
+                        MergedHomeRowBlendMode.RATING_WEIGHTED to "Rating Weighted",
+                        MergedHomeRowBlendMode.PROVIDER_PRIORITY to "Provider Priority",
+                        MergedHomeRowBlendMode.RANDOM to "Random Blend",
                     ).forEach { (mode, label) ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = draftBlendMode == mode, onClick = { draftBlendMode = mode })
+                            Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                    Text(
+                        text = when (draftBlendMode) {
+                            MergedHomeRowBlendMode.INTERLEAVE -> "Take turns between providers in their configured order."
+                            MergedHomeRowBlendMode.SMART_FRESHNESS_POPULARITY -> "Balance freshness, popularity, ratings and provider diversity."
+                            MergedHomeRowBlendMode.FRESHNESS_WEIGHTED -> "Give newer releases more influence without strict chronological sorting."
+                            MergedHomeRowBlendMode.POPULARITY_WEIGHTED -> "Give popular titles more influence while retaining provider diversity."
+                            MergedHomeRowBlendMode.RATING_WEIGHTED -> "Give highly rated titles more influence while retaining provider diversity."
+                            MergedHomeRowBlendMode.PROVIDER_PRIORITY -> "Respect provider order and take turns between providers."
+                            MergedHomeRowBlendMode.RANDOM -> "Shuffle provider queues and interleave their results."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                             RadioButton(selected = draftBlendMode == mode, onClick = { draftBlendMode = mode })
                             Text(stringResource(label), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                         }
@@ -387,8 +405,6 @@ private fun MergedHomeRowsEditor(
                         Text(stringResource(Res.string.settings_merged_rows_hide_included), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = draftHideTitlesWithoutPosters, onCheckedChange = { draftHideTitlesWithoutPosters = it })
-                        Text(stringResource(Res.string.settings_merged_rows_hide_without_posters), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                     }
 
                     Text(stringResource(Res.string.settings_merged_rows_select_sources), style = MaterialTheme.typography.titleSmall)
@@ -445,9 +461,7 @@ private fun MergedHomeRowsEditor(
                                 deduplicate = draftDeduplicate,
                                 contentType = draftContentType,
                                 blendMode = draftBlendMode,
-                                sortMode = draftSortMode,
                                 hideIncludedRows = draftHideIncludedRows,
-                                hideTitlesWithoutPosters = draftHideTitlesWithoutPosters,
                             )
                         } ?: (HomeCatalogSettingsRepository.createMergedRow(
                             title = draftTitle,
@@ -456,9 +470,7 @@ private fun MergedHomeRowsEditor(
                             deduplicate = draftDeduplicate,
                             contentType = draftContentType,
                             blendMode = draftBlendMode,
-                            sortMode = draftSortMode,
                             hideIncludedRows = draftHideIncludedRows,
-                            hideTitlesWithoutPosters = draftHideTitlesWithoutPosters,
                         ) != null)
                         if (saved) editorOpen = false
                     },
