@@ -367,7 +367,7 @@ object HomeRepository {
                         deduplicate = mergedRow.deduplicate,
                         blendMode = mergedRow.resolvedBlendMode(),
                         sortMode = mergedRow.resolvedSortMode(),
-                        hideTitlesWithoutPosters = mergedRow.hideTitlesWithoutPosters,
+                        hideTitlesWithoutPosters = snapshot.hideMergedTitlesWithoutPosters,
                         hasMore = sourceSections.any(HomeCatalogSection::hasMore),
                         maxItems = HOME_MERGED_ROW_ITEM_LIMIT,
                     )
