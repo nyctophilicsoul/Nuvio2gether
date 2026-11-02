@@ -348,7 +348,7 @@ object HomeRepository {
                             val sourceItems = filterMergedHomeItems(
                                 items = source.items,
                                 contentType = contentType,
-                                hideTitlesWithoutPosters = snapshot.hideMergedTitlesWithoutPosters || mergedRow.hideTitlesWithoutPosters,
+                                hideTitlesWithoutPosters = snapshot.hideMergedTitlesWithoutPosters,
                             )
                             add(
                                 HomeCatalogTab(
