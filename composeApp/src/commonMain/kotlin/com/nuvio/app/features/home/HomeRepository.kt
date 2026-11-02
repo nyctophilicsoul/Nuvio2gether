@@ -69,9 +69,8 @@ object HomeRepository {
             activeJob = null
             activeRequestKey = null
             cachedSections = emptyMap()
-        cloudStreamHomeJob?.cancel()
-        cloudStreamHomeJob = null
-        cachedCloudStreamSections = emptyList()
+            // CloudStream home rows are an independent source. Do not clear them
+            // merely because no Stremio add-on catalogs are configured.
             lastErrorMessage = null
             publishCurrentState(
                 isLoading = false,
@@ -151,6 +150,7 @@ object HomeRepository {
     }
 
     private fun refreshCloudStreamHomeSections() {
+        CloudStreamRepository.initialize()
         cloudStreamHomeJob?.cancel()
         val state = CloudStreamRepository.uiState.value
         if (state.hideAllHomeCatalogs) {
