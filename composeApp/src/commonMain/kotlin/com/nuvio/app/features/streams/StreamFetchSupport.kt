@@ -50,6 +50,7 @@ internal data class PluginProviderGroup(
 internal data class CloudStreamProviderGroup(
     val addonId: String,
     val addonName: String,
+    val providerName: String,
     val providerId: String,
 )
 
@@ -124,12 +125,14 @@ internal fun cloudStreamProviderGroupsForRequest(
                 CloudStreamProviderGroup(
                     addonId = "cloudstream-repo:${repositoryUrl.lowercase()}",
                     addonName = repositoryName,
+                    providerName = providerName,
                     providerId = plugin.metadata.id.value,
                 )
             } else {
                 CloudStreamProviderGroup(
                     addonId = cloudStreamAddonId(plugin.metadata.id.value),
                     addonName = providerName,
+                    providerName = providerName,
                     providerId = plugin.metadata.id.value,
                 )
             }
@@ -200,7 +203,7 @@ internal suspend fun resolveCloudStreamProviderStreams(
                     ?: return null
                 return cloudStreamSourcesToStreamItems(
                     providerId = providerGroup.providerId,
-                    providerName = providerGroup.addonName,
+                    providerName = providerGroup.providerName,
                     sources = sources,
                 ).takeIf { streams -> streams.isNotEmpty() }
                     ?: run {
