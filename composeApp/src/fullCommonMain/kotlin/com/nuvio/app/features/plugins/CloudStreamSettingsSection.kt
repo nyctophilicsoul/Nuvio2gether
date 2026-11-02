@@ -19,6 +19,7 @@ import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -387,6 +388,7 @@ private fun CloudStreamPluginCard(
     onMessage: (String) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    var isOpeningSettings by remember(plugin.metadata.id.value) { mutableStateOf(false) }
     NuvioSurfaceCard {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             AsyncImage(
@@ -405,6 +407,39 @@ private fun CloudStreamPluginCard(
                 )
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
+                if (
+                    plugin.isInstalled &&
+                    plugin.compatibility.runtimeKind == com.nuvio.app.features.cloudstream.CloudStreamRuntimeKind.AndroidDex &&
+                    CloudStreamPlatformRuntime.supportsAndroidDex
+                ) {
+                    IconButton(
+                        enabled = !isOpeningSettings,
+                        onClick = {
+                            isOpeningSettings = true
+                            scope.launch {
+                                try {
+                                    val opened = CloudStreamPlatformRuntime.openSettings(plugin)
+                                    if (!opened) {
+                                        onMessage(copy.pluginSettingsUnavailable)
+                                    }
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
+                                } catch (error: Exception) {
+                                    onMessage((error.message ?: copy.pluginSettingsFailed).localizedCloudStreamFailure(copy))
+                                } finally {
+                                    isOpeningSettings = false
+                                }
+                            }
+                        },
+                    ) {
+                        Icon(
+                            Icons.Rounded.Tune,
+                            contentDescription = copy.pluginSettingsContentDescription,
+                            tint = if (isOpeningSettings) MaterialTheme.colorScheme.onSurfaceVariant
+                                else MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
                 Switch(
                     checked = plugin.enabled,
                     enabled = plugin.canEnableProvider,
@@ -575,6 +610,12 @@ private class CloudStreamSettingsCopy private constructor(
         if (turkish) "Yazar belirtilmemiş" else "Author not specified"
     val noDescription: String =
         if (turkish) "Açıklama yok." else "No description."
+    val pluginSettingsContentDescription: String =
+        if (turkish) "Eklenti ayarları" else "Plugin settings"
+    val pluginSettingsUnavailable: String =
+        if (turkish) "Bu eklenti özel ayarlar sunmuyor." else "This plugin does not expose custom settings."
+    val pluginSettingsFailed: String =
+        if (turkish) "Eklenti ayarları açılamadı." else "Plugin settings could not be opened."
     val noProvidersFoundTitle: String =
         if (turkish) "Repository içinde provider bulunamadı" else "No providers found in these repositories"
     val noProvidersFoundDescription: String =
