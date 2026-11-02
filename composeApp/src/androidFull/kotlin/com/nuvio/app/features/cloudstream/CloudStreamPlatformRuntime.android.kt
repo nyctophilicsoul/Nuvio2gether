@@ -44,6 +44,8 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withContext
@@ -322,6 +324,7 @@ private class AndroidDexCloudStreamProvider(
             mutableListOf<Pair<String, List<CloudStreamSearchItem>>>(),
         )
         var lastError: Throwable? = null
+        val providerSemaphore = Semaphore(3)
         providers.filter { api ->
             // CloudStream providers should set hasMainPage, but a few extensions
             // expose non-default MainPageData without setting the flag. Honour that
@@ -329,7 +332,8 @@ private class AndroidDexCloudStreamProvider(
             api.hasMainPage || api.mainPage.any { data ->
                 data.name.isNotBlank() || data.data.isNotBlank()
             }
-        }.forEach { api ->
+        }.map { api -> async {
+            providerSemaphore.withPermit {
             // MainAPI's default mainPage is a single blank MainPageData entry,
             // not an empty list. ifEmpty() therefore does not provide a fallback.
             // Remove placeholder entries and use the provider's base URL when it
@@ -372,7 +376,8 @@ private class AndroidDexCloudStreamProvider(
                     requests.map { data -> async { loadRequest(data) } }.awaitAll()
                 }
             }
-        }
+            }
+        } }.awaitAll()
         if (sections.isEmpty()) throw lastError ?: return@withContext emptyList()
         synchronized(sections) { sections.toList() }
     }
@@ -380,11 +385,14 @@ private class AndroidDexCloudStreamProvider(
     override suspend fun search(query: String): List<CloudStreamSearchItem> = withContext(Dispatchers.IO) {
         val results = mutableListOf<CloudStreamSearchItem>()
         var lastError: Throwable? = null
-        providers.forEach { api ->
+        val providerSemaphore = Semaphore(3)
+        providers.map { api -> async {
+            providerSemaphore.withPermit {
             runCatching {
                 withTimeout(stageTimeout(api.searchTimeoutMs, DEFAULT_DISCOVERY_TIMEOUT_MS)) {
                     api.search(query, 1)?.items.orEmpty()
-                }
+                    }
+        } }.awaitAll()
             }.onSuccess { items ->
                 log.d {
                     "CloudStream search api=${api.name} query=$query returned=${items.size} " +
