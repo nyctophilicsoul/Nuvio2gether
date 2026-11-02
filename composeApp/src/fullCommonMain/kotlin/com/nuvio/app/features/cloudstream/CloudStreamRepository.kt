@@ -147,7 +147,7 @@ actual object CloudStreamRepository {
                                     repositories = current.repositories + CloudStreamRepositoryItem(repository),
                                     plugins = (current.plugins + plugins.map(::newPluginItem))
                                         .distinctBy { it.metadata.id.value }
-                                        .sortedBy { it.metadata.name.lowercase() },
+                                        .let(::sortPluginsByRepository),
                                 )
                             }
                             persist()
@@ -765,7 +765,7 @@ actual object CloudStreamRepository {
                     } else item
                 },
                 plugins = (current.plugins.filterNot { it.metadata.repositoryManifestUrl == repository.sourceUrl } + refreshed)
-                    .sortedBy { it.metadata.name.lowercase() },
+                    .let(::sortPluginsByRepository),
                 registryRevision = current.registryRevision + 1,
             )
         }
@@ -776,6 +776,16 @@ actual object CloudStreamRepository {
                 CloudStreamSearchRouteIndex.clearProvider(item.metadata.id.value)
                 CloudStreamPlatformRuntime.unload(item.metadata.id.value)
             }
+    }
+
+    private fun sortPluginsByRepository(plugins: List<CloudStreamPluginItem>): List<CloudStreamPluginItem> {
+        val repositoryOrder = _uiState.value.repositories.mapIndexed { index, item ->
+            item.manifest.sourceUrl to index
+        }.toMap()
+        return plugins.sortedWith(
+            compareBy<CloudStreamPluginItem> { repositoryOrder[it.metadata.repositoryManifestUrl] ?: Int.MAX_VALUE }
+                .thenBy { it.metadata.name.lowercase() },
+        )
     }
 
     private fun newPluginItem(metadata: CloudStreamPluginMetadata): CloudStreamPluginItem =
