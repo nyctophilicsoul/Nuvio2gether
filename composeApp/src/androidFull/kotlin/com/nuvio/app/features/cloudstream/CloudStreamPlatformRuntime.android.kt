@@ -80,6 +80,7 @@ internal actual object CloudStreamPlatformRuntime {
 
     actual fun unload(pluginId: String) {
         synchronized(loadedLock) { loaded.remove(pluginId) }?.unload()
+        appContext?.let(::prepareHostContext)
     }
 
     actual fun clear() {
@@ -125,25 +126,27 @@ internal actual object CloudStreamPlatformRuntime {
         val pluginClassName = manifest.pluginClassName?.takeIf(String::isNotBlank)
             ?: error("CloudStream manifest has no pluginClassName")
         val loader = PathClassLoader(file.absolutePath, context.classLoader)
-        val pluginClass = loader.loadClass(pluginClassName)
-        require(BasePlugin::class.java.isAssignableFrom(pluginClass)) {
-            "CloudStream entry point does not extend BasePlugin"
-        }
-
-        @Suppress("UNCHECKED_CAST")
-        val instance = (pluginClass as Class<out BasePlugin>).getDeclaredConstructor().newInstance()
-        instance.filename = file.absolutePath
-        PluginManager.currentlyLoading = item.metadata.internalName
-        val identityContext = CloudStreamIdentityContext(context)
-        CloudStreamApp.context = identityContext
-        setContext(WeakReference(identityContext))
-        applyHostCompatibilityDefaults(pluginClassName)
-        if (manifest.requiresResources) instance.attachResources(identityContext, file)
-
         val providersBefore = APIHolder.allProviders.toSet()
         val extractorsBefore = extractorApis.toSet()
+        var instance: BasePlugin? = null
+        PluginManager.currentlyLoading = item.metadata.internalName
         try {
-            if (instance is Plugin) instance.load(identityContext) else instance.load()
+            val pluginClass = loader.loadClass(pluginClassName)
+            require(BasePlugin::class.java.isAssignableFrom(pluginClass)) {
+                "CloudStream entry point does not extend BasePlugin"
+            }
+
+            @Suppress("UNCHECKED_CAST")
+            val pluginInstance = (pluginClass as Class<out BasePlugin>).getDeclaredConstructor().newInstance()
+            instance = pluginInstance
+            pluginInstance.filename = file.absolutePath
+            val identityContext = CloudStreamIdentityContext(context)
+            CloudStreamApp.context = identityContext
+            setContext(WeakReference(identityContext))
+            applyHostCompatibilityDefaults(pluginClassName)
+            if (manifest.requiresResources) pluginInstance.attachResources(identityContext, file)
+
+            if (pluginInstance is Plugin) pluginInstance.load(identityContext) else pluginInstance.load()
             val providers = APIHolder.allProviders
                 .filter { it !in providersBefore || it.sourcePlugin == file.absolutePath }
                 .distinct()
@@ -161,7 +164,7 @@ internal actual object CloudStreamPlatformRuntime {
                 filePath = file.absolutePath,
                 version = manifest.version ?: item.metadata.version,
             )
-            PluginManager.register(data, instance)
+            PluginManager.register(data, pluginInstance)
             log.i {
                 "Loaded ${item.metadata.internalName}: ${providers.size} provider(s), " +
                     "${registeredExtractors.size} extractor(s)"
@@ -170,18 +173,26 @@ internal actual object CloudStreamPlatformRuntime {
                 id = item.metadata.id.value,
                 path = file.absolutePath,
                 context = identityContext,
-                instance = instance,
+                instance = pluginInstance,
                 providers = providers,
                 extractors = registeredExtractors,
                 provider = AndroidDexCloudStreamProvider(item.metadata.id.value, providers),
             )
         } catch (error: Throwable) {
             log.e(error) { "Failed to load ${item.metadata.internalName}" }
+            runCatching { instance?.beforeUnload() }
+            val addedProviders = APIHolder.allProviders.filter {
+                it !in providersBefore && it.sourcePlugin == file.absolutePath
+            }
+            addedProviders.forEach(APIHolder::removePluginMapping)
             APIHolder.allProviders.removeAll { it !in providersBefore && it.sourcePlugin == file.absolutePath }
             extractorApis.removeAll { it !in extractorsBefore && it.sourcePlugin == file.absolutePath }
+            VideoClickActionHolder.allVideoClickActions.removeAll { it.sourcePlugin == file.absolutePath }
+            PluginManager.unregister(file.absolutePath)
             throw error
         } finally {
             PluginManager.currentlyLoading = null
+            prepareHostContext(context)
         }
     }
 
