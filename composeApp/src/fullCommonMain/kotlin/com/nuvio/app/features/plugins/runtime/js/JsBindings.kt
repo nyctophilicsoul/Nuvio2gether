@@ -36,7 +36,11 @@ internal object JsBindings {
                     var season = args.season == null ? undefined : args.season;
                     var episode = args.episode == null ? undefined : args.episode;
                     var result = await getStreams(args.tmdbId, args.mediaType, season, episode);
-                    __capture_result(JSON.stringify(result || []));
+                    if (result == null) result = [];
+                    if (!Array.isArray(result)) {
+                        throw new TypeError("getStreams must return an array of stream results");
+                    }
+                    __capture_result(JSON.stringify(result));
                 } catch (e) {
                     var errorName = e && e.name ? String(e.name) : "PluginExecutionError";
                     var errorMessage = e && e.message ? String(e.message) : String(e);
