@@ -644,7 +644,7 @@ object PlayerStreamsRepository {
                 }
             }
 
-            for (availabilityJob in debridAvailabilityJobs {
+            for (availabilityJob in debridAvailabilityJobs) {
                 availabilityJob.join()
             }
             launch {
