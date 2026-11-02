@@ -1,5 +1,7 @@
 package com.nuvio.app.features.home
 
+import com.nuvio.app.features.cloudstream.CloudStreamRepository
+import com.nuvio.app.features.cloudstream.toMetaPreview
 import com.nuvio.app.features.addons.ManagedAddon
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.enabledAddons
@@ -41,6 +43,8 @@ object HomeRepository {
     private var currentRequestKey: String? = null
     private var currentDefinitions: List<HomeCatalogDefinition> = emptyList()
     private var cachedSections: Map<String, HomeCatalogSection> = emptyMap()
+    private var cachedCloudStreamSections: List<HomeCatalogSection> = emptyList()
+    private var cloudStreamHomeJob: Job? = null
     private var cachedCollectionHeroItems: List<MetaPreview> = emptyList()
     private var collectionHeroJob: Job? = null
     private var collectionHeroRequestKey: String? = null
@@ -49,6 +53,7 @@ object HomeRepository {
 
     fun refresh(addons: List<ManagedAddon>, force: Boolean = false) {
         val activeAddons = addons.enabledAddons()
+        refreshCloudStreamHomeSections()
         val requests = buildHomeCatalogDefinitions(activeAddons)
         currentDefinitions = requests
         val requestCacheKeys = requests.mapTo(mutableSetOf(), HomeCatalogDefinition::cacheKey)
@@ -64,6 +69,9 @@ object HomeRepository {
             activeJob = null
             activeRequestKey = null
             cachedSections = emptyMap()
+        cloudStreamHomeJob?.cancel()
+        cloudStreamHomeJob = null
+        cachedCloudStreamSections = emptyList()
             lastErrorMessage = null
             publishCurrentState(
                 isLoading = false,
@@ -142,7 +150,44 @@ object HomeRepository {
         }
     }
 
+    private fun refreshCloudStreamHomeSections() {
+        cloudStreamHomeJob?.cancel()
+        val state = CloudStreamRepository.uiState.value
+        if (state.hideAllHomeCatalogs) {
+            cachedCloudStreamSections = emptyList()
+            publishCurrentState(isLoading = _uiState.value.isLoading, requestKey = currentRequestKey)
+            return
+        }
+        val plugins = state.plugins.filter { plugin ->
+            plugin.isRunnable && plugin.metadata.id.value !in state.hiddenHomeCatalogProviderIds
+        }
+        cloudStreamHomeJob = scope.launch {
+            val sections = plugins.flatMap { plugin ->
+                runCatching {
+                    CloudStreamRepository.getMainPage(plugin.metadata.id.value, 1).getOrThrow()
+                        .mapNotNull { (sectionName, items) ->
+                            if (items.isEmpty()) return@mapNotNull null
+                            val contentType = items.firstOrNull()?.type?.nuvioType ?: "other"
+                            HomeCatalogSection(
+                                key = "cloudstream:" + plugin.metadata.id.value + ":" + sectionName,
+                                title = sectionName,
+                                subtitle = plugin.metadata.name,
+                                addonName = plugin.metadata.name,
+                                target = CatalogTarget.CloudStream(plugin.metadata.id.value, sectionName, contentType),
+                                items = items.map { it.toMetaPreview() },
+                                availableItemCount = items.size,
+                                hasMore = false,
+                                supportsViewAll = true,
+                            )
+                        }
+                }.getOrElse { emptyList() }
+            }
+            cachedCloudStreamSections = sections
+            publishCurrentState(isLoading = _uiState.value.isLoading, requestKey = currentRequestKey)
+        }
+    }
     fun applyCurrentSettings() {
+        refreshCloudStreamHomeSections()
         publishCurrentState(
             isLoading = _uiState.value.isLoading,
             requestKey = currentRequestKey,
@@ -308,7 +353,7 @@ object HomeRepository {
                     supportsViewAll = true,
                 )
             }
-        val sectionByKey = (catalogSections + mergedSections).associateBy(HomeCatalogSection::key)
+        val sectionByKey = (catalogSections + mergedSections + cachedCloudStreamSections).associateBy(HomeCatalogSection::key)
         val configuredHomeOrder = HomeCatalogSettingsRepository.uiState.value.items
             .mapIndexed { index, item -> item.key to index }
             .toMap()
