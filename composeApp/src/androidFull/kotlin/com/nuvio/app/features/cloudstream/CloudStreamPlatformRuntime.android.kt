@@ -402,7 +402,7 @@ private class AndroidDexCloudStreamProvider(
         }.awaitAll()
         val successfulResults = results.mapNotNull { it.getOrNull() }.flatten()
         if (successfulResults.isEmpty()) {
-            val lastError = results.lastNotNullOfOrNull { it.exceptionOrNull() }
+            val lastError = results.asReversed().mapNotNull { it.exceptionOrNull() }.firstOrNull()
             throw lastError ?: return@withContext emptyList()
         }
         successfulResults.distinctBy { it.data }
