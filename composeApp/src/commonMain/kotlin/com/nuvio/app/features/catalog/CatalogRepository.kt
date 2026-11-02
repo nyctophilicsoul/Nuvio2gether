@@ -436,9 +436,16 @@ object CatalogRepository {
                     )
 
                     is CatalogTarget.CloudStream -> {
-                        val sections = CloudStreamRepository.getMainPage(target.providerId, 1).getOrThrow()
+                        val sections = CloudStreamRepository.getMainPage(
+                            target.providerId,
+                            cloudStreamPageNumber(requestedSkip),
+                        ).getOrThrow()
                         val items = sections.firstOrNull { it.first == target.sectionName }?.second.orEmpty()
-                        CatalogPage(items = items.map { it.toMetaPreview() }, rawItemCount = items.size, nextSkip = null)
+                        CatalogPage(
+                            items = items.map { it.toMetaPreview() },
+                            rawItemCount = items.size,
+                            nextSkip = cloudStreamNextPageSkip(requestedSkip, items.size),
+                        )
                     }
 
                     is CatalogTarget.CollectionSource -> fetchCollectionSourcePage(
