@@ -843,6 +843,7 @@ private fun ExoPlayerSurface(
                     videoAspectRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
                 }
                 playerViewRef?.post {
+                    playerViewRef?.applyAspectRatioOverride(resizeMode)
                     playerViewRef?.syncLibassOverlayGeometry()
                 }
             }
@@ -1369,6 +1370,7 @@ private fun ExoPlayerSurface(
                     player = exoPlayer
                     keepScreenOn = exoPlayer.shouldKeepPlayerScreenOn()
                     this.resizeMode = resizeMode.toExoResizeMode()
+                    applyAspectRatioOverride(resizeMode)
                     setShutterBackgroundColor(android.graphics.Color.BLACK)
                     playerViewRef = this
                     sidecarController.bindSubtitleView(this.subtitleView)
@@ -1396,6 +1398,7 @@ private fun ExoPlayerSurface(
                 playerView.player = exoPlayer
                 playerView.useController = useNativeController
                 playerView.resizeMode = resizeMode.toExoResizeMode()
+                playerView.applyAspectRatioOverride(resizeMode)
                 playerViewRef = playerView
                 sidecarController.bindSubtitleView(playerView.subtitleView)
                 syncPlayerViewKeepScreenOn()
@@ -2666,6 +2669,19 @@ private fun libassOverlayMargins(
  * using the actual transformed bounds of exo_content_frame, then applies them to
  * AssHandler. Only runs when the overlay SurfaceView exists (OVERLAY render mode).
  */
+/**
+ * Media3 normally derives exo_content_frame's aspect ratio from the video track.
+ * Reapply the explicit 16:9 override after video-size callbacks and view updates,
+ * because those callbacks can replace the frame's requested ratio.
+ */
+private fun PlayerView.applyAspectRatioOverride(mode: PlayerResizeMode) {
+    val contentFrame = findViewById<AspectRatioFrameLayout>(androidx.media3.ui.R.id.exo_content_frame)
+        ?: return
+    if (mode == PlayerResizeMode.Ratio16x9) {
+        contentFrame.setAspectRatio(16f / 9f)
+    }
+}
+
 private fun PlayerView.syncLibassOverlayGeometry() {
     val overlay = findViewById<android.widget.FrameLayout>(R.id.libass_overlay_container_gl)
     val assOverlayView = overlay?.findAssOverlayChild()
