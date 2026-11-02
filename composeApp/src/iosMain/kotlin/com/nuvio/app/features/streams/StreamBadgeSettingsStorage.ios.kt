@@ -20,8 +20,9 @@ actual object StreamBadgeSettingsStorage {
     private const val streamBadgePlacementKey = "stream_badge_placement"
     private const val streamFormattingEnabledKey = "stream_formatting_enabled"
     private const val streamFormatPresetKey = "stream_format_preset"
+    private const val streamFormattingScopeKey = "stream_formatting_scope"
     private const val legacyDebridStreamBadgeRulesKey = "debrid_stream_badge_rules"
-    private val syncKeys = listOf(streamBadgeRulesKey, showFileSizeBadgesKey, showInPlayerKey, playerBadgeSourceKey, streamBadgePlacementKey, streamBackgroundModeKey, streamFormattingEnabledKey, streamFormatPresetKey)
+    private val syncKeys = listOf(streamBadgeRulesKey, showFileSizeBadgesKey, showInPlayerKey, playerBadgeSourceKey, streamBadgePlacementKey, streamBackgroundModeKey, streamFormattingEnabledKey, streamFormatPresetKey, streamFormattingScopeKey)
 
     actual fun loadStreamBadgeRules(): String? = loadString(streamBadgeRulesKey)
 
@@ -77,6 +78,12 @@ actual object StreamBadgeSettingsStorage {
         saveString(streamFormatPresetKey, preset)
     }
 
+    actual fun loadStreamFormattingScope(): String? = loadString(streamFormattingScopeKey)
+
+    actual fun saveStreamFormattingScope(scope: String) {
+        saveString(streamFormattingScopeKey, scope)
+    }
+
     actual fun loadLegacyDebridStreamBadgeRules(): String? =
         loadString(legacyDebridStreamBadgeRulesKey)
 
@@ -114,6 +121,7 @@ actual object StreamBadgeSettingsStorage {
         loadStreamBackgroundMode()?.let { put(streamBackgroundModeKey, encodeSyncString(it)) }
         loadStreamFormattingEnabled()?.let { put(streamFormattingEnabledKey, encodeSyncBoolean(it)) }
         loadStreamFormatPreset()?.let { put(streamFormatPresetKey, encodeSyncString(it)) }
+        loadStreamFormattingScope()?.let { put(streamFormattingScopeKey, encodeSyncString(it)) }
     }
 
     actual fun replaceFromSyncPayload(payload: JsonObject) {
@@ -129,5 +137,6 @@ actual object StreamBadgeSettingsStorage {
         payload.decodeSyncString(streamBackgroundModeKey)?.let(::saveStreamBackgroundMode)
         payload.decodeSyncBoolean(streamFormattingEnabledKey)?.let(::saveStreamFormattingEnabled)
         payload.decodeSyncString(streamFormatPresetKey)?.let(::saveStreamFormatPreset)
+        payload.decodeSyncString(streamFormattingScopeKey)?.let(::saveStreamFormattingScope)
     }
 }
