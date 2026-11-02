@@ -82,13 +82,17 @@ internal fun StreamCard(
         stream.isInstalledAddonStream -> StreamProviderFamily.NUVIO_ADDON
         else -> StreamProviderFamily.OTHER
     }
-    val formattedPresentation = remember(stream, formatSettings.streamFormattingEnabled, formatSettings.streamFormatPreset) {
+    val formattedPresentation = remember(stream, formatSettings.streamFormattingEnabled, formatSettings.streamFormatPreset, formatSettings.streamFormattingScope) {
         StreamFormattingEngine.format(
             stream = stream,
             preset = if (formatSettings.streamFormattingEnabled) formatSettings.streamFormatPreset else StreamFormatPreset.ORIGINAL,
             providerId = stream.addonId,
             providerFamily = providerFamily,
-            settings = StreamFormattingSettings(enabled = formatSettings.streamFormattingEnabled, preset = formatSettings.streamFormatPreset),
+            settings = StreamFormattingSettings(
+                enabled = formatSettings.streamFormattingEnabled,
+                preset = formatSettings.streamFormatPreset,
+                scope = formatSettings.streamFormattingScope,
+            ),
         )
     }
     val cardShape = RoundedCornerShape(12.dp)
