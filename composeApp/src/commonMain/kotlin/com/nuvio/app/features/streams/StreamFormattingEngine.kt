@@ -135,7 +135,6 @@ object StreamFormattingEngine {
      * technical summaries are also treated as already formatted to avoid duplicate labels.
      */
     fun hasExistingFormatting(stream: StreamItem): Boolean {
-        if (stream.badges.isNotEmpty()) return true
         val description = stream.description.orEmpty()
         if (description.isBlank()) return false
         val hasQuality = Regex("(?i)\\b(?:2160p|1440p|1080p|720p|480p|4k|uhd)\\b").containsMatchIn(description)
