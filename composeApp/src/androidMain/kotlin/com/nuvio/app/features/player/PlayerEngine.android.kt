@@ -843,7 +843,6 @@ private fun ExoPlayerSurface(
                     videoAspectRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
                 }
                 playerViewRef?.post {
-                    playerViewRef?.applyResizeMode(resizeMode, videoAspectRatio)
                     playerViewRef?.syncLibassOverlayGeometry()
                 }
             }
@@ -1369,7 +1368,7 @@ private fun ExoPlayerSurface(
                     layoutParams = android.view.ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT)
                     player = exoPlayer
                     keepScreenOn = exoPlayer.shouldKeepPlayerScreenOn()
-                    applyResizeMode(resizeMode, videoAspectRatio)
+                    this.resizeMode = resizeMode.toExoResizeMode()
                     setShutterBackgroundColor(android.graphics.Color.BLACK)
                     playerViewRef = this
                     sidecarController.bindSubtitleView(this.subtitleView)
@@ -1396,7 +1395,7 @@ private fun ExoPlayerSurface(
             update = { playerView ->
                 playerView.player = exoPlayer
                 playerView.useController = useNativeController
-                playerView.applyResizeMode(resizeMode, videoAspectRatio)
+                playerView.resizeMode = resizeMode.toExoResizeMode()
                 playerViewRef = playerView
                 sidecarController.bindSubtitleView(playerView.subtitleView)
                 syncPlayerViewKeepScreenOn()
@@ -2012,32 +2011,16 @@ private class NuvioLibmpvView(
         executeMpv {
             when (resizeMode) {
                 PlayerResizeMode.Fit -> {
-                    mpv.setPropertyBoolean("keepaspect", true)
                     mpv.setPropertyDouble("panscan", 0.0)
-                    mpv.setPropertyString("video-aspect-override", "no")
-                }
-                PlayerResizeMode.BestFit -> {
-                    // Restrained crop: distinct from Fit and the stronger Zoom mode.
-                    mpv.setPropertyBoolean("keepaspect", true)
-                    mpv.setPropertyDouble("panscan", 0.35)
                     mpv.setPropertyString("video-aspect-override", "no")
                 }
                 PlayerResizeMode.Fill -> {
-                    // Fill the viewport by stretching the complete frame, without cropping.
-                    mpv.setPropertyBoolean("keepaspect", false)
-                    mpv.setPropertyDouble("panscan", 0.0)
-                    mpv.setPropertyString("video-aspect-override", "no")
-                }
-                PlayerResizeMode.Zoom -> {
-                    // Preserve the source aspect ratio and crop overflow to fill the viewport.
-                    mpv.setPropertyBoolean("keepaspect", true)
                     mpv.setPropertyDouble("panscan", 1.0)
                     mpv.setPropertyString("video-aspect-override", "no")
                 }
-                PlayerResizeMode.Ratio16x9 -> {
-                    mpv.setPropertyBoolean("keepaspect", true)
-                    mpv.setPropertyDouble("panscan", 0.0)
-                    mpv.setPropertyString("video-aspect-override", "16:9")
+                PlayerResizeMode.Zoom -> {
+                    mpv.setPropertyDouble("panscan", 0.5)
+                    mpv.setPropertyString("video-aspect-override", "no")
                 }
             }
         }
@@ -2521,39 +2504,12 @@ private fun PlaybackException.isDecoderFailure(): Boolean =
         PlaybackException.ERROR_CODE_DECODING_RESOURCES_RECLAIMED,
     )
 
-private fun PlayerView.applyResizeMode(mode: PlayerResizeMode, sourceAspectRatio: Float) {
-    val contentFrame = findViewById<AspectRatioFrameLayout>(androidx.media3.ui.R.id.exo_content_frame)
-        ?: return
-    val viewportWidth = contentFrame.width
-    val viewportHeight = contentFrame.height
-    val viewportAspectRatio = if (viewportWidth > 0 && viewportHeight > 0) {
-        viewportWidth.toFloat() / viewportHeight.toFloat()
-    } else {
-        0f
-    }
-    val cropFraction = if (sourceAspectRatio > 0f && viewportAspectRatio > 0f) {
-        if (sourceAspectRatio > viewportAspectRatio) {
-            1f - (viewportAspectRatio / sourceAspectRatio)
-        } else {
-            1f - (sourceAspectRatio / viewportAspectRatio)
-        }
-    } else {
-        Float.POSITIVE_INFINITY
-    }
-
-    // Best Fit prefers a modest crop only when it removes at most 12% of the image.
-    resizeMode = when (mode) {
-        PlayerResizeMode.Fit, PlayerResizeMode.Ratio16x9 -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+private fun PlayerResizeMode.toExoResizeMode(): Int =
+    when (this) {
+        PlayerResizeMode.Fit -> AspectRatioFrameLayout.RESIZE_MODE_FIT
         PlayerResizeMode.Fill -> AspectRatioFrameLayout.RESIZE_MODE_FILL
         PlayerResizeMode.Zoom -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-        PlayerResizeMode.BestFit -> if (cropFraction <= 0.12f) {
-            AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-        } else {
-            AspectRatioFrameLayout.RESIZE_MODE_FIT
-        }
     }
-    contentFrame.setAspectRatio(if (mode == PlayerResizeMode.Ratio16x9) 16f / 9f else 0f)
-}
 
 private fun PlayerView.syncLibassOverlay(
     player: ExoPlayer,
@@ -2700,19 +2656,6 @@ private fun libassOverlayMargins(
  * using the actual transformed bounds of exo_content_frame, then applies them to
  * AssHandler. Only runs when the overlay SurfaceView exists (OVERLAY render mode).
  */
-/**
- * Media3 normally derives exo_content_frame's aspect ratio from the video track.
- * Reapply the explicit 16:9 override after video-size callbacks and view updates,
- * because those callbacks can replace the frame's requested ratio.
- */
-private fun PlayerView.applyAspectRatioOverride(mode: PlayerResizeMode) {
-    val contentFrame = findViewById<AspectRatioFrameLayout>(androidx.media3.ui.R.id.exo_content_frame)
-        ?: return
-    contentFrame.setAspectRatio(
-        if (mode == PlayerResizeMode.Ratio16x9) 16f / 9f else 0f,
-    )
-}
-
 private fun PlayerView.syncLibassOverlayGeometry() {
     val overlay = findViewById<android.widget.FrameLayout>(R.id.libass_overlay_container_gl)
     val assOverlayView = overlay?.findAssOverlayChild()
