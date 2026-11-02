@@ -16,6 +16,7 @@ import com.nuvio.app.features.collection.CollectionMobileSettingsStorage
 import com.nuvio.app.features.collection.CollectionRepository
 import com.nuvio.app.features.collection.CollectionSource
 import com.nuvio.app.features.collection.CollectionStorage
+import com.nuvio.app.features.catalog.CatalogTarget
 import com.nuvio.app.features.profiles.ProfileRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -64,6 +65,30 @@ class HomeCatalogSettingsRepositoryTest {
         HomeCatalogSettingsRepository.clearLocalState()
         CollectionRepository.clearLocalState()
         HomeRepository.clear()
+    }
+
+    @Test
+    fun cloudStreamCatalogRowsAreExposedAndKeepTheirHomeVisibilityPreference() {
+        val providerId = "https://example.com/repo.json#Provider"
+        val section = HomeCatalogSection(
+            key = "cloudstream:$providerId:Anime",
+            title = "Anime",
+            subtitle = "Example Provider",
+            addonName = "Example Provider",
+            target = CatalogTarget.CloudStream(providerId, "Anime", "series"),
+            items = listOf(MetaPreview(id = "show-1", type = "series", name = "Example Show")),
+        )
+
+        HomeCatalogSettingsRepository.syncCloudStreamCatalogs(listOf(section))
+        assertEquals(section.key, HomeCatalogSettingsRepository.uiState.value.items.single().key)
+        assertEquals("Example Provider", HomeCatalogSettingsRepository.uiState.value.items.single().addonName)
+
+        HomeCatalogSettingsRepository.setEnabled(section.key, false)
+        HomeCatalogSettingsRepository.syncCloudStreamCatalogs(listOf(section.copy(title = "Anime Updated")))
+
+        val item = HomeCatalogSettingsRepository.uiState.value.items.single()
+        assertFalse(item.enabled)
+        assertEquals("Anime Updated", item.defaultTitle)
     }
 
     @Test
