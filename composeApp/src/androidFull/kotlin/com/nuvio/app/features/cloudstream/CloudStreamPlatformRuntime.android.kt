@@ -315,7 +315,14 @@ private class AndroidDexCloudStreamProvider(
             mutableListOf<Pair<String, List<CloudStreamSearchItem>>>(),
         )
         var lastError: Throwable? = null
-        providers.filter(MainAPI::hasMainPage).forEach { api ->
+        providers.filter { api ->
+            // CloudStream providers should set hasMainPage, but a few extensions
+            // expose non-default MainPageData without setting the flag. Honour that
+            // explicit catalogue declaration instead of silently hiding its rows.
+            api.hasMainPage || api.mainPage.any { data ->
+                data.name.isNotBlank() || data.data.isNotBlank()
+            }
+        }.forEach { api ->
             val requests = api.mainPage.ifEmpty {
                 listOf(com.lagradost.cloudstream3.MainPageData(api.name, api.mainUrl, false))
             }
