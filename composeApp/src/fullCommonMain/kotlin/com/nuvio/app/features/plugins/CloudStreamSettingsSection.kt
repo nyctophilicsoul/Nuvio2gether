@@ -80,8 +80,8 @@ internal fun CloudStreamSettingsSection() {
     var editingRepositoryUrl by rememberSaveable { mutableStateOf<String?>(null) }
     var isAddingRepository by remember { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
-    var selectedLanguages by rememberSaveable { mutableStateOf<Set<String>>(emptySet()) }
-    var selectedTypes by rememberSaveable { mutableStateOf<Set<String>>(emptySet()) }
+    var selectedLanguages by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var selectedTypes by remember { mutableStateOf<Set<String>>(emptySet()) }
     var selectedRepositoryUrl by rememberSaveable { mutableStateOf<String?>(null) }
     var message by rememberSaveable { mutableStateOf<String?>(null) }
     var bulkInstallMessage by rememberSaveable { mutableStateOf<String?>(null) }
