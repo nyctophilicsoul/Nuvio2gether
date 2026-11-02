@@ -29,10 +29,8 @@ internal object JsBindings {
             (async function() {
                 try {
                     var getStreams = module.exports.getStreams || globalThis.getStreams;
-                    if (!getStreams) {
-                        console.error("getStreams function not found on module.exports or globalThis");
-                        __capture_result(JSON.stringify([]));
-                        return;
+                    if (typeof getStreams !== 'function') {
+                        throw new Error("getStreams function not found on module.exports or globalThis");
                     }
                     var args = JSON.parse(__get_call_args());
                     var season = args.season == null ? undefined : args.season;
@@ -40,8 +38,17 @@ internal object JsBindings {
                     var result = await getStreams(args.tmdbId, args.mediaType, season, episode);
                     __capture_result(JSON.stringify(result || []));
                 } catch (e) {
-                    console.error("getStreams error:", e && e.message ? e.message : e, e && e.stack ? e.stack : "");
-                    __capture_result(JSON.stringify([]));
+                    var errorName = e && e.name ? String(e.name) : "PluginExecutionError";
+                    var errorMessage = e && e.message ? String(e.message) : String(e);
+                    var errorStack = e && e.stack ? String(e.stack) : "";
+                    console.error("getStreams error:", errorName, errorMessage, errorStack);
+                    __capture_result(JSON.stringify({
+                        __pluginRuntimeError: {
+                            name: errorName,
+                            message: errorMessage,
+                            stack: errorStack
+                        }
+                    }));
                 }
             })();
         """.trimIndent()
