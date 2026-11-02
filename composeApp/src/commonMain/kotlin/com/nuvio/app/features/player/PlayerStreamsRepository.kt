@@ -392,7 +392,7 @@ object PlayerStreamsRepository {
                 streams = emptyList(),
                 isLoading = true,
             )
-        } + cloudStreamProviderGroups.map { providerGroup ->
+        } + cloudStreamProviderGroups.distinctBy { it.addonId }.map { providerGroup ->
             AddonStreamGroup(
                 addonName = providerGroup.addonName,
                 addonId = providerGroup.addonId,
@@ -414,6 +414,12 @@ object PlayerStreamsRepository {
                 .associate { it.addonId to it.scrapers.size }
                 .toMutableMap()
             val pluginFirstErrorByAddonId = mutableMapOf<String, String>()
+            val cloudStreamRemainingByAddonId = cloudStreamProviderGroups
+                .groupingBy { it.addonId }
+                .eachCount()
+                .toMutableMap()
+            val cloudStreamFirstErrorByAddonId = mutableMapOf<String, String>()
+            val seenCloudStreamIdentities = mutableSetOf<String>()
             val totalTasks = streamAddons.size + pluginProviderGroups.sumOf { it.scrapers.size } + cloudStreamProviderGroups.size + serverSources.size
             val completions = Channel<StreamLoadCompletion>(capacity = Channel.BUFFERED)
             val debridAvailabilityJobs = mutableListOf<Job>()
@@ -628,14 +634,31 @@ object PlayerStreamsRepository {
                         }
                     }
                     is StreamLoadCompletion.CloudStreamProvider -> {
+                        val remaining = (cloudStreamRemainingByAddonId[completion.addonId] ?: 1) - 1
+                        cloudStreamRemainingByAddonId[completion.addonId] = remaining.coerceAtLeast(0)
+                        if (!completion.error.isNullOrBlank() &&
+                            cloudStreamFirstErrorByAddonId[completion.addonId].isNullOrBlank()
+                        ) {
+                            cloudStreamFirstErrorByAddonId[completion.addonId] = completion.error
+                        }
+                        val uniqueStreams = completion.streams.filter { stream ->
+                            seenCloudStreamIdentities.add(crossProviderStreamIdentity(stream))
+                        }
+                        val currentGroup = stateFlow.value.groups.firstOrNull { it.addonId == completion.addonId }
+                        val mergedStreams = currentGroup?.streams.orEmpty() + uniqueStreams
+                        val stillLoading = remaining > 0
                         publishStreamGroup(
                             presentStreamGroup(
                                 AddonStreamGroup(
                                     addonName = completion.addonName,
                                     addonId = completion.addonId,
-                                    streams = completion.streams,
-                                    isLoading = false,
-                                    error = completion.error,
+                                    streams = if (stillLoading) mergedStreams else mergedStreams.sortedForGroupedDisplay(),
+                                    isLoading = stillLoading,
+                                    error = if (mergedStreams.isEmpty() && !stillLoading) {
+                                        cloudStreamFirstErrorByAddonId[completion.addonId]
+                                    } else {
+                                        null
+                                    },
                                 ),
                             ),
                         )
