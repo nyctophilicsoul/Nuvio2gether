@@ -38,6 +38,24 @@ class StreamFormattingEngineTest {
     }
 
     @Test
+    fun doesNotTreatAQualityBadgeAloneAsCompleteFormatting() {
+        val item = stream(
+            name = "Apocalypse.Z.New.World.2026.1080p.WEB-DL.HEVC.mkv",
+            badges = listOf(StreamBadge(name = "FHD")),
+        )
+
+        assertFalse(StreamFormattingEngine.hasExistingFormatting(item))
+        val result = StreamFormattingEngine.format(
+            stream = item,
+            preset = StreamFormatPreset.NUVIOEX_MODERN,
+            providerId = item.addonId,
+            providerFamily = StreamProviderFamily.CLOUDSTREAM_PLUGIN,
+            settings = StreamFormattingSettings(),
+        )
+        assertTrue(result.title.contains("Apocalypse Z New World"))
+    }
+
+    @Test
     fun preservesProviderFormattingWhenStructuredBadgesExist() {
         val item = stream(
             name = "Allmovieland [English]",
