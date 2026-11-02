@@ -128,7 +128,7 @@ object LiveTvRepository {
             if (normalizedUrl.looksLikeDirectVideoUrl()) {
                 val channel = directStreamChannel(normalizedUrl)
                 LiveTvStorage.saveSourceUrl(normalizedUrl)
-                LiveTvStorage.saveLocalPlaylistData("")
+                withContext(Dispatchers.IO) { LiveTvStorage.saveLocalPlaylistData("") }
                 LiveTvStorage.saveSourceType(LiveTvSourceType.M3u)
                 mutableUiState.value = LiveTvUiState(
                     sourceType = LiveTvSourceType.M3u,
@@ -163,7 +163,7 @@ object LiveTvRepository {
             val channels = playlist.channels
             require(channels.isNotEmpty()) { "Bu M3U listesinde oynatılabilir kanal bulunamadı." }
             LiveTvStorage.saveSourceUrl(normalizedUrl)
-            LiveTvStorage.saveLocalPlaylistData("")
+            withContext(Dispatchers.IO) { LiveTvStorage.saveLocalPlaylistData("") }
             LiveTvStorage.saveSourceType(LiveTvSourceType.M3u)
             mutableUiState.value = LiveTvUiState(
                 sourceType = LiveTvSourceType.M3u,
@@ -211,7 +211,7 @@ object LiveTvRepository {
             val channels = playlist.channels
             require(channels.isNotEmpty()) { "Bu M3U dosyasında oynatılabilir kanal bulunamadı." }
             LiveTvStorage.saveSourceUrl(displayName)
-            LiveTvStorage.saveLocalPlaylistData(trimmedData)
+            withContext(Dispatchers.IO) { LiveTvStorage.saveLocalPlaylistData(trimmedData) }
             LiveTvStorage.saveSourceType(LiveTvSourceType.M3u)
             mutableUiState.value = LiveTvUiState(
                 sourceType = LiveTvSourceType.M3u,
@@ -237,13 +237,15 @@ object LiveTvRepository {
 
     suspend fun loadStoredLocalPlaylist(): Result<List<LiveTvChannel>> {
         if (!featureEnabled) return liveTvDisabledResult()
-        val playlistData = LiveTvStorage.loadLocalPlaylistData().orEmpty()
-        if (playlistData.isBlank()) {
+        val saved = withContext(Dispatchers.IO) {
+            LiveTvStorage.loadSourceUrl().orEmpty() to LiveTvStorage.loadLocalPlaylistData().orEmpty()
+        }
+        if (saved.second.isBlank()) {
             return Result.failure(IllegalStateException("Kayıtlı M3U dosyası bulunamadı."))
         }
         return loadLocalPlaylist(
-            fileName = LiveTvStorage.loadSourceUrl().orEmpty().ifBlank { "Local M3U playlist" },
-            playlistData = playlistData,
+            fileName = saved.first.ifBlank { "Local M3U playlist" },
+            playlistData = saved.second,
         )
     }
 
@@ -274,7 +276,7 @@ object LiveTvRepository {
                 fetchStalkerChannels(normalizedSettings)
             }
             require(channels.isNotEmpty()) { "Bu Stalker Portal içinde oynatılabilir kanal bulunamadı." }
-            LiveTvStorage.saveLocalPlaylistData("")
+            withContext(Dispatchers.IO) { LiveTvStorage.saveLocalPlaylistData("") }
             LiveTvStorage.saveSourceType(LiveTvSourceType.Stalker)
             LiveTvStorage.saveStalkerSettings(normalizedSettings)
             mutableUiState.value = LiveTvUiState(
@@ -325,7 +327,7 @@ object LiveTvRepository {
                 fetchXtreamChannels(normalizedSettings)
             }
             require(channels.isNotEmpty()) { "No playable channels were found for this Xtream provider." }
-            LiveTvStorage.saveLocalPlaylistData("")
+            withContext(Dispatchers.IO) { LiveTvStorage.saveLocalPlaylistData("") }
             LiveTvStorage.saveSourceType(LiveTvSourceType.Xtream)
             LiveTvStorage.saveXtreamSettings(normalizedSettings)
             mutableUiState.value = LiveTvUiState(
@@ -404,6 +406,9 @@ object LiveTvRepository {
             }
         }
     }
+
+    suspend fun hasStoredLocalPlaylist(): Boolean =
+        withContext(Dispatchers.IO) { LiveTvStorage.loadLocalPlaylistData().orEmpty().isNotBlank() }
 
     fun recordRecentChannel(channel: LiveTvChannel) {
         if (!featureEnabled) return
