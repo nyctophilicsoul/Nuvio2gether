@@ -147,7 +147,7 @@ actual object CloudStreamRepository {
                                     repositories = current.repositories + CloudStreamRepositoryItem(repository),
                                     plugins = (current.plugins + plugins.map(::newPluginItem))
                                         .distinctBy { it.metadata.id.value }
-                                        .let(::sortPluginsByRepository),
+                                        .let { sortPluginsByRepository(it, current.repositories + CloudStreamRepositoryItem(repository)) },
                                 )
                             }
                             persist()
@@ -778,8 +778,11 @@ actual object CloudStreamRepository {
             }
     }
 
-    private fun sortPluginsByRepository(plugins: List<CloudStreamPluginItem>): List<CloudStreamPluginItem> {
-        val repositoryOrder = _uiState.value.repositories.mapIndexed { index, item ->
+    private fun sortPluginsByRepository(
+        plugins: List<CloudStreamPluginItem>,
+        repositories: List<CloudStreamRepositoryItem> = _uiState.value.repositories,
+    ): List<CloudStreamPluginItem> {
+        val repositoryOrder = repositories.mapIndexed { index, item ->
             item.manifest.sourceUrl to index
         }.toMap()
         return plugins.sortedWith(
