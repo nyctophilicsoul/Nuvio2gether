@@ -98,7 +98,13 @@ object StreamsRepository {
             manualSelection = manualSelection,
             qualitySelectionMode = qualitySelectionMode,
         )
-        val requestKey = "$requestToken::pluginsGrouped=${pluginUiState.groupStreamsByRepository}"
+        val cloudStreamGroupByRepository = if (AppFeaturePolicy.pluginsEnabled) {
+            CloudStreamRepository.initialize()
+            CloudStreamRepository.uiState.value.groupStreamsByRepository
+        } else {
+            false
+        }
+        val requestKey = "$requestToken::pluginsGrouped=${pluginUiState.groupStreamsByRepository}::cloudStreamGrouped=$cloudStreamGroupByRepository"
         val currentState = _uiState.value
         if (
             !forceRefresh &&
