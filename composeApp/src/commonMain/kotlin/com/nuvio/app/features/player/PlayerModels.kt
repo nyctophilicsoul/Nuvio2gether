@@ -148,8 +148,6 @@ enum class PlayerResizeMode {
     Fit,
     Fill,
     Zoom,
-    BestFit,
-    Ratio16x9,
 }
 
 enum class AndroidPlaybackEngine(
