@@ -80,7 +80,13 @@ internal actual object CloudStreamPlatformRuntime {
 
     actual fun unload(pluginId: String) {
         synchronized(loadedLock) { loaded.remove(pluginId) }?.unload()
-        appContext?.let(::prepareHostContext)
+        val remainingContext = synchronized(loadedLock) { loaded.values.lastOrNull()?.context }
+        if (remainingContext != null) {
+            CloudStreamApp.context = remainingContext
+            setContext(WeakReference(remainingContext))
+        } else {
+            appContext?.let(::prepareHostContext)
+        }
     }
 
     actual fun clear() {
@@ -190,10 +196,10 @@ internal actual object CloudStreamPlatformRuntime {
             extractorApis.removeAll { it !in extractorsBefore && it.sourcePlugin == file.absolutePath }
             VideoClickActionHolder.allVideoClickActions.removeAll { it.sourcePlugin == file.absolutePath }
             PluginManager.unregister(file.absolutePath)
+            prepareHostContext(context)
             throw error
         } finally {
             PluginManager.currentlyLoading = null
-            prepareHostContext(context)
         }
     }
 
