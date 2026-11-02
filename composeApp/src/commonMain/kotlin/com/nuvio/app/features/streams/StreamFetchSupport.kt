@@ -713,10 +713,14 @@ private fun List<CloudStreamEpisode>.bestEpisodeTitleMatch(
         ?.takeUnless { it.isGenericCloudStreamEpisodeTitle() }
         ?: return null
 
-    return firstOrNull { item ->
+    val matches = filter { item ->
         val candidateTitle = item.name.normalizedCloudStreamSearchTitle()
         candidateTitle.matchesRequestedCloudStreamEpisodeTitle(requestedTitle)
     }
+    if (request.season == null && matches.map(CloudStreamEpisode::season).distinct().size > 1) {
+        return null
+    }
+    return matches.firstOrNull()
 }
 
 private fun List<CloudStreamEpisode>.safeUnknownSeasonEpisodeMatch(
