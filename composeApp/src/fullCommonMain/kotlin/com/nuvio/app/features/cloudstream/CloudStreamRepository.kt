@@ -523,12 +523,10 @@ actual object CloudStreamRepository {
         if (!item.metadata.status.canInstall) {
             return CloudStreamInstallResult.Error("This CloudStream plugin is marked as down")
         }
-        // Downloading a .cs3 artifact does not make its DEX executable. Unsupported
-        // packages may be retained and hash-verified for inspection/compatibility
-        // tracking, but canEnableProvider remains false until a reviewed adapter exists.
-        // CloudStream repositories do not universally publish fileHash. The package
-        // inspector validates the archive structure; a declared SHA-256 is always
-        // enforced below. The user must explicitly accept the third-party code warning.
+        // Android Full can execute compatible Android DEX providers in-process.
+        // Packages for unsupported platforms are retained for inspection only and remain
+        // disabled. The archive is always inspected; a repository-declared SHA-256 is
+        // enforced when present. The user must explicitly accept the third-party-code warning.
         var installationStarted = false
         val startCommitted = commitForProfile(expectedProfileGeneration) {
             val latest = _uiState.value.plugins.firstOrNull { it.metadata.id.value == pluginId }
