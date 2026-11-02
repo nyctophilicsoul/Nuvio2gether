@@ -159,12 +159,6 @@ object HomeRepository {
         CloudStreamRepository.initialize()
         cloudStreamHomeJob?.cancel()
         val state = CloudStreamRepository.uiState.value
-        if (state.hideAllHomeCatalogs) {
-            cachedCloudStreamSections = emptyList()
-            publishCurrentState(isLoading = _uiState.value.isLoading, requestKey = currentRequestKey)
-            // Keep the last discovered catalog definitions registered for Home layout editing.
-            return
-        }
         val plugins = state.plugins.filter(CloudStreamPluginItem::isRunnable)
         cloudStreamHomeJob = scope.launch {
             // Plugins are independent. Fetch them concurrently so one slow extension
