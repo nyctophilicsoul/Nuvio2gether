@@ -796,14 +796,10 @@ actual object CloudStreamRepository {
                 installedVersion = plugin.installedVersion.takeIf { packageExists },
                 installedAtEpochMs = plugin.installedAtEpochMs.takeIf { packageExists } ?: 0L,
                 enabled = plugin.enabled && packageExists && plugin.verified &&
-                    CloudStreamFileHash.parse(plugin.installedFileHash ?: plugin.fileHash.takeIf {
-                        plugin.installedVersion == plugin.availableVersion
-                    }) != null && compatibility.isRunnable && metadata.status.canInstall,
-                verified = plugin.verified && packageExists && CloudStreamFileHash.parse(
-                    plugin.installedFileHash ?: plugin.fileHash.takeIf {
-                        plugin.installedVersion == plugin.availableVersion
-                    },
-                ) != null,
+                    compatibility.isRunnable && metadata.status.canInstall,
+                // "verified" means the archive passed structural inspection and any
+                // repository-declared checksum matched. Older repositories may omit hashes.
+                verified = plugin.verified && packageExists,
                 installedFileHash = plugin.installedFileHash
                     ?: plugin.fileHash.takeIf { plugin.installedVersion == plugin.availableVersion && packageExists },
             )
