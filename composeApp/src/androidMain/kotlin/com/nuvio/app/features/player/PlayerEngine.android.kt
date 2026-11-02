@@ -197,6 +197,7 @@ actual fun PlatformPlayerSurface(
         sanitizePlaybackHeaders(sourceHeaders),
         sanitizePlaybackResponseHeaders(sourceResponseHeaders),
         normalizeStreamType(streamType).orEmpty(),
+        isLive,
         useYoutubeChunkedPlayback,
         initialPositionRequestKey.orEmpty(),
     )
@@ -316,6 +317,7 @@ private fun ExoPlayerSurface(
         sanitizedSourceHeaders,
         sanitizedSourceResponseHeaders,
         normalizedStreamType.orEmpty(),
+        isLive,
         useYoutubeChunkedPlayback,
         initialPositionRequestKey.orEmpty(),
     )
@@ -522,7 +524,7 @@ private fun ExoPlayerSurface(
         val loadControl = NuvioExoPlayerPerformanceHelper.buildLoadControl(
             context,
             PlaybackBufferSettings(
-                enabled = playerSettings.bufferEngineEnabled,
+                enabled = isLive || playerSettings.bufferEngineEnabled,
                 minBufferMs = if (isLive) 5_000 else playerSettings.minBufferMs,
                 maxBufferMs = if (isLive) 15_000 else playerSettings.maxBufferMs,
                 bufferForPlaybackMs = if (isLive) 1_000 else playerSettings.bufferForPlaybackMs,
@@ -718,26 +720,26 @@ private fun ExoPlayerSurface(
         }
 
         fun scheduleLiveReconnect(error: PlaybackException): Boolean {
-        val recoverable = error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW ||
-            error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED
-        if (!isLive || !recoverable || liveReconnectAttempts >= MAX_LIVE_RECONNECT_ATTEMPTS) return false
-        if (liveReconnectJob.value?.isActive == true) return true
+            val recoverable = error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW ||
+                error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED
+            if (!isLive || !recoverable || liveReconnectAttempts >= MAX_LIVE_RECONNECT_ATTEMPTS) return false
+            if (liveReconnectJob.value?.isActive == true) return true
 
-        liveReconnectAttempts += 1
-        val attempt = liveReconnectAttempts
-        liveReconnectJob.value = coroutineScope.launch {
-            delay(LIVE_RECONNECT_BASE_DELAY_MS * attempt)
-            if (exoPlayer.currentMediaItem?.mediaId != sourceUrl) return@launch
-            if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
-                exoPlayer.seekToDefaultPosition()
+            liveReconnectAttempts += 1
+            val attempt = liveReconnectAttempts
+            liveReconnectJob.value = coroutineScope.launch {
+                delay(LIVE_RECONNECT_BASE_DELAY_MS * attempt)
+                if (exoPlayer.currentMediaItem?.mediaId != sourceUrl) return@launch
+                if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
+                    exoPlayer.seekToDefaultPosition()
+                }
+                exoPlayer.prepare()
+                if (latestPlayWhenReady.value) exoPlayer.play() else exoPlayer.pause()
             }
-            exoPlayer.prepare()
-            if (latestPlayWhenReady.value) exoPlayer.play() else exoPlayer.pause()
+            return true
         }
-        return true
-    }
 
-    fun reportPlayerError(error: PlaybackException) {
+        fun reportPlayerError(error: PlaybackException) {
             if (
                 playerSettings.decoderPriority == DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON &&
                 effectiveDecoderPriority != DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER &&
