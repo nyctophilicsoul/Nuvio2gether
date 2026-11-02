@@ -227,13 +227,11 @@ class StreamBadgePresentationTest {
             manifestEnabled = true,
             code = "",
         )
-        val pluginStream = com.nuvio.app.features.streams.run {
-            com.nuvio.app.features.plugins.PluginRuntimeResult(
-                title = "Movie 2026",
-                url = "https://cdn.example.test/movie.mkv",
-                filename = "Movie.2026.1080p.WEB-DL.BATCH-GROUP.mkv",
-            ).toStreamItem(scraper)
-        }
+        val pluginStream = com.nuvio.app.features.plugins.PluginRuntimeResult(
+            title = "Movie 2026",
+            url = "https://cdn.example.test/movie.mkv",
+            filename = "Movie.2026.1080p.WEB-DL.BATCH-GROUP.mkv",
+        ).toStreamItem(scraper)
         val rules = StreamBadgeRules(
             imports = listOf(
                 StreamBadgeImport(
