@@ -121,6 +121,7 @@ internal fun LazyListScope.streamsSettingsContent(isTablet: Boolean) {
         var showPlayerBadgesDialog by rememberSaveable { mutableStateOf(false) }
         var showBackgroundDialog by rememberSaveable { mutableStateOf(false) }
         var showStreamFormatDialog by rememberSaveable { mutableStateOf(false) }
+        var draftStreamFormatPreset by rememberSaveable { mutableStateOf(StreamFormatPreset.NUVIOEX_MODERN) }
         val badgePlacementLabel = streamBadgePlacementLabel(currentSettings.badgePlacement)
 
         SettingsSection(
@@ -198,7 +199,10 @@ internal fun LazyListScope.streamsSettingsContent(isTablet: Boolean) {
                         .replaceFirstChar { it.uppercase() },
                     enabled = currentSettings.streamFormattingEnabled,
                     isTablet = isTablet,
-                    onClick = { showStreamFormatDialog = true },
+                    onClick = {
+                        draftStreamFormatPreset = currentSettings.streamFormatPreset
+                        showStreamFormatDialog = true
+                    },
                 )
                 SettingsSwitchRow(
                     title = stringResource(Res.string.settings_stream_addon_logo_title),
@@ -257,7 +261,7 @@ internal fun LazyListScope.streamsSettingsContent(isTablet: Boolean) {
                 title = "Stream formatting preset",
                 message = "Choose how stream details are presented. Original preserves provider formatting.",
             ) {
-                val previewStream = remember(currentSettings.streamFormatPreset) {
+                val previewStream = remember(draftStreamFormatPreset) {
                     StreamItem(
                         name = "Example.Movie.2024.1080p.WEB-DL.HEVC.DDP5.1.HDR10.2GB",
                         title = "Example Movie (2024)",
@@ -268,10 +272,10 @@ internal fun LazyListScope.streamsSettingsContent(isTablet: Boolean) {
                 }
                 val preview = StreamFormattingEngine.format(
                     stream = previewStream,
-                    preset = currentSettings.streamFormatPreset,
+                    preset = draftStreamFormatPreset,
                     providerId = previewStream.addonId,
                     providerFamily = StreamProviderFamily.NUVIO_ADDON,
-                    settings = StreamFormattingSettings(preset = currentSettings.streamFormatPreset),
+                    settings = StreamFormattingSettings(preset = draftStreamFormatPreset),
                 )
                 Text(
                     text = "Preview",
@@ -293,17 +297,22 @@ internal fun LazyListScope.streamsSettingsContent(isTablet: Boolean) {
                 StreamFormatPreset.entries.forEach { preset ->
                     DialogOption(
                         text = preset.name.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() },
-                        selected = currentSettings.streamFormatPreset == preset,
-                        onClick = {
-                            StreamBadgeSettingsRepository.setStreamFormatPreset(preset)
-                            showStreamFormatDialog = false
-                        },
+                        selected = draftStreamFormatPreset == preset,
+                        onClick = { draftStreamFormatPreset = preset },
                     )
                 }
                 DialogButtons {
                     DialogButton(
-                        text = stringResource(Res.string.action_close),
+                        text = stringResource(Res.string.action_cancel),
                         onClick = { showStreamFormatDialog = false },
+                        style = DialogButtonStyle.Secondary,
+                    )
+                    DialogButton(
+                        text = "Apply",
+                        onClick = {
+                            StreamBadgeSettingsRepository.setStreamFormatPreset(draftStreamFormatPreset)
+                            showStreamFormatDialog = false
+                        },
                     )
                 }
             }
