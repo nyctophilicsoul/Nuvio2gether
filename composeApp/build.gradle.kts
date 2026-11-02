@@ -551,6 +551,7 @@ kotlin {
                 // libass - atlas-based subtitle rendering (from NuvioMedia/nuvio-libass)
                 implementation(files("libs/nuvio-libass-release.aar"))
                 implementation(libs.ktor.client.okhttp)
+                implementation("org.tukaani:xz:1.10")
                 implementation(libs.sentry.android)
                 // Use the complete Maven Media3 player stack at one pinned version.
                 // Legacy precompiled core/UI/data-source AARs are intentionally excluded
@@ -658,6 +659,9 @@ kotlin {
             implementation(libs.supabase.storage)
             implementation(libs.supabase.realtime)
             implementation(libs.reorderable)
+        }
+        desktopMain.dependencies {
+            implementation("org.tukaani:xz:1.10")
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

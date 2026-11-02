@@ -15,7 +15,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Tv
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,6 +43,7 @@ import com.nuvio.app.features.p2p.formatP2pMegabytes
 import com.nuvio.app.features.p2p.formatP2pSpeed
 import com.nuvio.app.features.player.skip.internalSkipAction
 import com.nuvio.app.features.servers.ServerStreams
+import com.nuvio.app.features.livetv.LiveTvRepository
 import com.nuvio.app.features.streams.streamAddonInstanceId
 import com.nuvio.app.isIos
 import kotlinx.coroutines.launch
@@ -345,6 +350,21 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
         Box(modifier = panelModifier) {
             RenderPlayerModals(displayedPositionMs = displayedPositionMs)
             RenderParty(runtime = runtime)
+            if (activeProviderAddonId == "live-tv" && !playerControlsLocked && !isInPip) {
+                IconButton(
+                    onClick = {
+                        showLiveTvChannelsPanel = true
+                        controlsVisible = true
+                    },
+                    modifier = Modifier.align(Alignment.TopStart).padding(start = 24.dp, top = 72.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Tv,
+                        contentDescription = stringResource(Res.string.live_tv_player_channels),
+                        tint = Color.White,
+                    )
+                }
+            }
         }
 
         val completedMedia = completionRatingMedia
@@ -663,6 +683,19 @@ private fun BoxScope.RenderPlaybackOverlays(
 
 @Composable
 private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
+    LiveTvChannelsPanel(
+        visible = showLiveTvChannelsPanel,
+        currentStreamUrl = activeSourceUrl,
+        onChannelSelected = { channel ->
+            scope.launch {
+                switchToLiveTvChannel(LiveTvRepository.prepareForPlayback(channel))
+            }
+        },
+        onDismiss = {
+            showLiveTvChannelsPanel = false
+            controlsVisible = true
+        },
+    )
     PlayerChaptersPanel(
         visible = showChaptersPanel && chapters.isNotEmpty(),
         chapters = chapters,

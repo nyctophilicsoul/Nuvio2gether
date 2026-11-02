@@ -77,6 +77,8 @@ import com.nuvio.app.features.watchprogress.ContinueWatchingEnrichmentStorage
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesStorage
 import com.nuvio.app.features.watchprogress.ResumePromptStorage
 import com.nuvio.app.features.watchprogress.WatchProgressStorage
+import com.nuvio.app.features.livetv.LiveTvStorage
+import com.nuvio.app.features.settings.NuvioEnhancedBackupFileBridge
 
 open class MainActivity : AppCompatActivity() {
     private var pipRemoteActionReceiver: PipRemoteActionReceiver? = null
@@ -99,6 +101,8 @@ open class MainActivity : AppCompatActivity() {
         SyncClientIdentityStorage.initialize(applicationContext)
         AddonHttpClientProvider.initialize(applicationContext)
         AddonStorage.initialize(applicationContext)
+        LiveTvStorage.initialize(applicationContext)
+        NuvioEnhancedBackupFileBridge.bindActivity(this)
         // Pass the Activity so the CloudStream compatibility runtime can expose the
         // current host activity to providers that use CloudStream's CommonActivity APIs.
         CloudStreamPlatformStorage.initialize(this)
@@ -187,6 +191,7 @@ open class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        NuvioEnhancedBackupFileBridge.unbindActivity(this)
         EpisodeReleaseNotificationPlatform.unbindActivity(this)
         val receiver = pipRemoteActionReceiver
         if (receiver != null) {
@@ -194,6 +199,12 @@ open class MainActivity : AppCompatActivity() {
             pipRemoteActionReceiver = null
         }
         super.onDestroy()
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (NuvioEnhancedBackupFileBridge.handleActivityResult(requestCode, resultCode, data)) return
+        super.onActivityResult(requestCode, resultCode, data)
     }
 
     override fun onRequestPermissionsResult(

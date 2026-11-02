@@ -14,7 +14,7 @@ internal fun PlayerScreenRuntime.switchToLiveTvChannel(channel: LiveTvChannel) {
     activeSourceAudioUrl = null
     activeSourceHeaders = sanitizePlaybackHeaders(channel.headers)
     activeSourceResponseHeaders = emptyMap()
-    activeExternalSubtitles = emptyList()
+    externalSubtitles = emptyList()
     activeStreamType = channel.streamType
     activeSourceIdentityKey = "live-tv:${channel.streamUrl}"
     activeStreamTitle = channel.name

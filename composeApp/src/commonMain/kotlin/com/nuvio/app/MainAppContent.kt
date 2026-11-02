@@ -140,6 +140,8 @@ import com.nuvio.app.features.player.recordExternalPlaybackProgress
 import com.nuvio.app.features.player.ExternalPlayerPlatform
 import com.nuvio.app.features.player.PlayerLaunch
 import com.nuvio.app.features.player.PlayerLaunchStore
+import com.nuvio.app.features.livetv.LiveTvChannel
+import com.nuvio.app.features.livetv.LiveTvRepository
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.player.SubtitleLanguageOption
 import com.nuvio.app.features.player.prepareExternalPlayerLaunch
@@ -425,6 +427,7 @@ internal fun MainAppContent(
 
         when (tab) {
             AppScreenTab.Home -> homeScrollToTopRequests.tryEmit(Unit)
+            AppScreenTab.LiveTv -> Unit
             AppScreenTab.Search -> {
                 searchFocusRequestCount++
                 searchScrollToTopRequests.tryEmit(Unit)
@@ -1399,6 +1402,26 @@ internal fun MainAppContent(
                                     )
                                 },
                                 onLibrarySectionViewAllClick = onLibrarySectionViewAllClick,
+                                onLiveTvChannelClick = { channel ->
+                                    val launch = PlayerLaunch(
+                                        profileId = profileState.activeProfile?.profileIndex ?: ProfileRepository.activeProfileId,
+                                        title = channel.name,
+                                        sourceUrl = channel.streamUrl,
+                                        sourceHeaders = channel.headers,
+                                        sourceResponseHeaders = emptyMap(),
+                                        streamType = channel.streamType,
+                                        logo = channel.logoUrl,
+                                        streamTitle = channel.name,
+                                        providerName = "Live TV",
+                                        providerAddonId = "live-tv",
+                                        contentType = "live",
+                                        videoId = channel.id,
+                                        parentMetaId = channel.id,
+                                        parentMetaType = "live-tv",
+                                    )
+                                    val launchId = PlayerLaunchStore.put(launch)
+                                    navController.navigate(PlayerRoute(launchId = launchId, title = launch.title))
+                                },
                                 onCloudFilePlay = { item, file ->
                                     coroutineScope.launch {
                                         val resumeItem = WatchProgressRepository
