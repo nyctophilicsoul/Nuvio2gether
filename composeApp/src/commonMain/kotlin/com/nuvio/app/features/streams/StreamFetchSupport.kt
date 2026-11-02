@@ -530,10 +530,17 @@ internal fun crossProviderStreamIdentity(stream: StreamItem): String {
         .joinToString("\u001f") { "${it.key.lowercase()}=${it.value}" }
     val playableUrl = stream.playableDirectUrl.orEmpty().trim()
     val fallbackUrl = stream.url.orEmpty().trim()
+    val infoHash = stream.infoHash?.trim()?.lowercase().orEmpty()
+    val externalUrl = stream.externalUrl?.trim().orEmpty()
+    val primaryIdentity = (playableUrl.ifBlank { fallbackUrl }).trimEnd('/')
+    if (primaryIdentity.isBlank() && infoHash.isBlank() && externalUrl.isBlank()) {
+        // Metadata-only results cannot safely be collapsed across providers.
+        return "unresolved:${stream.sourceName.orEmpty()}:${stream.name}"
+    }
     return listOf(
-        (playableUrl.ifBlank { fallbackUrl }).trimEnd('/'),
-        stream.infoHash?.trim()?.lowercase().orEmpty(),
-        stream.externalUrl?.trim().orEmpty(),
+        primaryIdentity,
+        infoHash,
+        externalUrl,
         requestHeaders,
     ).joinToString("\u001c")
 }
