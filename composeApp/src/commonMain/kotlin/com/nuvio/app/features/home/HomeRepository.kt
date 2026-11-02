@@ -195,7 +195,7 @@ object HomeRepository {
                                         target = CatalogTarget.CloudStream(plugin.metadata.id.value, sectionName, contentType),
                                         items = items.map { it.toMetaPreview() },
                                         availableItemCount = items.size,
-                                        hasMore = false,
+                                        hasMore = true,
                                         supportsViewAll = true,
                                     )
                                 }
