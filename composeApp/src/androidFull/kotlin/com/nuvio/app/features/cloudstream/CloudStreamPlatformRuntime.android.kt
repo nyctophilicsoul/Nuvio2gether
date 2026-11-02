@@ -330,7 +330,14 @@ private class AndroidDexCloudStreamProvider(
                 data.name.isNotBlank() || data.data.isNotBlank()
             }
         }.forEach { api ->
-            val requests = api.mainPage.ifEmpty {
+            // MainAPI's default mainPage is a single blank MainPageData entry,
+            // not an empty list. ifEmpty() therefore does not provide a fallback.
+            // Remove placeholder entries and use the provider's base URL when it
+            // declares hasMainPage but does not define explicit categories.
+            val declaredRequests = api.mainPage.filter { data ->
+                data.name.isNotBlank() || data.data.isNotBlank()
+            }
+            val requests = declaredRequests.ifEmpty {
                 listOf(com.lagradost.cloudstream3.MainPageData(api.name, api.mainUrl, false))
             }
             suspend fun loadRequest(data: com.lagradost.cloudstream3.MainPageData) =
