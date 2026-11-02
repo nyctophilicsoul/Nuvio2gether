@@ -82,6 +82,12 @@ internal sealed interface StreamLoadCompletion {
         val streams: List<StreamItem>,
         val error: String?,
     ) : StreamLoadCompletion
+    data class CloudStreamProvider(
+        val addonId: String,
+        val addonName: String,
+        val streams: List<StreamItem>,
+        val error: String?,
+    ) : StreamLoadCompletion
 }
 
 internal fun cloudStreamAddonId(providerId: String): String =
