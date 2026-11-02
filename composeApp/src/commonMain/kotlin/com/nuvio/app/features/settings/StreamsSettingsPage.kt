@@ -60,6 +60,10 @@ import com.nuvio.app.features.streams.StreamBadgePlacement
 import com.nuvio.app.features.streams.StreamBadgeRules
 import com.nuvio.app.features.streams.StreamBadgeSettingsRepository
 import com.nuvio.app.features.streams.StreamFormatPreset
+import com.nuvio.app.features.streams.StreamFormattingEngine
+import com.nuvio.app.features.streams.StreamFormattingSettings
+import com.nuvio.app.features.streams.StreamProviderFamily
+import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamBackgroundMode
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
@@ -253,6 +257,39 @@ internal fun LazyListScope.streamsSettingsContent(isTablet: Boolean) {
                 title = "Stream formatting preset",
                 message = "Choose how stream details are presented. Original preserves provider formatting.",
             ) {
+                val previewStream = remember(currentSettings.streamFormatPreset) {
+                    StreamItem(
+                        name = "Example.Movie.2024.1080p.WEB-DL.HEVC.DDP5.1.HDR10.2GB",
+                        title = "Example Movie (2024)",
+                        description = "English ESubs",
+                        addonName = "Preview Add-on",
+                        addonId = "addon:format-preview",
+                    )
+                }
+                val preview = StreamFormattingEngine.format(
+                    stream = previewStream,
+                    preset = currentSettings.streamFormatPreset,
+                    providerId = previewStream.addonId,
+                    providerFamily = StreamProviderFamily.NUVIO_ADDON,
+                    settings = StreamFormattingSettings(preset = currentSettings.streamFormatPreset),
+                )
+                Text(
+                    text = "Preview",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = tokens.colors.textSecondary,
+                )
+                Text(
+                    text = preview.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = tokens.colors.textPrimary,
+                )
+                preview.summary?.takeIf { it.isNotBlank() }?.let { summary ->
+                    Text(
+                        text = summary,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = tokens.colors.textSecondary,
+                    )
+                }
                 StreamFormatPreset.entries.forEach { preset ->
                     DialogOption(
                         text = preset.name.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() },
