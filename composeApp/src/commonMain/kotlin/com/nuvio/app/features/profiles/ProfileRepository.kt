@@ -136,7 +136,16 @@ object ProfileRepository {
         }
         try {
             val result = SupabaseProvider.client.postgrest.rpc("sync_pull_profiles")
-            val profiles = result.decodeList<NuvioProfile>()
+            val cachedProfiles = decodeStoredPayload()?.profiles.orEmpty().associateBy { it.profileIndex }
+            val profiles = result.decodeList<NuvioProfile>().map { remoteProfile ->
+                val cachedProfile = cachedProfiles[remoteProfile.profileIndex]
+                // Keep custom backgrounds available on installations whose profile-sync
+                // RPC has not yet started returning the optional background columns.
+                remoteProfile.copy(
+                    profileBackgroundId = remoteProfile.profileBackgroundId ?: cachedProfile?.profileBackgroundId,
+                    profileBackgroundUrl = remoteProfile.profileBackgroundUrl ?: cachedProfile?.profileBackgroundUrl,
+                )
+            }
             _state.value = _state.value.copy(
                 profiles = profiles.sortedBy { it.profileIndex },
                 isLoaded = true,
@@ -217,9 +226,10 @@ object ProfileRepository {
                 putSyncOriginClientId()
             }
             SupabaseProvider.client.postgrest.rpc("sync_push_profiles", params)
-            if (!pullProfiles() && AuthRepository.state.value is AuthState.Authenticated) {
-                applyPayloadsLocally(profiles)
-            }
+            // Cache the user's submitted profile fields before pulling the server copy.
+            // This protects optional cosmetic fields when an older RPC response omits them.
+            applyPayloadsLocally(profiles)
+            pullProfiles()
             return true
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
