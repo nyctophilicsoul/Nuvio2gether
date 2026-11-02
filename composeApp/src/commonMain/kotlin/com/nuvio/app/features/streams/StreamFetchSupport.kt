@@ -771,7 +771,7 @@ internal fun CloudStreamLoadItem.matchesCloudStreamRequest(
         if (requestedYear == null || loadedYear != requestedYear) return false
     }
 
-    return titleMatches
+    return titleMatches || allowProviderRankedFallback
 }
 
 internal fun CloudStreamLoadItem.matchesCloudStreamExternalIdRequest(
