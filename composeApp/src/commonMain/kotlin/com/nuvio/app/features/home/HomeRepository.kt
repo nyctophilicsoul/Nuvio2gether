@@ -162,11 +162,10 @@ object HomeRepository {
         if (state.hideAllHomeCatalogs) {
             cachedCloudStreamSections = emptyList()
             publishCurrentState(isLoading = _uiState.value.isLoading, requestKey = currentRequestKey)
+            // Keep the last discovered catalog definitions registered for Home layout editing.
             return
         }
-        val plugins = state.plugins.filter { plugin ->
-            plugin.isRunnable && plugin.metadata.id.value !in state.hiddenHomeCatalogProviderIds
-        }
+        val plugins = state.plugins.filter(CloudStreamPluginItem::isRunnable)
         cloudStreamHomeJob = scope.launch {
             // Plugins are independent. Fetch them concurrently so one slow extension
             // cannot hold every other CloudStream catalog behind it.
@@ -202,7 +201,16 @@ object HomeRepository {
                     }
                 }.awaitAll().flatten()
             }
-            cachedCloudStreamSections = sections
+            HomeCatalogSettingsRepository.syncCloudStreamCatalogs(sections)
+            val latestState = CloudStreamRepository.uiState.value
+            cachedCloudStreamSections = if (latestState.hideAllHomeCatalogs) {
+                emptyList()
+            } else {
+                sections.filter { section ->
+                    val target = section.target as? CatalogTarget.CloudStream
+                    target == null || target.providerId !in latestState.hiddenHomeCatalogProviderIds
+                }
+            }
             publishCurrentState(isLoading = _uiState.value.isLoading, requestKey = currentRequestKey)
         }
     }
@@ -373,7 +381,14 @@ object HomeRepository {
                     supportsViewAll = true,
                 )
             }
-        val sectionByKey = (catalogSections + mergedSections + cachedCloudStreamSections).associateBy(HomeCatalogSection::key)
+        val cloudStreamSections = cachedCloudStreamSections.mapNotNull { section ->
+            val preference = snapshot.preferences[section.key]
+            if (preference?.enabled == false) return@mapNotNull null
+            section.withPosterOverlay().withReleaseFilter().copy(
+                title = preference?.customTitle?.takeIf { it.isNotBlank() } ?: section.title,
+            )
+        }
+        val sectionByKey = (catalogSections + mergedSections + cloudStreamSections).associateBy(HomeCatalogSection::key)
         val configuredHomeOrder = HomeCatalogSettingsRepository.uiState.value.items
             .mapIndexed { index, item -> item.key to index }
             .toMap()
