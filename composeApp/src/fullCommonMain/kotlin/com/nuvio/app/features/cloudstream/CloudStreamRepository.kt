@@ -417,6 +417,14 @@ actual object CloudStreamRepository {
         HomeRepository.applyCurrentSettings()
     }
 
+    actual fun setGroupStreamsByRepository(enabled: Boolean) {
+        initialize()
+        synchronized(profileLock) {
+            _uiState.update { it.copy(groupStreamsByRepository = enabled) }
+            persist()
+        }
+    }
+
     actual fun setPluginEnabled(pluginId: String, enabled: Boolean) {
         initialize()
         synchronized(profileLock) {
@@ -835,6 +843,7 @@ actual object CloudStreamRepository {
             securityWarningAccepted = stored.securityWarningAccepted,
             hideAllHomeCatalogs = stored.hideAllHomeCatalogs,
             hiddenHomeCatalogProviderIds = stored.hiddenHomeCatalogProviderIds,
+            groupStreamsByRepository = stored.groupStreamsByRepository,
         )
     }
 
@@ -855,6 +864,7 @@ actual object CloudStreamRepository {
             securityWarningAccepted = current.securityWarningAccepted,
             hideAllHomeCatalogs = current.hideAllHomeCatalogs,
             hiddenHomeCatalogProviderIds = current.hiddenHomeCatalogProviderIds,
+            groupStreamsByRepository = current.groupStreamsByRepository,
         )
         CloudStreamPlatformStorage.saveState(currentProfileId, json.encodeToString(stored))
     }
