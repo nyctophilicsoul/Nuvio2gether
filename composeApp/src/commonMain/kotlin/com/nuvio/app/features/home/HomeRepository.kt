@@ -161,6 +161,19 @@ object HomeRepository {
         cloudStreamHomeJob?.cancel()
         val state = CloudStreamRepository.uiState.value
         val plugins = state.plugins.filter(CloudStreamPluginItem::isRunnable)
+        val runnableProviderIds = plugins.mapTo(mutableSetOf()) { it.metadata.id.value }
+        cachedCloudStreamSections = if (state.hideAllHomeCatalogs) {
+            emptyList()
+        } else {
+            cachedCloudStreamSections.filter { section ->
+                val target = section.target as? CatalogTarget.CloudStream
+                target == null || (
+                    target.providerId in runnableProviderIds &&
+                        target.providerId !in state.hiddenHomeCatalogProviderIds
+                    )
+            }
+        }
+        publishCurrentState(isLoading = _uiState.value.isLoading, requestKey = currentRequestKey)
         cloudStreamHomeJob = scope.launch {
             // Plugins are independent. Fetch them concurrently so one slow extension
             // cannot hold every other CloudStream catalog behind it.
