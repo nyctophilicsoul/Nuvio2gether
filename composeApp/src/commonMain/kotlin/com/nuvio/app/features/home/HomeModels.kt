@@ -92,9 +92,9 @@ internal fun shouldShowHomeEmptyState(
     hasActiveAddons: Boolean,
     hasServerLibraries: Boolean,
     hasRenderableCollectionRows: Boolean,
-    hasCloudStreamRows: Boolean,
+    hasRenderableHomeSections: Boolean,
 ): Boolean = !hasActiveAddons && !hasServerLibraries &&
-    !hasRenderableCollectionRows && !hasCloudStreamRows
+    !hasRenderableCollectionRows && !hasRenderableHomeSections
 
 internal data class CatalogRequest(
     val addon: ManagedAddon,
