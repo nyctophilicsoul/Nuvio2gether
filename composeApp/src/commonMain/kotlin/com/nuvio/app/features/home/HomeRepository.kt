@@ -1,5 +1,6 @@
 package com.nuvio.app.features.home
 
+import co.touchlab.kermit.Logger
 import com.nuvio.app.features.cloudstream.CloudStreamRepository
 import com.nuvio.app.features.cloudstream.toMetaPreview
 import com.nuvio.app.features.addons.ManagedAddon
@@ -19,6 +20,7 @@ import com.nuvio.app.features.collection.findCollectionCatalog
 import com.nuvio.app.features.servers.ServerCatalog
 import com.nuvio.app.features.trakt.TraktPublicListSourceResolver
 import com.nuvio.app.features.watchprogress.CurrentDateProvider
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -34,6 +36,7 @@ import kotlin.math.absoluteValue
 import kotlin.random.Random
 
 object HomeRepository {
+    private val log = Logger.withTag("HomeRepository")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -163,7 +166,7 @@ object HomeRepository {
         }
         cloudStreamHomeJob = scope.launch {
             val sections = plugins.flatMap { plugin ->
-                runCatching {
+                try {
                     CloudStreamRepository.getMainPage(plugin.metadata.id.value, 1).getOrThrow()
                         .mapNotNull { (sectionName, items) ->
                             if (items.isEmpty()) return@mapNotNull null
@@ -180,7 +183,12 @@ object HomeRepository {
                                 supportsViewAll = true,
                             )
                         }
-                }.getOrElse { emptyList() }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Throwable) {
+                    log.w(error) { "CloudStream home catalog failed plugin=${plugin.metadata.name} id=${plugin.metadata.id.value}" }
+                    emptyList()
+                }
             }
             cachedCloudStreamSections = sections
             publishCurrentState(isLoading = _uiState.value.isLoading, requestKey = currentRequestKey)
