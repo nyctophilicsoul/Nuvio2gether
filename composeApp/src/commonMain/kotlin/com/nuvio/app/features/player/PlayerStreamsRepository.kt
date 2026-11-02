@@ -627,10 +627,24 @@ object PlayerStreamsRepository {
                             )
                         }
                     }
+                    is StreamLoadCompletion.CloudStreamProvider -> {
+                        publishStreamGroup(
+                            presentStreamGroup(
+                                AddonStreamGroup(
+                                    addonName = completion.addonName,
+                                    addonId = completion.addonId,
+                                    streams = completion.streams,
+                                    isLoading = false,
+                                    error = completion.error,
+                                ),
+                            ),
+                        )
+                    }
+
                 }
             }
 
-            for (availabilityJob in debridAvailabilityJobs) {
+            for (availabilityJob in debridAvailabilityJobs {
                 availabilityJob.join()
             }
             launch {
