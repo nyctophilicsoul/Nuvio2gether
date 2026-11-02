@@ -1056,7 +1056,7 @@ object HomeCatalogSettingsRepository {
         val normalized = if (preserveUnknownCatalogPreferences) {
             current.toMutableMap()
         } else {
-            current.filterKeys { it !in knownKeys }.toMutableMap()
+            current.filterKeys { it !in knownKeys || it.startsWith("cloudstream:") }.toMutableMap()
         }
         var enabledHeroSourceCount = 0
         orderedEntries.forEach { entry ->
