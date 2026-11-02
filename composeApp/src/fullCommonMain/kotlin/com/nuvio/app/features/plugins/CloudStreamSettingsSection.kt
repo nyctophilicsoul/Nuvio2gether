@@ -402,6 +402,7 @@ internal fun CloudStreamSettingsSection() {
             plugin = plugin,
             securityWarningAccepted = state.securityWarningAccepted,
             homeCatalogsHidden = state.hideAllHomeCatalogs || plugin.metadata.id.value in state.hiddenHomeCatalogProviderIds,
+            homeCatalogsGloballyHidden = state.hideAllHomeCatalogs,
             copy = copy,
             onMessage = { message = it },
         )
@@ -432,6 +433,7 @@ private fun CloudStreamPluginCard(
     plugin: CloudStreamPluginItem,
     securityWarningAccepted: Boolean,
     homeCatalogsHidden: Boolean,
+    homeCatalogsGloballyHidden: Boolean,
     copy: CloudStreamSettingsCopy,
     onMessage: (String) -> Unit,
 ) {
@@ -531,6 +533,7 @@ private fun CloudStreamPluginCard(
             }
             Switch(
                 checked = !homeCatalogsHidden,
+                enabled = !homeCatalogsGloballyHidden,
                 onCheckedChange = { visible ->
                     CloudStreamRepository.setPluginHomeCatalogsHidden(plugin.metadata.id.value, !visible)
                 },
