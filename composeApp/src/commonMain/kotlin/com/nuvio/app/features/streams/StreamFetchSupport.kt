@@ -739,18 +739,33 @@ internal fun CloudStreamLoadItem.linkDataForCloudStreamRequest(
         val exactEpisodes = sortedEpisodes.filter { item ->
             item.season == request.season && item.episode == request.episode
         }
-        return exactEpisodes.bestEpisodeTitleMatch(request)?.data
-            ?: exactEpisodes.firstOrNull()?.data
-            ?: titledEpisode?.takeIf { item -> item.season == request.season && item.episode == request.episode }?.data
-            ?: sortedEpisodes.safeUnknownSeasonEpisodeMatch(request)?.data
+        val exactTitleMatch = exactEpisodes.bestEpisodeTitleMatch(request)
+        if (exactTitleMatch != null) return exactTitleMatch.data
+
+        // A numbered episode is not enough when metadata supplies a meaningful title.
+        // Only fall back to the numeric S/E identity when the provider's episode title
+        // is generic/missing, or when there is no meaningful requested title.
+        val exactNumberMatch = exactEpisodes.singleOrNull()
+        if (exactNumberMatch != null &&
+            exactNumberMatch.hasNoSpecificEpisodeTitle(request)
+        ) {
+            return exactNumberMatch.data
+        }
+
+        // Unknown-season fallback is deliberately last and must independently prove
+        // that this episode is safe; never cross an explicit season boundary.
+        sortedEpisodes.safeUnknownSeasonEpisodeMatch(request)?.data
     }
 
     if (request.episode != null) {
         val episodeMatches = sortedEpisodes.filter { item -> item.episode == request.episode }
         // Episode numbers repeat across seasons. Without an explicit season, only a
         // title match or a unique candidate is safe; never silently choose the first.
-        return episodeMatches.bestEpisodeTitleMatch(request)?.data
-            ?: episodeMatches.singleOrNull()?.data
+        episodeMatches.bestEpisodeTitleMatch(request)?.let { return it.data }
+        val uniqueEpisode = episodeMatches.singleOrNull()
+        return uniqueEpisode
+            ?.takeIf { it.hasNoSpecificEpisodeTitle(request) }
+            ?.data
             ?: titledEpisode?.data
     }
 
@@ -761,6 +776,19 @@ internal fun CloudStreamLoadItem.linkDataForCloudStreamRequest(
     }
 
     return null
+}
+
+private fun CloudStreamEpisode.hasNoSpecificEpisodeTitle(
+    request: CloudStreamSearchRequest,
+): Boolean {
+    val requestedTitle = request.episodeTitle
+        ?.normalizedCloudStreamSearchTitle()
+        ?.takeIf(String::isNotBlank)
+        ?.takeUnless { it.isGenericCloudStreamEpisodeTitle() }
+        ?: return true
+    val providerTitle = name.normalizedCloudStreamSearchTitle()
+    return providerTitle.isBlank() || providerTitle.isGenericCloudStreamEpisodeTitle() ||
+        providerTitle == requestedTitle
 }
 
 private fun List<CloudStreamEpisode>.bestEpisodeTitleMatch(
@@ -831,13 +859,15 @@ internal fun CloudStreamLoadItem.matchesCloudStreamRequest(
     }
 
     if (!titleMatches && allowProviderRankedFallback) {
-        // A provider's result order is not identity evidence. Permit a localized title
-        // only when the loaded response independently confirms the requested release
-        // year. Missing years must not turn an unrelated result into a valid match.
+        // Search rank plus a matching year is insufficient to identify a TV series:
+        // many unrelated series share the same release year. Keep localized-title
+        // fallback for movies, where an exact release-year match is a useful second
+        // identity signal, but never use it to accept an unrelated series.
+        if (requestedType == "series") return false
         if (requestedYear == null || loadedYear != requestedYear) return false
     }
 
-    return titleMatches || allowProviderRankedFallback
+    return titleMatches || (allowProviderRankedFallback && requestedType != "series")
 }
 
 internal fun CloudStreamLoadItem.matchesCloudStreamExternalIdRequest(
@@ -858,9 +888,10 @@ internal fun CloudStreamLoadItem.matchesCloudStreamExternalIdRequest(
     if (requestedYear != null && loadedYear != requestedYear) return false
     if (titleMatches) return true
 
-    // External-ID lookups may legitimately return a localized title, but the ID alone
-    // is not trusted because third-party providers can implement this method incorrectly.
-    // Require an independently matching year before accepting a non-matching title.
+    // External-ID lookups may legitimately return localized movie titles. For
+    // series, however, many unrelated shows share a year, so a year-only match is
+    // not enough to authorize loading their episodes.
+    if (requestedType == "series") return false
     return requestedYear != null && loadedYear == requestedYear
 }
 
