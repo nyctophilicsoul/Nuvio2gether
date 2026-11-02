@@ -1,29 +1,36 @@
 package com.nuvio.app.features.cloudstream
 
 /**
- * CloudStream .cs3 files contain Android DEX, not portable provider scripts.
- * Only reviewed adapters compiled into Nuvio are executable. Downloaded DEX is
- * retained as an artifact and is never loaded by the app.
+ * Standard CS3 packages contain Android DEX. They can run only in Android Full,
+ * where the embedded CloudStream-compatible runtime is present. iOS and store
+ * distributions must never advertise arbitrary DEX packages as runnable.
  */
 object CloudStreamCompatibilityResolver {
     private val crossPlatformAdapters = mapOf(
         "https://raw.githubusercontent.com/Kraptor123/cs-kraptor/master/repo.json#KickTR" to "kick-tr-v1",
     )
 
-    fun resolve(metadata: CloudStreamPluginMetadata): CloudStreamCompatibility {
+    fun resolve(
+        metadata: CloudStreamPluginMetadata,
+        supportsAndroidDex: Boolean = false,
+    ): CloudStreamCompatibility {
         val adapterId = crossPlatformAdapters[metadata.id.value]
-        return if (adapterId != null) {
-            CloudStreamCompatibility(
+        return when {
+            adapterId != null -> CloudStreamCompatibility(
                 runtimeKind = CloudStreamRuntimeKind.PrecompiledCrossPlatformAdapter,
                 platformSupport = CloudStreamPlatformSupport.AndroidAndIos,
                 adapterId = adapterId,
-                reason = "This provider has a reviewed cross-platform adapter compiled into Nuvio.",
+                reason = "This provider has a reviewed cross-platform adapter compiled into NuvioEx.",
             )
-        } else {
-            CloudStreamCompatibility(
+            supportsAndroidDex -> CloudStreamCompatibility(
+                runtimeKind = CloudStreamRuntimeKind.AndroidDex,
+                platformSupport = CloudStreamPlatformSupport.AndroidOnly,
+                reason = "This standard .cs3 package can run using the embedded CloudStream-compatible runtime in Android Full builds.",
+            )
+            else -> CloudStreamCompatibility(
                 runtimeKind = CloudStreamRuntimeKind.UnsupportedAndroidDex,
                 platformSupport = CloudStreamPlatformSupport.Unsupported,
-                reason = "This standard .cs3 package contains Android DEX code. Nuvio does not execute downloaded plugin code; a reviewed built-in adapter is required.",
+                reason = "This standard .cs3 package contains Android DEX and requires the Android Full runtime.",
             )
         }
     }
