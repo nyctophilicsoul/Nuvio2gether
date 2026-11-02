@@ -18,6 +18,8 @@ import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_player_resize_fill
 import nuvio.composeapp.generated.resources.compose_player_resize_fit
 import nuvio.composeapp.generated.resources.compose_player_resize_zoom
+import nuvio.composeapp.generated.resources.compose_player_resize_best_fit
+import nuvio.composeapp.generated.resources.compose_player_resize_16_9
 import org.jetbrains.compose.resources.StringResource
 import kotlin.math.max
 
@@ -138,7 +140,9 @@ internal fun PlayerResizeMode.next(): PlayerResizeMode =
     when (this) {
         PlayerResizeMode.Fit -> PlayerResizeMode.Fill
         PlayerResizeMode.Fill -> PlayerResizeMode.Zoom
-        PlayerResizeMode.Zoom -> PlayerResizeMode.Fit
+        PlayerResizeMode.Zoom -> PlayerResizeMode.BestFit
+        PlayerResizeMode.BestFit -> PlayerResizeMode.Ratio16x9
+        PlayerResizeMode.Ratio16x9 -> PlayerResizeMode.Fit
     }
 
 internal val PlayerResizeMode.labelRes: StringResource
@@ -146,6 +150,8 @@ internal val PlayerResizeMode.labelRes: StringResource
         PlayerResizeMode.Fit -> Res.string.compose_player_resize_fit
         PlayerResizeMode.Fill -> Res.string.compose_player_resize_fill
         PlayerResizeMode.Zoom -> Res.string.compose_player_resize_zoom
+        PlayerResizeMode.BestFit -> Res.string.compose_player_resize_best_fit
+        PlayerResizeMode.Ratio16x9 -> Res.string.compose_player_resize_16_9
     }
 
 internal fun formatPlaybackTime(positionMs: Long): String {
