@@ -91,6 +91,7 @@ internal actual object CloudStreamPlatformRuntime {
         }
         plugins.forEach(LoadedPlugin::unload)
         PluginManager.clear()
+        appContext?.let(::prepareHostContext)
     }
 
     private fun loadPlugin(item: CloudStreamPluginItem): LoadedPlugin {
