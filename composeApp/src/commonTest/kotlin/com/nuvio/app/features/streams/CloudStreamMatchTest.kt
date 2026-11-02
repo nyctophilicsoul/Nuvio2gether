@@ -326,4 +326,11 @@ class CloudStreamMatchTest {
         val request = CloudStreamSearchRequest("Show", type = "series", year = null, season = null, episode = 2)
         assertNull(loaded.linkDataForCloudStreamRequest(request))
     }
+
+    @Test
+    fun rejectsExternalIdExactTitleWhenRequestedYearIsMissingFromLoadedResponse() {
+        val request = CloudStreamSearchRequest("The Office", type = "series", year = 2005, season = null, episode = null)
+        val loaded = CloudStreamLoadItem("provider", "yearless", "The Office", CloudStreamTvType.TvSeries)
+        assertFalse(loaded.matchesCloudStreamExternalIdRequest(request))
+    }
 }
