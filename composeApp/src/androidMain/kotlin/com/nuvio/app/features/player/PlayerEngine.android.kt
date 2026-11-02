@@ -2022,6 +2022,14 @@ private class NuvioLibmpvView(
                     mpv.setPropertyDouble("panscan", 0.5)
                     mpv.setPropertyString("video-aspect-override", "no")
                 }
+                PlayerResizeMode.BestFit -> {
+                    mpv.setPropertyDouble("panscan", 0.0)
+                    mpv.setPropertyString("video-aspect-override", "no")
+                }
+                PlayerResizeMode.Ratio16x9 -> {
+                    mpv.setPropertyDouble("panscan", 0.0)
+                    mpv.setPropertyString("video-aspect-override", "16:9")
+                }
             }
         }
     }
@@ -2509,6 +2517,8 @@ private fun PlayerResizeMode.toExoResizeMode(): Int =
         PlayerResizeMode.Fit -> AspectRatioFrameLayout.RESIZE_MODE_FIT
         PlayerResizeMode.Fill -> AspectRatioFrameLayout.RESIZE_MODE_FILL
         PlayerResizeMode.Zoom -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+        PlayerResizeMode.BestFit -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+        PlayerResizeMode.Ratio16x9 -> AspectRatioFrameLayout.RESIZE_MODE_FIT
     }
 
 private fun PlayerView.syncLibassOverlay(
