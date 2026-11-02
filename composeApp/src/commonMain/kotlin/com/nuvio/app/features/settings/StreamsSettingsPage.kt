@@ -59,6 +59,7 @@ import com.nuvio.app.features.streams.StreamBadgeImportResult
 import com.nuvio.app.features.streams.StreamBadgePlacement
 import com.nuvio.app.features.streams.StreamBadgeRules
 import com.nuvio.app.features.streams.StreamBadgeSettingsRepository
+import com.nuvio.app.features.streams.StreamFormatPreset
 import com.nuvio.app.features.streams.StreamBackgroundMode
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
@@ -115,6 +116,7 @@ internal fun LazyListScope.streamsSettingsContent(isTablet: Boolean) {
         var showBadgePositionDialog by rememberSaveable { mutableStateOf(false) }
         var showPlayerBadgesDialog by rememberSaveable { mutableStateOf(false) }
         var showBackgroundDialog by rememberSaveable { mutableStateOf(false) }
+        var showStreamFormatDialog by rememberSaveable { mutableStateOf(false) }
         val badgePlacementLabel = streamBadgePlacementLabel(currentSettings.badgePlacement)
 
         SettingsSection(
@@ -180,6 +182,21 @@ internal fun LazyListScope.streamsSettingsContent(isTablet: Boolean) {
                     )
                 }
                 SettingsSwitchRow(
+                    title = "Stream formatting",
+                    description = "Standardise stream names and show detected media details.",
+                    checked = currentSettings.streamFormattingEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = StreamBadgeSettingsRepository::setStreamFormattingEnabled,
+                )
+                SettingsNavigationRow(
+                    title = "Formatting preset",
+                    description = currentSettings.streamFormatPreset.name.replace('_', ' ').lowercase()
+                        .replaceFirstChar { it.uppercase() },
+                    enabled = currentSettings.streamFormattingEnabled,
+                    isTablet = isTablet,
+                    onClick = { showStreamFormatDialog = true },
+                )
+                SettingsSwitchRow(
                     title = stringResource(Res.string.settings_stream_addon_logo_title),
                     description = stringResource(Res.string.settings_stream_addon_logo_description),
                     checked = currentSettings.showAddonLogo,
@@ -228,6 +245,31 @@ internal fun LazyListScope.streamsSettingsContent(isTablet: Boolean) {
                 },
                 onDismiss = { showBadgePositionDialog = false },
             )
+        }
+
+        if (showStreamFormatDialog) {
+            DialogSurface(
+                onDismissRequest = { showStreamFormatDialog = false },
+                title = "Stream formatting preset",
+                message = "Choose how stream details are presented. Original preserves provider formatting.",
+            ) {
+                StreamFormatPreset.entries.forEach { preset ->
+                    DialogOption(
+                        text = preset.name.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() },
+                        selected = currentSettings.streamFormatPreset == preset,
+                        onClick = {
+                            StreamBadgeSettingsRepository.setStreamFormatPreset(preset)
+                            showStreamFormatDialog = false
+                        },
+                    )
+                }
+                DialogButtons {
+                    DialogButton(
+                        text = stringResource(Res.string.action_close),
+                        onClick = { showStreamFormatDialog = false },
+                    )
+                }
+            }
         }
     }
 }
