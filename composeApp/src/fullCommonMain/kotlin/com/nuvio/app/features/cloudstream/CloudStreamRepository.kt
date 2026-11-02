@@ -393,6 +393,27 @@ actual object CloudStreamRepository {
         )
     }
 
+    actual fun setHideAllHomeCatalogs(hidden: Boolean) {
+        initialize()
+        synchronized(profileLock) {
+            _uiState.update { it.copy(hideAllHomeCatalogs = hidden) }
+            persist()
+        }
+    }
+
+    actual fun setPluginHomeCatalogsHidden(pluginId: String, hidden: Boolean) {
+        initialize()
+        synchronized(profileLock) {
+            _uiState.update { current ->
+                val updated = current.hiddenHomeCatalogProviderIds.toMutableSet().apply {
+                    if (hidden) add(pluginId) else remove(pluginId)
+                }
+                current.copy(hiddenHomeCatalogProviderIds = updated)
+            }
+            persist()
+        }
+    }
+
     actual fun setPluginEnabled(pluginId: String, enabled: Boolean) {
         initialize()
         synchronized(profileLock) {
@@ -807,6 +828,8 @@ actual object CloudStreamRepository {
             plugins = plugins,
             registryRevision = 1,
             securityWarningAccepted = stored.securityWarningAccepted,
+            hideAllHomeCatalogs = stored.hideAllHomeCatalogs,
+            hiddenHomeCatalogProviderIds = stored.hiddenHomeCatalogProviderIds,
         )
     }
 
@@ -825,6 +848,8 @@ actual object CloudStreamRepository {
             },
             plugins = current.plugins.map { item -> item.toStored() },
             securityWarningAccepted = current.securityWarningAccepted,
+            hideAllHomeCatalogs = current.hideAllHomeCatalogs,
+            hiddenHomeCatalogProviderIds = current.hiddenHomeCatalogProviderIds,
         )
         CloudStreamPlatformStorage.saveState(currentProfileId, json.encodeToString(stored))
     }
