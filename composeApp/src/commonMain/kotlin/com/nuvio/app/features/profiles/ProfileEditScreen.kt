@@ -84,6 +84,19 @@ fun ProfileEditScreen(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showPinSetup by remember { mutableStateOf(false) }
     var showPinClear by remember { mutableStateOf(false) }
+
+    // The profile may be refreshed from the account after this screen is composed.
+    // Keep the editable background fields in sync with the persisted profile, and
+    // reset them when switching between profiles in the same navigation destination.
+    LaunchedEffect(
+        currentProfile?.profileIndex,
+        currentProfile?.profileBackgroundId,
+        currentProfile?.profileBackgroundUrl,
+    ) {
+        selectedBackgroundId = currentProfile?.profileBackgroundId
+        selectedBackgroundUrl = currentProfile?.profileBackgroundUrl
+    }
+
     val memberAccess by remember {
         MemberAccessRepository.ensureStarted()
         MemberAccessRepository.access
