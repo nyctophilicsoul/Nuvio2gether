@@ -823,22 +823,27 @@ final class MPVPlayerViewController: UIViewController {
 
     func setResize(_ mode: Int) {
         guard mpv != nil else { return }
-        // Always clear a forced aspect override before applying the selected mode.
+        // Clear any previous mode's aspect override before applying the selected mode.
         setStringProperty("video-aspect-override", mode == 4 ? "16:9" : "no")
         switch mode {
-        case 1: // Fill
-            setStringProperty("panscan", "1.0")
+        case 1: // Fill: stretch the complete frame to the viewport.
+            setFlag("keepaspect", false)
+            setStringProperty("panscan", "0.0")
             setStringProperty("video-unscaled", "no")
-        case 2: // Zoom (retain legacy behavior)
+        case 2: // Zoom: preserve aspect ratio and crop overflow to fill.
+            setFlag("keepaspect", true)
             setStringProperty("panscan", "1.0")
             setStringProperty("video-unscaled", "no")
         case 3: // Best Fit: show the complete frame at its original aspect ratio.
+            setFlag("keepaspect", true)
             setStringProperty("panscan", "0.0")
             setStringProperty("video-unscaled", "no")
-        case 4: // 16:9 display aspect ratio.
+        case 4: // 16:9 display aspect ratio, fitted without distortion.
+            setFlag("keepaspect", true)
             setStringProperty("panscan", "0.0")
             setStringProperty("video-unscaled", "no")
-        default: // Fit (retain legacy behavior)
+        default: // Fit: preserve source aspect ratio and fit inside the viewport.
+            setFlag("keepaspect", true)
             setStringProperty("panscan", "0.0")
             setStringProperty("video-unscaled", "no")
         }
