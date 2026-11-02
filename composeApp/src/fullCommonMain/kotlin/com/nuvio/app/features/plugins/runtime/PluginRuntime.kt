@@ -269,6 +269,7 @@ internal object PluginRuntime {
                     language = item.stringValue("language"),
                     provider = item.stringValue("provider"),
                     type = item.stringValue("type"),
+                    filename = item.stringValue("filename") ?: item.stringValue("fileName"),
                     seeders = (item["seeders"] as? JsonPrimitive)?.intOrNull,
                     peers = (item["peers"] as? JsonPrimitive)?.intOrNull,
                     infoHash = item.stringValue("infoHash"),
