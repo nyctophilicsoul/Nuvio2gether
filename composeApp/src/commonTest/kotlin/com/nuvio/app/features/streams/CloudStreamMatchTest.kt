@@ -348,4 +348,69 @@ class CloudStreamMatchTest {
         )
         assertNull(loaded.linkDataForCloudStreamRequest(request))
     }
+
+    @Test
+    fun rejectsProviderRankedUnrelatedSeriesEvenWhenReleaseYearMatches() {
+        val request = CloudStreamSearchRequest(
+            "Breaking Bad", type = "series", year = 2008, season = 1, episode = 1,
+        )
+        val item = CloudStreamSearchItem(
+            "provider", "wrong-series", "Another Show", CloudStreamTvType.TvSeries, year = 2008,
+        )
+        val loaded = CloudStreamLoadItem(
+            "provider", "wrong-series", "Another Show", CloudStreamTvType.TvSeries, year = 2008,
+        )
+
+        assertFalse(loaded.matchesCloudStreamRequest(request, item, allowProviderRankedFallback = true))
+    }
+
+    @Test
+    fun rejectsExternalIdUnrelatedSeriesEvenWhenReleaseYearMatches() {
+        val request = CloudStreamSearchRequest(
+            "The Office", type = "series", year = 2005, season = null, episode = null,
+        )
+        val loaded = CloudStreamLoadItem(
+            "provider", "wrong-series", "Another Office", CloudStreamTvType.TvSeries, year = 2005,
+        )
+
+        assertFalse(loaded.matchesCloudStreamExternalIdRequest(request))
+    }
+
+    @Test
+    fun rejectsNumberedEpisodeWhenProviderTitleConflictsWithRequestedTitle() {
+        val loaded = CloudStreamLoadItem(
+            providerId = "provider",
+            data = "show",
+            name = "Show",
+            type = CloudStreamTvType.TvSeries,
+            episodes = listOf(
+                CloudStreamEpisode(data = "wrong-s1e1", name = "A Different Story", season = 1, episode = 1),
+            ),
+        )
+        val request = CloudStreamSearchRequest(
+            "Show", type = "series", year = null, season = 1, episode = 1,
+            episodeTitle = "The Beginning",
+        )
+
+        assertNull(loaded.linkDataForCloudStreamRequest(request))
+    }
+
+    @Test
+    fun acceptsNumberedEpisodeWhenProviderOnlyHasGenericEpisodeTitle() {
+        val loaded = CloudStreamLoadItem(
+            providerId = "provider",
+            data = "show",
+            name = "Show",
+            type = CloudStreamTvType.TvSeries,
+            episodes = listOf(
+                CloudStreamEpisode(data = "s1e1", name = "Episode 1", season = 1, episode = 1),
+            ),
+        )
+        val request = CloudStreamSearchRequest(
+            "Show", type = "series", year = null, season = 1, episode = 1,
+            episodeTitle = "The Beginning",
+        )
+
+        assertEquals("s1e1", loaded.linkDataForCloudStreamRequest(request))
+    }
 }
