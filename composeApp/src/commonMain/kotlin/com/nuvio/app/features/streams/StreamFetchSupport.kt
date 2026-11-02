@@ -467,14 +467,11 @@ internal fun PluginRuntimeResult.toStreamItem(
         addonName = addonName,
         addonId = addonId,
         streamType = normalizeStreamType(type),
-        behaviorHints = if (requestHeaders.isEmpty()) {
-            StreamBehaviorHints()
-        } else {
-            StreamBehaviorHints(
-                notWebReady = true,
-                proxyHeaders = StreamProxyHeaders(request = requestHeaders),
-            )
-        },
+        behaviorHints = StreamBehaviorHints(
+            filename = filename?.takeIf { it.isNotBlank() },
+            notWebReady = requestHeaders.isNotEmpty(),
+            proxyHeaders = requestHeaders.takeIf { it.isNotEmpty() }?.let { StreamProxyHeaders(request = it) },
+        ),
         externalSubtitles = subtitles?.map {
             StreamSubtitle(
                 url = it.url,
@@ -484,6 +481,29 @@ internal fun PluginRuntimeResult.toStreamItem(
             )
         } ?: emptyList()
     )
+}
+
+/**
+ * Identity for native plugin results across providers. Provider labels are deliberately
+ * excluded so mirrors of the same file are collapsed, while different request headers,
+ * subtitles, hashes, or filenames remain independently playable.
+ */
+internal fun pluginStreamIdentity(stream: StreamItem): String {
+    val requestHeaders = stream.behaviorHints.proxyHeaders?.request.orEmpty()
+        .entries
+        .sortedWith(compareBy({ it.key.lowercase() }, { it.value }))
+        .joinToString("\u001f") { "${it.key.lowercase()}=${it.value}" }
+    val subtitleIdentity = stream.externalSubtitles.joinToString("\u001e") { subtitle ->
+        listOf(subtitle.url, subtitle.language, subtitle.name.orEmpty()).joinToString("\u001d")
+    }
+    return listOf(
+        stream.url?.trim().orEmpty(),
+        stream.infoHash?.trim()?.lowercase().orEmpty(),
+        stream.externalUrl?.trim().orEmpty(),
+        stream.behaviorHints.filename.orEmpty().trim().lowercase(),
+        requestHeaders,
+        subtitleIdentity,
+    ).joinToString("\u001c")
 }
 
 internal fun List<StreamItem>.sortedForGroupedDisplay(): List<StreamItem> =
