@@ -134,6 +134,8 @@ internal fun PlayerScreenContent(args: PlayerScreenArgs) {
         runtime.resizeModeFitLabel = stringResource(Res.string.compose_player_resize_fit)
         runtime.resizeModeFillLabel = stringResource(Res.string.compose_player_resize_fill)
         runtime.resizeModeZoomLabel = stringResource(Res.string.compose_player_resize_zoom)
+        runtime.resizeModeBestFitLabel = stringResource(Res.string.compose_player_resize_best_fit)
+        runtime.resizeMode16x9Label = stringResource(Res.string.compose_player_resize_16_9)
         runtime.downloadedLabel = stringResource(Res.string.compose_player_downloaded)
         runtime.airsPrefix = stringResource(Res.string.compose_player_airs_prefix)
         runtime.tbaLabel = stringResource(Res.string.compose_player_tba)
