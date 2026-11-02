@@ -146,4 +146,39 @@ class CloudStreamSearchRouteIndexTest {
             ).map { it.data },
         )
     }
+
+    @Test
+    fun cachedRouteWithMissingYearDoesNotMatchKnownRequestedYear() {
+        val providerId = "route-index-missing-year"
+        CloudStreamSearchRouteIndex.clear()
+        CloudStreamSearchRouteIndex.remember(
+            providerId,
+            "The Office",
+            listOf(CloudStreamSearchItem(providerId, "yearless", "The Office", CloudStreamTvType.TvSeries)),
+        )
+        assertEquals(
+            emptyList(),
+            CloudStreamSearchRouteIndex.find(providerId, listOf("The Office"), "series", 2005),
+        )
+        CloudStreamSearchRouteIndex.clear()
+    }
+
+    @Test
+    fun cachedRoutesWithMultipleReleaseYearsAreRejectedWhenYearIsUnknown() {
+        val providerId = "route-index-ambiguous-years"
+        CloudStreamSearchRouteIndex.clear()
+        CloudStreamSearchRouteIndex.remember(
+            providerId,
+            "The Office",
+            listOf(
+                CloudStreamSearchItem(providerId, "uk-office", "The Office 2001", CloudStreamTvType.TvSeries, year = 2001),
+                CloudStreamSearchItem(providerId, "us-office", "The Office 2005", CloudStreamTvType.TvSeries, year = 2005),
+            ),
+        )
+        assertEquals(
+            emptyList(),
+            CloudStreamSearchRouteIndex.find(providerId, listOf("The Office"), "series", null),
+        )
+        CloudStreamSearchRouteIndex.clear()
+    }
 }
