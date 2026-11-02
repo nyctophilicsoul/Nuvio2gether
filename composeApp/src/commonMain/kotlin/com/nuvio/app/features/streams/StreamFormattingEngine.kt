@@ -1,11 +1,14 @@
 package com.nuvio.app.features.streams
 
+import kotlinx.serialization.Serializable
+
 /**
  * Pure presentation-layer stream formatting.
  *
  * This deliberately returns display data instead of mutating [StreamItem]. Playback URLs,
  * headers, provider identifiers and the original provider response must remain untouched.
  */
+@Serializable
 enum class StreamFormatPreset {
     ORIGINAL,
     NUVIOEX_MODERN,
@@ -14,12 +17,14 @@ enum class StreamFormatPreset {
     ESSENTIALS,
 }
 
+@Serializable
 enum class StreamProviderFamily {
     NUVIO_ADDON,
     CLOUDSTREAM_PLUGIN,
     OTHER,
 }
 
+@Serializable
 data class StreamFormattingScope(
     val includeNuvioAddons: Boolean = true,
     val includeCloudstreamPlugins: Boolean = true,
@@ -40,6 +45,7 @@ data class StreamFormattingScope(
     }
 }
 
+@Serializable
 data class StreamFormattingSettings(
     val enabled: Boolean = true,
     val preset: StreamFormatPreset = StreamFormatPreset.NUVIOEX_MODERN,
@@ -81,7 +87,7 @@ object StreamFormattingEngine {
             stream.name, stream.title, stream.description, stream.behaviorHints.filename,
         ).joinToString(" ")
         if (!settings.enabled || preset == StreamFormatPreset.ORIGINAL ||
-            !settings.scope.includes(providerId, providerFamily)
+            !settings.scope.includes(providerId, providerFamily) || hasExistingFormatting(stream)
         ) {
             return FormattedStreamPresentation(original, stream.description, emptyList(), original)
         }
@@ -119,6 +125,20 @@ object StreamFormattingEngine {
             else -> technical.take(6).joinToString(" · ").ifBlank { null }
         }
         return FormattedStreamPresentation(title, summary, technical, original)
+    }
+
+    /**
+     * Preserve provider-authored cards. Structured badges are the strongest signal;
+     * technical summaries are also treated as already formatted to avoid duplicate labels.
+     */
+    fun hasExistingFormatting(stream: StreamItem): Boolean {
+        if (stream.badges.isNotEmpty()) return true
+        val description = stream.description.orEmpty()
+        if (description.isBlank()) return false
+        val hasQuality = Regex("(?i)\\b(?:2160p|1440p|1080p|720p|480p|4k|uhd)\\b").containsMatchIn(description)
+        val hasLabeledMetadata = Regex("(?i)\\b(?:audio|provider|subtitles?|codec|size)\\s*:").containsMatchIn(description)
+        val separators = description.count { it == '·' || it == '|' }
+        return (hasQuality && hasLabeledMetadata) || (hasLabeledMetadata && separators >= 2)
     }
 
     private data class Facts(
