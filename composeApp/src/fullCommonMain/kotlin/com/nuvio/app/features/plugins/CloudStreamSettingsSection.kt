@@ -426,10 +426,12 @@ private fun CloudStreamPluginCard(
             plugin.metadata.rawTvTypes.forEach { NuvioInfoBadge(text = it) }
             NuvioInfoBadge(
                 text = when {
-                    plugin.verified && plugin.metadata.fileHash != null -> copy.sha256Verified
-                    plugin.verified -> copy.archiveInspected
-                    plugin.metadata.fileHash == null -> copy.hashMissing
-                    else -> copy.hashUnverified
+                    plugin.isInstalled && plugin.verified && plugin.installedFileHash != null -> copy.sha256Verified
+                    plugin.isInstalled && plugin.verified -> copy.archiveInspected
+                    plugin.isInstalled && plugin.installedFileHash == null -> copy.hashMissing
+                    plugin.isInstalled -> copy.hashUnverified
+                    plugin.metadata.fileHash != null -> copy.hashAvailable
+                    else -> copy.hashMissing
                 },
             )
             NuvioInfoBadge(
@@ -585,6 +587,8 @@ private class CloudStreamSettingsCopy private constructor(
         if (turkish) "SHA-256 doğrulandı" else "SHA-256 verified"
     val archiveInspected: String =
         if (turkish) "Arşiv yapısı denetlendi" else "Archive inspected"
+    val hashAvailable: String =
+        if (turkish) "Repository SHA-256 sağladı" else "Repository SHA-256 supplied"
     val hashUnverified: String =
         if (turkish) "Hash doğrulanmadı" else "Hash unverified"
     val hashMissing: String =
@@ -733,7 +737,7 @@ private class CloudStreamSettingsCopy private constructor(
         }
 
     fun pluginInstalled(plugin: CloudStreamPluginItem): String = when {
-        !plugin.compatibility.isRunnable && plugin.verified && plugin.metadata.fileHash != null -> if (turkish) {
+        !plugin.compatibility.isRunnable && plugin.verified && plugin.installedFileHash != null -> if (turkish) {
             "${plugin.metadata.name} paketi arşiv denetiminden ve SHA-256 doğrulamasından geçti; ancak bu derlemenin çalışma ortamı provider ile uyumlu değil. DEX kodu çalıştırılmayacak."
         } else {
             "${plugin.metadata.name} passed archive inspection and SHA-256 verification, but this build cannot run the provider. Its DEX will not be executed."
@@ -748,7 +752,7 @@ private class CloudStreamSettingsCopy private constructor(
         } else {
             "${plugin.metadata.name} could not be verified and cannot run on this build."
         }
-        plugin.verified && plugin.metadata.fileHash != null -> if (turkish) {
+        plugin.verified && plugin.installedFileHash != null -> if (turkish) {
             "${plugin.metadata.name} paketi arşiv denetiminden ve SHA-256 doğrulamasından geçti."
         } else {
             "${plugin.metadata.name} passed archive inspection and repository SHA-256 verification."
