@@ -94,6 +94,7 @@ expect object CloudStreamRepository {
     fun setPluginEnabled(pluginId: String, enabled: Boolean)
     fun setHideAllHomeCatalogs(hidden: Boolean)
     fun setPluginHomeCatalogsHidden(pluginId: String, hidden: Boolean)
+    fun setGroupStreamsByRepository(enabled: Boolean)
     fun removePlugin(pluginId: String)
 
     suspend fun getMainPage(providerId: String, page: Int = 1): Result<List<Pair<String, List<CloudStreamSearchItem>>>>
