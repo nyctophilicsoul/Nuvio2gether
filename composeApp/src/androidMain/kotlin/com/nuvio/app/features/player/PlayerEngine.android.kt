@@ -843,7 +843,7 @@ private fun ExoPlayerSurface(
                     videoAspectRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
                 }
                 playerViewRef?.post {
-                    playerViewRef?.applyAspectRatioOverride(resizeMode)
+                    playerViewRef?.applyResizeMode(resizeMode, videoAspectRatio)
                     playerViewRef?.syncLibassOverlayGeometry()
                 }
             }
@@ -1369,8 +1369,7 @@ private fun ExoPlayerSurface(
                     layoutParams = android.view.ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT)
                     player = exoPlayer
                     keepScreenOn = exoPlayer.shouldKeepPlayerScreenOn()
-                    this.resizeMode = resizeMode.toExoResizeMode()
-                    applyAspectRatioOverride(resizeMode)
+                    applyResizeMode(resizeMode, videoAspectRatio)
                     setShutterBackgroundColor(android.graphics.Color.BLACK)
                     playerViewRef = this
                     sidecarController.bindSubtitleView(this.subtitleView)
@@ -1397,8 +1396,7 @@ private fun ExoPlayerSurface(
             update = { playerView ->
                 playerView.player = exoPlayer
                 playerView.useController = useNativeController
-                playerView.resizeMode = resizeMode.toExoResizeMode()
-                playerView.applyAspectRatioOverride(resizeMode)
+                playerView.applyResizeMode(resizeMode, videoAspectRatio)
                 playerViewRef = playerView
                 sidecarController.bindSubtitleView(playerView.subtitleView)
                 syncPlayerViewKeepScreenOn()
@@ -2013,9 +2011,15 @@ private class NuvioLibmpvView(
     fun applyResizeMode(resizeMode: PlayerResizeMode) {
         executeMpv {
             when (resizeMode) {
-                PlayerResizeMode.Fit, PlayerResizeMode.BestFit -> {
+                PlayerResizeMode.Fit -> {
                     mpv.setPropertyBoolean("keepaspect", true)
                     mpv.setPropertyDouble("panscan", 0.0)
+                    mpv.setPropertyString("video-aspect-override", "no")
+                }
+                PlayerResizeMode.BestFit -> {
+                    // Restrained crop: distinct from Fit and the stronger Zoom mode.
+                    mpv.setPropertyBoolean("keepaspect", true)
+                    mpv.setPropertyDouble("panscan", 0.35)
                     mpv.setPropertyString("video-aspect-override", "no")
                 }
                 PlayerResizeMode.Fill -> {
@@ -2517,14 +2521,39 @@ private fun PlaybackException.isDecoderFailure(): Boolean =
         PlaybackException.ERROR_CODE_DECODING_RESOURCES_RECLAIMED,
     )
 
-private fun PlayerResizeMode.toExoResizeMode(): Int =
-    when (this) {
-        PlayerResizeMode.Fit -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+private fun PlayerView.applyResizeMode(mode: PlayerResizeMode, sourceAspectRatio: Float) {
+    val contentFrame = findViewById<AspectRatioFrameLayout>(androidx.media3.ui.R.id.exo_content_frame)
+        ?: return
+    val viewportWidth = contentFrame.width
+    val viewportHeight = contentFrame.height
+    val viewportAspectRatio = if (viewportWidth > 0 && viewportHeight > 0) {
+        viewportWidth.toFloat() / viewportHeight.toFloat()
+    } else {
+        0f
+    }
+    val cropFraction = if (sourceAspectRatio > 0f && viewportAspectRatio > 0f) {
+        if (sourceAspectRatio > viewportAspectRatio) {
+            1f - (viewportAspectRatio / sourceAspectRatio)
+        } else {
+            1f - (sourceAspectRatio / viewportAspectRatio)
+        }
+    } else {
+        Float.POSITIVE_INFINITY
+    }
+
+    // Best Fit prefers a modest crop only when it removes at most 12% of the image.
+    resizeMode = when (mode) {
+        PlayerResizeMode.Fit, PlayerResizeMode.Ratio16x9 -> AspectRatioFrameLayout.RESIZE_MODE_FIT
         PlayerResizeMode.Fill -> AspectRatioFrameLayout.RESIZE_MODE_FILL
         PlayerResizeMode.Zoom -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-        PlayerResizeMode.BestFit -> AspectRatioFrameLayout.RESIZE_MODE_FIT
-        PlayerResizeMode.Ratio16x9 -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+        PlayerResizeMode.BestFit -> if (cropFraction <= 0.12f) {
+            AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+        } else {
+            AspectRatioFrameLayout.RESIZE_MODE_FIT
+        }
     }
+    contentFrame.setAspectRatio(if (mode == PlayerResizeMode.Ratio16x9) 16f / 9f else 0f)
+}
 
 private fun PlayerView.syncLibassOverlay(
     player: ExoPlayer,
