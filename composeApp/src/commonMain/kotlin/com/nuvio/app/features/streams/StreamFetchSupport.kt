@@ -826,6 +826,7 @@ private fun List<CloudStreamEpisode>.safeUnknownSeasonEpisodeMatch(
 
     val requestedSeason = request.season
     return unknownSeasonMatches.singleOrNull()
+        ?.takeIf { it.hasNoSpecificEpisodeTitle(request) }
         ?.takeIf { requestedSeason == null || requestedSeason == 1 || requestedSeason in explicitSeasons }
 }
 
