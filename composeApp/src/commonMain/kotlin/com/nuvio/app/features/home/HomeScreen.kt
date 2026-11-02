@@ -1230,6 +1230,34 @@ fun HomeScreen(
                             }
                         }
                     }
+
+                    // CloudStream catalogs are managed by CloudStreamRepository rather
+                    // than HomeCatalogSettingsRepository. Render them independently so
+                    // they are not lost when the home settings list contains only
+                    // Stremio/server/collection rows.
+                    homeUiState.sections
+                        .filter { section ->
+                            section.key.startsWith("cloudstream:") && section.items.isNotEmpty()
+                        }
+                        .forEach { section ->
+                            item(key = section.key, contentType = "catalog") {
+                                HomeCatalogRowSection(
+                                    section = section,
+                                    entries = section.items.take(HOME_CATALOG_PREVIEW_LIMIT),
+                                    modifier = Modifier.padding(bottom = 12.dp),
+                                    sectionPadding = homeSectionPadding,
+                                    onViewAllClick = if (section.canOpenCatalog(HOME_CATALOG_PREVIEW_LIMIT)) {
+                                        onCatalogClick?.let { { it(section) } }
+                                    } else {
+                                        null
+                                    },
+                                    watchedKeys = watchedUiState.watchedKeys,
+                                    fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
+                                    onPosterClick = onPosterClick,
+                                    onPosterLongClick = onPosterLongClick,
+                                )
+                            }
+                        }
                 }
             }
         }
