@@ -131,8 +131,8 @@ object StreamFormattingEngine {
     }
 
     /**
-     * Preserve provider-authored cards. Structured badges are the strongest signal;
-     * technical summaries are also treated as already formatted to avoid duplicate labels.
+     * Preserve provider-authored technical summaries to avoid duplicate labels.
+     * A quality badge alone is not enough: raw titles may still need normalisation.
      */
     fun hasExistingFormatting(stream: StreamItem): Boolean {
         val description = stream.description.orEmpty()
