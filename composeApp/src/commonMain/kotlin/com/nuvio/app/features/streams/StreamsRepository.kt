@@ -726,7 +726,9 @@ object StreamsRepository {
                                         val mergedStreams = if (presentedPluginStreams.isEmpty()) {
                                             group.streams
                                         } else {
-                                            (group.streams + presentedPluginStreams).sortedForGroupedDisplay()
+                                            val combined = group.streams + presentedPluginStreams
+                                            // Keep progressive results cheap; sort once when this provider group finishes.
+                                            if (remaining > 0) combined else combined.sortedForGroupedDisplay()
                                         }
                                         val stillLoading = remaining > 0
                                         val finalError = if (mergedStreams.isEmpty() && !stillLoading) {
