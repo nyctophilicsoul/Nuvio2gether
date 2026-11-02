@@ -47,6 +47,8 @@ data class CloudStreamUiState(
     val plugins: List<CloudStreamPluginItem> = emptyList(),
     val registryRevision: Long = 0L,
     val securityWarningAccepted: Boolean = false,
+    val hideAllHomeCatalogs: Boolean = false,
+    val hiddenHomeCatalogProviderIds: Set<String> = emptySet(),
 )
 
 sealed interface AddCloudStreamRepositoryResult {
@@ -89,6 +91,8 @@ expect object CloudStreamRepository {
     suspend fun updatePlugin(pluginId: String): CloudStreamInstallResult
     suspend fun installAndEnablePlugins(pluginIds: List<String>): CloudStreamBulkInstallResult
     fun setPluginEnabled(pluginId: String, enabled: Boolean)
+    fun setHideAllHomeCatalogs(hidden: Boolean)
+    fun setPluginHomeCatalogsHidden(pluginId: String, hidden: Boolean)
     fun removePlugin(pluginId: String)
 
     suspend fun getMainPage(providerId: String, page: Int = 1): Result<List<Pair<String, List<CloudStreamSearchItem>>>>
