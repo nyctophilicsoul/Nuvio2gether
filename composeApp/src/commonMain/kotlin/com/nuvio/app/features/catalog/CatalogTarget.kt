@@ -45,7 +45,7 @@ sealed interface CatalogTarget {
         val sectionName: String,
         override val contentType: String,
     ) : CatalogTarget {
-        override val supportsPagination: Boolean = false
+        override val supportsPagination: Boolean = true
     }
 
     data class MergedRow(
