@@ -198,6 +198,7 @@ object HomeCatalogSettingsRepository {
 
     private var hasLoaded = false
     private var definitions: List<HomeCatalogDefinition> = emptyList()
+    private var cloudStreamCatalogItems: List<HomeCatalogSettingsItem> = emptyList()
     private var collectionDefinitions: List<CollectionCatalogDefinition> = emptyList()
     private var lastCatalogSync: CatalogSyncInput? = null
     private var lastCollectionSync: Pair<List<Collection>, String>? = null
@@ -225,6 +226,7 @@ object HomeCatalogSettingsRepository {
     fun clearLocalState() {
         hasLoaded = false
         definitions = emptyList()
+        cloudStreamCatalogItems = emptyList()
         collectionDefinitions = emptyList()
         lastCatalogSync = null
         lastCollectionSync = null
@@ -273,6 +275,28 @@ object HomeCatalogSettingsRepository {
         enforcePinnedCollectionsAtTop()
         publish()
         persist()
+    }
+
+    fun syncCloudStreamCatalogs(sections: List<HomeCatalogSection>) {
+        ensureLoaded()
+        val nextItems = sections.mapNotNull { section ->
+            val target = section.target as? com.nuvio.app.features.catalog.CatalogTarget.CloudStream ?: return@mapNotNull null
+            val preference = preferences[section.key]
+            HomeCatalogSettingsItem(
+                key = section.key,
+                defaultTitle = section.title,
+                addonName = section.addonName,
+                customTitle = preference?.customTitle.orEmpty(),
+                enabled = preference?.enabled ?: true,
+                heroSourceEnabled = false,
+                order = preference?.order ?: 0,
+                addonId = "cloudstream:${target.providerId}",
+                rowPlacement = HomeCatalogRowPlacement.fromStorage(preference?.rowPlacement),
+            )
+        }
+        if (cloudStreamCatalogItems == nextItems) return
+        cloudStreamCatalogItems = nextItems
+        publish()
     }
 
     fun syncCollections(collections: List<Collection>) {
@@ -1115,10 +1139,11 @@ object HomeCatalogSettingsRepository {
         }
 
         val items = orderHomeCatalogSettingsItems(
-            items = catalogItems + collectionItems + mergedItems,
+            items = catalogItems + collectionItems + cloudStreamCatalogItems + mergedItems,
             addonIdByCatalogKey = definitions
                 .filterNot { ServerCatalog.isServerKey(it.key) }
-                .associate { definition -> definition.key to definition.addonGroupId() },
+                .associate { definition -> definition.key to definition.addonGroupId() } +
+                cloudStreamCatalogItems.mapNotNull { item -> item.addonId?.let { item.key to it } }.toMap(),
             addonLayouts = addonLayouts.mapValues { (_, stored) ->
                 HomeAddonLayoutPreference(
                     mode = HomeAddonLayoutMode.fromStorage(stored.mode),
@@ -1394,7 +1419,7 @@ object HomeCatalogSettingsRepository {
 
     private fun defaultPreferenceForMissingKey(key: String): StoredHomeCatalogPreference? {
         val isCollection = collectionDefinitions.any { it.key == key }
-        val isCatalog = definitions.any { it.key == key }
+        val isCatalog = definitions.any { it.key == key } || cloudStreamCatalogItems.any { it.key == key }
         val isMerged = validMergedRowKey(key)
         if (!isCollection && !isCatalog && !isMerged) return null
 
@@ -1410,6 +1435,7 @@ object HomeCatalogSettingsRepository {
 
     private fun knownPreferenceKeys(): Set<String> =
         definitions.mapTo(mutableSetOf()) { it.key }.also { keys ->
+            keys.addAll(cloudStreamCatalogItems.map { it.key })
             keys.addAll(collectionDefinitions.map { it.key })
             keys.addAll(mergedRows.map { mergedHomeRowKey(it.id) })
         }
