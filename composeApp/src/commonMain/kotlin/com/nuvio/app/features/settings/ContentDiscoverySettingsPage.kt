@@ -33,10 +33,6 @@ internal fun LazyListScope.contentDiscoveryContent(
     onMediaServersClick: () -> Unit,
 ) {
     item {
-        val recentSearchesEnabled by remember {
-            SearchHistoryRepository.ensureLoaded()
-            SearchHistoryRepository.enabled
-        }.collectAsStateWithLifecycle()
         val catalogSettings by HomeCatalogSettingsRepository.uiState.collectAsStateWithLifecycle()
 
         SettingsSection(
@@ -56,6 +52,11 @@ internal fun LazyListScope.contentDiscoveryContent(
     }
 
     item {
+        val recentSearchesEnabled by remember {
+            SearchHistoryRepository.ensureLoaded()
+            SearchHistoryRepository.enabled
+        }.collectAsStateWithLifecycle()
+
         SettingsSection(
             title = stringResource(Res.string.settings_content_discovery_section_search),
             isTablet = isTablet,
