@@ -2,6 +2,7 @@ package com.nuvio.app.features.home
 
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.cloudstream.CloudStreamRepository
+import com.nuvio.app.features.cloudstream.CloudStreamPluginItem
 import com.nuvio.app.features.cloudstream.toMetaPreview
 import com.nuvio.app.features.addons.ManagedAddon
 import com.nuvio.app.features.addons.AddonRepository
