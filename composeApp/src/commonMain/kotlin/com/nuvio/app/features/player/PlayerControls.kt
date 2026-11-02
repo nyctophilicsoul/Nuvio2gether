@@ -318,6 +318,9 @@ internal fun PlayerControlsShell(
                     onSubtitleClick = onSubtitleClick,
                     onAudioClick = onAudioClick,
                     onStreamInfoClick = onStreamInfoClick,
+                    onVideoSettingsClick = onVideoSettingsClick,
+                    onOpenInExternalPlayer = onOpenInExternalPlayer,
+                    onSubmitIntroClick = onSubmitIntroClick,
                     onSourcesClick = onSourcesClick,
                     onEpisodesClick = onEpisodesClick,
                     chapters = chapters,
@@ -694,6 +697,9 @@ private fun ProgressControls(
     onSubtitleClick: () -> Unit,
     onAudioClick: () -> Unit,
     onStreamInfoClick: () -> Unit = {},
+    onVideoSettingsClick: (() -> Unit)? = null,
+    onOpenInExternalPlayer: (() -> Unit)? = null,
+    onSubmitIntroClick: (() -> Unit)? = null,
     onSourcesClick: (() -> Unit)? = null,
     onEpisodesClick: (() -> Unit)? = null,
     chapters: List<PlayerChapter> = emptyList(),
@@ -763,6 +769,27 @@ private fun ProgressControls(
                         icon = Icons.Rounded.Info,
                         onClick = onStreamInfoClick,
                     )
+                    onVideoSettingsClick?.let { onClick ->
+                        PlayerActionPillButton(
+                            label = stringResource(Res.string.player_action_video_settings),
+                            icon = Icons.Rounded.Build,
+                            onClick = onClick,
+                        )
+                    }
+                    onOpenInExternalPlayer?.let { onClick ->
+                        PlayerActionPillButton(
+                            label = stringResource(Res.string.streams_open_external_player),
+                            icon = Icons.AutoMirrored.Rounded.OpenInNew,
+                            onClick = onClick,
+                        )
+                    }
+                    onSubmitIntroClick?.let { onClick ->
+                        PlayerActionPillButton(
+                            label = stringResource(Res.string.submit_intro_action),
+                            icon = Icons.Rounded.Flag,
+                            onClick = onClick,
+                        )
+                    }
                     if (onChaptersClick != null) {
                         PlayerActionPillButton(
                             label = stringResource(Res.string.compose_player_chapters),
