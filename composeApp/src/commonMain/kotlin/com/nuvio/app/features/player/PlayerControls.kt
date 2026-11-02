@@ -237,6 +237,7 @@ internal fun PlayerControlsShell(
                     isLocked = isLocked,
                     showActions = showPlaybackControls,
                     onSubmitIntroClick = onSubmitIntroClick,
+                    onStreamInfoClick = onStreamInfoClick,
                     parentalWarnings = parentalWarnings,
                     showParentalGuide = showParentalGuide,
                     onParentalGuideAnimationComplete = onParentalGuideAnimationComplete,
@@ -318,10 +319,6 @@ internal fun PlayerControlsShell(
                     onSpeedClick = onSpeedClick,
                     onSubtitleClick = onSubtitleClick,
                     onAudioClick = onAudioClick,
-                    onStreamInfoClick = onStreamInfoClick,
-                    onVideoSettingsClick = onVideoSettingsClick,
-                    onOpenInExternalPlayer = onOpenInExternalPlayer,
-                    onSubmitIntroClick = onSubmitIntroClick,
                     onSourcesClick = onSourcesClick,
                     onEpisodesClick = onEpisodesClick,
                     chapters = chapters,
@@ -403,6 +400,7 @@ private fun PlayerHeader(
     isLocked: Boolean,
     showActions: Boolean,
     onSubmitIntroClick: (() -> Unit)?,
+    onStreamInfoClick: () -> Unit,
     parentalWarnings: List<ParentalWarning>,
     showParentalGuide: Boolean,
     onParentalGuideAnimationComplete: () -> Unit,
@@ -502,6 +500,15 @@ private fun PlayerHeader(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    if (onStreamInfoClick != null) {
+                        PlayerHeaderIconButton(
+                            icon = Icons.Rounded.Info,
+                            contentDescription = stringResource(Res.string.cd_stream_info),
+                            buttonSize = metrics.headerIconSize + 16.dp,
+                            iconSize = metrics.headerIconSize,
+                            onClick = onStreamInfoClick,
+                        )
+                    }
                     if (onSubmitIntroClick != null) {
                         PlayerHeaderIconButton(
                             icon = Icons.Rounded.Flag,
@@ -697,10 +704,6 @@ private fun ProgressControls(
     onSpeedClick: () -> Unit,
     onSubtitleClick: () -> Unit,
     onAudioClick: () -> Unit,
-    onStreamInfoClick: () -> Unit = {},
-    onVideoSettingsClick: (() -> Unit)? = null,
-    onOpenInExternalPlayer: (() -> Unit)? = null,
-    onSubmitIntroClick: (() -> Unit)? = null,
     onSourcesClick: (() -> Unit)? = null,
     onEpisodesClick: (() -> Unit)? = null,
     chapters: List<PlayerChapter> = emptyList(),
@@ -765,32 +768,6 @@ private fun ProgressControls(
                         painter = audioPainter,
                         onClick = onAudioClick,
                     )
-                    PlayerActionPillButton(
-                        label = stringResource(Res.string.cd_stream_info),
-                        icon = Icons.Rounded.Info,
-                        onClick = onStreamInfoClick,
-                    )
-                    onVideoSettingsClick?.let { onClick ->
-                        PlayerActionPillButton(
-                            label = stringResource(Res.string.player_action_video_settings),
-                            icon = Icons.Rounded.Build,
-                            onClick = onClick,
-                        )
-                    }
-                    onOpenInExternalPlayer?.let { onClick ->
-                        PlayerActionPillButton(
-                            label = stringResource(Res.string.streams_open_external_player),
-                            icon = Icons.AutoMirrored.Rounded.OpenInNew,
-                            onClick = onClick,
-                        )
-                    }
-                    onSubmitIntroClick?.let { onClick ->
-                        PlayerActionPillButton(
-                            label = stringResource(Res.string.submit_intro_action),
-                            icon = Icons.Rounded.Flag,
-                            onClick = onClick,
-                        )
-                    }
                     if (onChaptersClick != null) {
                         PlayerActionPillButton(
                             label = stringResource(Res.string.compose_player_chapters),
