@@ -1,6 +1,4 @@
 package com.nuvio.app.features.settings
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.material3.OutlinedTextField
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
@@ -97,12 +95,6 @@ import nuvio.composeapp.generated.resources.settings_homescreen_show_hero
 import nuvio.composeapp.generated.resources.settings_homescreen_show_hero_description
 import nuvio.composeapp.generated.resources.settings_homescreen_summary
 import nuvio.composeapp.generated.resources.settings_homescreen_summary_hint
-import nuvio.composeapp.generated.resources.settings_homescreen_background_save
-import nuvio.composeapp.generated.resources.settings_homescreen_background_clear
-import nuvio.composeapp.generated.resources.settings_homescreen_background_invalid_url
-import nuvio.composeapp.generated.resources.settings_homescreen_background_url
-import nuvio.composeapp.generated.resources.settings_homescreen_background_description
-import nuvio.composeapp.generated.resources.settings_homescreen_background_title
 import nuvio.composeapp.generated.resources.settings_homescreen_addon_row_order
 import nuvio.composeapp.generated.resources.settings_homescreen_addon_row_order_description
 import nuvio.composeapp.generated.resources.settings_homescreen_addon_order_edit
@@ -140,10 +132,6 @@ internal fun LazyListScope.homescreenSettingsContent(
     val selectedHeroSourceCount = items.count { it.heroSourceEnabled && it.supportsHeroSource }
     val enabledCatalogCount = items.count { it.isVisible }
 
-    // Keep the custom start-screen background control immediately visible at the top.
-    item(key = "homescreen_background_url_settings") {
-        HomeScreenBackgroundUrlSettings(isTablet = isTablet)
-    }
     // Keep the merged-row editor entry visible near the top of Home Layout.
     item(key = "merged_rows_settings_entry") {
         Button(
@@ -728,77 +716,6 @@ private fun HomescreenSummaryCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-    }
-}
-
-@Composable
-private fun HomeScreenBackgroundUrlSettings(isTablet: Boolean) {
-    ThemeSettingsRepository.ensureLoaded()
-    val savedUrl by ThemeSettingsRepository.homeBackgroundUrl.collectAsStateWithLifecycle()
-    var draftUrl by remember(savedUrl) { mutableStateOf(savedUrl) }
-    var showInvalidUrl by remember { mutableStateOf(false) }
-    val trimmedUrl = draftUrl.trim()
-    val validUrl = trimmedUrl.isBlank() ||
-        ((trimmedUrl.startsWith("https://", ignoreCase = true) ||
-            trimmedUrl.startsWith("http://", ignoreCase = true)) &&
-            trimmedUrl.none(Char::isWhitespace))
-
-    SettingsSection(
-        title = stringResource(Res.string.settings_homescreen_background_title),
-        isTablet = isTablet,
-    ) {
-        SettingsGroup(isTablet = isTablet) {
-            Text(
-                text = stringResource(Res.string.settings_homescreen_background_description),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            OutlinedTextField(
-                value = draftUrl,
-                onValueChange = {
-                    draftUrl = it
-                    showInvalidUrl = false
-                },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                isError = showInvalidUrl,
-                label = { Text(stringResource(Res.string.settings_homescreen_background_url)) },
-                supportingText = {
-                    if (showInvalidUrl) {
-                        Text(stringResource(Res.string.settings_homescreen_background_invalid_url))
-                    }
-                },
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TextButton(
-                    onClick = {
-                        draftUrl = ""
-                        showInvalidUrl = false
-                        ThemeSettingsRepository.setHomeBackgroundUrl("")
-                    },
-                    enabled = savedUrl.isNotBlank(),
-                ) {
-                    Text(stringResource(Res.string.settings_homescreen_background_clear))
-                }
-                Button(
-                    onClick = {
-                        if (validUrl) {
-                            ThemeSettingsRepository.setHomeBackgroundUrl(trimmedUrl)
-                            showInvalidUrl = false
-                        } else {
-                            showInvalidUrl = true
-                        }
-                    },
-                    enabled = trimmedUrl != savedUrl,
-                ) {
-                    Text(stringResource(Res.string.settings_homescreen_background_save))
-                }
-            }
         }
     }
 }
