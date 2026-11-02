@@ -48,6 +48,7 @@ actual fun PlatformPlayerSurface(
     sourceResponseHeaders: Map<String, String>,
     externalSubtitles: List<com.nuvio.app.features.streams.StreamSubtitle>,
     streamType: String?,
+    isLive: Boolean,
     useYoutubeChunkedPlayback: Boolean,
     modifier: Modifier,
     playWhenReady: Boolean,

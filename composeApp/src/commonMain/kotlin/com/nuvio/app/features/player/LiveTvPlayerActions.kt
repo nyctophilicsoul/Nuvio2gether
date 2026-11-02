@@ -19,7 +19,19 @@ internal fun PlayerScreenRuntime.switchToLiveTvChannel(channel: LiveTvChannel) {
     activeSourceIdentityKey = "live-tv:${channel.streamUrl}"
     activeStreamTitle = channel.name
     activeStreamSubtitle = null
-    activeProviderName = "M3U"
+    activeStreamFilename = channel.name
+    activeSourceFilename = channel.name
+    activeStream = null
+    currentStreamBingeGroup = null
+    currentStreamFilename = null
+    currentStreamInfoHash = null
+    credentialRefreshAttemptedSourceUrl = null
+    errorMessage = null
+    activeProviderName = when (com.nuvio.app.features.livetv.LiveTvRepository.uiState.value.sourceType) {
+        com.nuvio.app.features.livetv.LiveTvSourceType.M3u -> "M3U"
+        com.nuvio.app.features.livetv.LiveTvSourceType.Xtream -> "Xtream"
+        com.nuvio.app.features.livetv.LiveTvSourceType.Stalker -> "Stalker"
+    }
     activeProviderAddonId = "live-tv"
     activeVideoId = null
     activeInitialPositionMs = 0L

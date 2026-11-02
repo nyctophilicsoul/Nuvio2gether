@@ -261,6 +261,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
                     sourceResponseHeaders = activeSourceResponseHeaders,
                     externalSubtitles = externalSubtitles,
                     streamType = activeStreamType,
+                    isLive = activeProviderAddonId == "live-tv",
                     modifier = videoModifier,
                     playWhenReady = shouldPlay,
                     initialPositionMs = activeInitialPositionMs.takeIf { it > 0L },
