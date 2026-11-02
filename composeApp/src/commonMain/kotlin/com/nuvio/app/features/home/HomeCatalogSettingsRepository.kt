@@ -35,6 +35,7 @@ data class HomeCatalogSettingsItem(
     val addonCatalogsEnabled: Boolean = true,
     val isMergedRow: Boolean = false,
     val mergedRowId: String? = null,
+    val supportsHeroSource: Boolean = true,
 ) {
     val displayTitle: String
         get() = customTitle.ifBlank { defaultTitle }
@@ -116,7 +117,7 @@ data class HomeCatalogSettingsUiState(
             append('|')
             append(
                 items.joinToString(separator = "|") { item ->
-                    "${item.key}:${item.order}:${item.enabled}:${item.heroSourceEnabled}:${item.customTitle}:${item.rowPlacement}:${item.addonCatalogsEnabled}"
+                    "${item.key}:${item.order}:${item.enabled}:${item.heroSourceEnabled}:${item.supportsHeroSource}:${item.customTitle}:${item.rowPlacement}:${item.addonCatalogsEnabled}"
                 }
             )
             append('|')
@@ -290,6 +291,7 @@ object HomeCatalogSettingsRepository {
                 enabled = preference?.enabled ?: true,
                 heroSourceEnabled = false,
                 order = preference?.order ?: 0,
+                supportsHeroSource = false,
                 addonId = "cloudstream:${target.providerId}",
                 rowPlacement = HomeCatalogRowPlacement.fromStorage(preference?.rowPlacement),
             )
