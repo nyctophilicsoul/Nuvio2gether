@@ -137,7 +137,7 @@ internal fun LazyListScope.homescreenSettingsContent(
     catalogErrorMessage: String?,
     onMergedRowsClick: () -> Unit,
 ) {
-    val selectedHeroSourceCount = items.count { it.heroSourceEnabled }
+    val selectedHeroSourceCount = items.count { it.heroSourceEnabled && it.supportsHeroSource }
     val enabledCatalogCount = items.count { it.isVisible }
 
     // Keep the custom start-screen background control immediately visible at the top.
@@ -670,7 +670,9 @@ private fun HeroSourcesDropdown(
                     }
                     SettingsSwitchRow(
                         title = item.displayTitle,
-                        description = if (!item.heroSourceEnabled &&
+                        description = if (!item.supportsHeroSource) {
+                            "CloudStream catalogs are managed independently of the Home hero."
+                        } else if (!item.heroSourceEnabled &&
                             selectedHeroSourceCount >= HomeCatalogSettingsRepository.HERO_SOURCE_SELECTION_LIMIT
                         ) {
                             stringResource(
@@ -682,8 +684,8 @@ private fun HeroSourcesDropdown(
                             item.addonName
                         },
                         checked = item.heroSourceEnabled,
-                        enabled = item.heroSourceEnabled ||
-                            selectedHeroSourceCount < HomeCatalogSettingsRepository.HERO_SOURCE_SELECTION_LIMIT,
+                        enabled = item.supportsHeroSource && (item.heroSourceEnabled ||
+                            selectedHeroSourceCount < HomeCatalogSettingsRepository.HERO_SOURCE_SELECTION_LIMIT),
                         isTablet = isTablet,
                         onCheckedChange = { HomeCatalogSettingsRepository.setHeroSourceEnabled(item.key, it) },
                     )
