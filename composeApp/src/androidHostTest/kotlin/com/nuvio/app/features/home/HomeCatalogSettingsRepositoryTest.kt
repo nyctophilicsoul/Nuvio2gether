@@ -82,6 +82,7 @@ class HomeCatalogSettingsRepositoryTest {
         HomeCatalogSettingsRepository.syncCloudStreamCatalogs(listOf(section))
         assertEquals(section.key, HomeCatalogSettingsRepository.uiState.value.items.single().key)
         assertEquals("Example Provider", HomeCatalogSettingsRepository.uiState.value.items.single().addonName)
+        assertFalse(HomeCatalogSettingsRepository.uiState.value.items.single().supportsHeroSource)
 
         HomeCatalogSettingsRepository.setEnabled(section.key, false)
         HomeCatalogSettingsRepository.syncCloudStreamCatalogs(listOf(section.copy(title = "Anime Updated")))
