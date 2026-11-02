@@ -514,25 +514,27 @@ internal fun PluginRuntimeResult.toStreamItem(
  * excluded so mirrors of the same file are collapsed, while different request headers,
  * subtitles, hashes, or filenames remain independently playable.
  */
-internal fun pluginStreamIdentity(stream: StreamItem): String {
+internal fun pluginStreamIdentity(stream: StreamItem): String =
+    crossProviderStreamIdentity(stream)
+
+/**
+ * Stable playable identity shared across providers. Provider names, repository IDs,
+ * display labels and subtitle metadata are intentionally excluded: they describe
+ * attribution, not a different video source. Request headers remain part of identity
+ * because the same URL can require different credentials or referers.
+ */
+internal fun crossProviderStreamIdentity(stream: StreamItem): String {
     val requestHeaders = stream.behaviorHints.proxyHeaders?.request.orEmpty()
         .entries
         .sortedWith(compareBy({ it.key.lowercase() }, { it.value }))
         .joinToString("\u001f") { "${it.key.lowercase()}=${it.value}" }
-    val subtitleIdentity = stream.externalSubtitles.joinToString("\u001e") { subtitle ->
-        val subtitleHeaders = subtitle.headers.orEmpty().entries
-            .sortedWith(compareBy({ it.key.lowercase() }, { it.value }))
-            .joinToString("\u001f") { "${it.key.lowercase()}=${it.value}" }
-        listOf(subtitle.url, subtitle.language, subtitle.name.orEmpty(), subtitleHeaders)
-            .joinToString("\u001d")
-    }
+    val playableUrl = stream.playableDirectUrl.orEmpty().trim()
+    val fallbackUrl = stream.url.orEmpty().trim()
     return listOf(
-        stream.url?.trim().orEmpty(),
+        (playableUrl.ifBlank { fallbackUrl }).trimEnd('/'),
         stream.infoHash?.trim()?.lowercase().orEmpty(),
         stream.externalUrl?.trim().orEmpty(),
-        stream.behaviorHints.filename.orEmpty().trim().lowercase(),
         requestHeaders,
-        subtitleIdentity,
     ).joinToString("\u001c")
 }
 
