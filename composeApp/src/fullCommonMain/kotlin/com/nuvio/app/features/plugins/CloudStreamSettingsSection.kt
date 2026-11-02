@@ -72,11 +72,6 @@ internal fun CloudStreamSettingsSection() {
     }
     val state by CloudStreamRepository.uiState.collectAsStateWithLifecycle()
     val selectedAppLanguage by ThemeSettingsRepository.selectedAppLanguage.collectAsStateWithLifecycle()
-    LaunchedEffect(state.repositories) {
-        if (selectedRepositoryUrl != null && state.repositories.none { it.manifest.sourceUrl == selectedRepositoryUrl }) {
-            selectedRepositoryUrl = null
-        }
-    }
     val copy = remember(selectedAppLanguage, CloudStreamPlatformRuntime.supportsAndroidDex) {
         CloudStreamSettingsCopy.forLanguage(selectedAppLanguage, CloudStreamPlatformRuntime.supportsAndroidDex)
     }
@@ -91,6 +86,12 @@ internal fun CloudStreamSettingsSection() {
     var message by rememberSaveable { mutableStateOf<String?>(null) }
     var bulkInstallMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var isBulkInstalling by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state.repositories) {
+        if (selectedRepositoryUrl != null && state.repositories.none { it.manifest.sourceUrl == selectedRepositoryUrl }) {
+            selectedRepositoryUrl = null
+        }
+    }
 
     val languages = remember(state.plugins) {
         state.plugins.flatMap { item -> item.metadata.language.orEmpty().split(',', ';') }
