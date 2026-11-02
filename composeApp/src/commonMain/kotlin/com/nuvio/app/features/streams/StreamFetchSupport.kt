@@ -428,6 +428,9 @@ internal suspend fun <T> runCatchingUnlessCancelled(block: suspend () -> T): Res
 // callback-based loadLinks contract, whose upstream default is measured in minutes.
 private const val CLOUDSTREAM_PROVIDER_STREAM_TIMEOUT_MS = 120_000L
 private const val CLOUDSTREAM_SEARCH_CANDIDATE_LIMIT = 3
+// Provider-ranked candidates need a wider scan because the first few cards may be
+// unrelated; each candidate is still independently verified after load().
+private const val CLOUDSTREAM_PROVIDER_RANKED_CANDIDATE_LIMIT = 10
 
 internal fun PluginRuntimeResult.toStreamItem(
     scraper: PluginScraper,
@@ -637,7 +640,7 @@ private fun List<CloudStreamSearchItem>.providerRankedCloudStreamFallbacks(
         // title (for example "Les Evades") must not be discarded solely because it is
         // different from the metadata title used for the query.
         .distinctBy { item -> item.data }
-        .take(CLOUDSTREAM_SEARCH_CANDIDATE_LIMIT)
+        .take(CLOUDSTREAM_PROVIDER_RANKED_CANDIDATE_LIMIT)
 }
 
 private fun CloudStreamSearchItem.matchScore(requestedTitle: String, requestedYear: Int?): Int? {
