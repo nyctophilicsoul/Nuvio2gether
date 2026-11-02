@@ -276,4 +276,54 @@ class CloudStreamMatchTest {
 
         assertEquals("e1", loaded.linkDataForCloudStreamRequest(request))
     }
+
+    @Test
+    fun rejectsProviderRankedUnrelatedSeriesWhenYearCannotVerifyIdentity() {
+        val request = CloudStreamSearchRequest("Breaking Bad", type = "series", year = 2008, season = null, episode = null)
+        val item = CloudStreamSearchItem("provider", "wrong", "Unrelated Series", CloudStreamTvType.TvSeries)
+        val loaded = CloudStreamLoadItem("provider", "wrong", "Unrelated Series", CloudStreamTvType.TvSeries)
+        assertFalse(loaded.matchesCloudStreamRequest(request, item, allowProviderRankedFallback = true))
+    }
+
+    @Test
+    fun acceptsLocalizedProviderRankedTitleOnlyWhenLoadedYearMatches() {
+        val request = CloudStreamSearchRequest("The Shawshank Redemption", type = "movie", year = 1994, season = null, episode = null)
+        val item = CloudStreamSearchItem("provider", "localized", "Les Evades", CloudStreamTvType.Movie)
+        val loaded = CloudStreamLoadItem("provider", "localized", "Les Evades", CloudStreamTvType.Movie, year = 1994)
+        assertTrue(loaded.matchesCloudStreamRequest(request, item, allowProviderRankedFallback = true))
+    }
+
+    @Test
+    fun rejectsExternalIdResultWithWrongTitleAndNoVerifyingYear() {
+        val request = CloudStreamSearchRequest("The Office", type = "series", year = 2005, season = null, episode = null)
+        val loaded = CloudStreamLoadItem("provider", "wrong-id", "Another Office", CloudStreamTvType.TvSeries)
+        assertFalse(loaded.matchesCloudStreamExternalIdRequest(request))
+    }
+
+    @Test
+    fun rejectsExternalIdResultWithWrongYear() {
+        val request = CloudStreamSearchRequest("The Office", type = "series", year = 2005, season = null, episode = null)
+        val loaded = CloudStreamLoadItem("provider", "wrong-year", "The Office", CloudStreamTvType.TvSeries, year = 1993)
+        assertFalse(loaded.matchesCloudStreamExternalIdRequest(request))
+    }
+
+    @Test
+    fun acceptsLocalizedExternalIdResultWhenTypeAndYearMatch() {
+        val request = CloudStreamSearchRequest("The Shawshank Redemption", type = "movie", year = 1994, season = null, episode = null)
+        val loaded = CloudStreamLoadItem("provider", "localized-id", "Les Evades", CloudStreamTvType.Movie, year = 1994)
+        assertTrue(loaded.matchesCloudStreamExternalIdRequest(request))
+    }
+
+    @Test
+    fun doesNotChooseFirstEpisodeWhenSeasonIsAmbiguous() {
+        val loaded = CloudStreamLoadItem(
+            providerId = "provider", data = "show", name = "Show", type = CloudStreamTvType.TvSeries,
+            episodes = listOf(
+                CloudStreamEpisode(data = "s1e2", name = "Episode 2", season = 1, episode = 2),
+                CloudStreamEpisode(data = "s2e2", name = "Episode 2", season = 2, episode = 2),
+            ),
+        )
+        val request = CloudStreamSearchRequest("Show", type = "series", year = null, season = null, episode = 2)
+        assertNull(loaded.linkDataForCloudStreamRequest(request))
+    }
 }
