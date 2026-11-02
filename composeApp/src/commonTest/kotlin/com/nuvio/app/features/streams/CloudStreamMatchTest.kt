@@ -333,4 +333,19 @@ class CloudStreamMatchTest {
         val loaded = CloudStreamLoadItem("provider", "yearless", "The Office", CloudStreamTvType.TvSeries)
         assertFalse(loaded.matchesCloudStreamExternalIdRequest(request))
     }
+
+    @Test
+    fun episodeTitleDoesNotResolveDuplicateEpisodeAcrossSeasons() {
+        val loaded = CloudStreamLoadItem(
+            providerId = "provider", data = "show", name = "Show", type = CloudStreamTvType.TvSeries,
+            episodes = listOf(
+                CloudStreamEpisode(data = "s1e1", name = "Pilot", season = 1, episode = 1),
+                CloudStreamEpisode(data = "s2e1", name = "Pilot", season = 2, episode = 1),
+            ),
+        )
+        val request = CloudStreamSearchRequest(
+            "Show", type = "series", year = null, season = null, episode = 1, episodeTitle = "Pilot",
+        )
+        assertNull(loaded.linkDataForCloudStreamRequest(request))
+    }
 }
