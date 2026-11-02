@@ -6,6 +6,7 @@ import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.features.search.SearchHistoryRepository
+import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_settings_page_addons
 import nuvio.composeapp.generated.resources.compose_settings_page_cloudstream
@@ -36,7 +37,25 @@ internal fun LazyListScope.contentDiscoveryContent(
             SearchHistoryRepository.ensureLoaded()
             SearchHistoryRepository.enabled
         }.collectAsStateWithLifecycle()
+        val catalogSettings by HomeCatalogSettingsRepository.uiState.collectAsStateWithLifecycle()
 
+        SettingsSection(
+            title = "Global content display",
+            isTablet = isTablet,
+        ) {
+            SettingsGroup(isTablet = isTablet) {
+                SettingsSwitchRow(
+                    title = "Hide titles without posters",
+                    description = "Hide posterless titles across Nuvio, including addon and CloudStream catalog listings.",
+                    checked = catalogSettings.hideMergedTitlesWithoutPosters,
+                    isTablet = isTablet,
+                    onCheckedChange = HomeCatalogSettingsRepository::setHideMergedTitlesWithoutPosters,
+                )
+            }
+        }
+    }
+
+    item {
         SettingsSection(
             title = stringResource(Res.string.settings_content_discovery_section_search),
             isTablet = isTablet,
