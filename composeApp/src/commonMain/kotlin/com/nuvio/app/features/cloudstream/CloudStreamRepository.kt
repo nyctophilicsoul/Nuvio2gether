@@ -49,6 +49,7 @@ data class CloudStreamUiState(
     val securityWarningAccepted: Boolean = false,
     val hideAllHomeCatalogs: Boolean = false,
     val hiddenHomeCatalogProviderIds: Set<String> = emptySet(),
+    val groupStreamsByRepository: Boolean = false,
 )
 
 sealed interface AddCloudStreamRepositoryResult {
