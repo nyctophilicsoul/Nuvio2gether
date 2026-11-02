@@ -323,91 +323,89 @@ private class AndroidDexCloudStreamProvider(
         val sections = Collections.synchronizedList(
             mutableListOf<Pair<String, List<CloudStreamSearchItem>>>(),
         )
-        var lastError: Throwable? = null
+        val errors = Collections.synchronizedList(mutableListOf<Throwable>())
         val providerSemaphore = Semaphore(3)
         providers.filter { api ->
-            // CloudStream providers should set hasMainPage, but a few extensions
-            // expose non-default MainPageData without setting the flag. Honour that
-            // explicit catalogue declaration instead of silently hiding its rows.
+            // Some providers declare categories without setting hasMainPage.
             api.hasMainPage || api.mainPage.any { data ->
                 data.name.isNotBlank() || data.data.isNotBlank()
             }
-        }.map { api -> async {
-            providerSemaphore.withPermit {
-            // MainAPI's default mainPage is a single blank MainPageData entry,
-            // not an empty list. ifEmpty() therefore does not provide a fallback.
-            // Remove placeholder entries and use the provider's base URL when it
-            // declares hasMainPage but does not define explicit categories.
-            val declaredRequests = api.mainPage.filter { data ->
-                data.name.isNotBlank() || data.data.isNotBlank()
-            }
-            val requests = declaredRequests.ifEmpty {
-                listOf(com.lagradost.cloudstream3.MainPageData(api.name, api.mainUrl, false))
-            }
-            suspend fun loadRequest(data: com.lagradost.cloudstream3.MainPageData) =
-                runCatching {
-                    withTimeout(stageTimeout(api.getMainPageTimeoutMs, DEFAULT_DISCOVERY_TIMEOUT_MS)) {
-                        api.getMainPage(
-                            page.coerceAtLeast(1),
-                            MainPageRequest(data.name, data.data, data.horizontalImages),
-                        )
+        }.map { api ->
+            async {
+                providerSemaphore.withPermit {
+                    val declaredRequests = api.mainPage.filter { data ->
+                        data.name.isNotBlank() || data.data.isNotBlank()
                     }
-                }.onSuccess { response ->
-                    response?.items.orEmpty().forEach { section ->
-                        val title = if (providers.size > 1) "${api.name} · ${section.name}" else section.name
-                        val items = section.list.map { it.toNuvioSearchItem(api) }
-                        if (items.isNotEmpty()) sections += title to items
+                    val requests = declaredRequests.ifEmpty {
+                        listOf(com.lagradost.cloudstream3.MainPageData(api.name, api.mainUrl, false))
                     }
-                }.onFailure { error ->
-                    if (error is kotlinx.coroutines.CancellationException) throw error
-                    synchronized(sections) { lastError = error }
-                    log.w(error) { "CloudStream main page failed api=${api.name}" }
-                }
+                    suspend fun loadRequest(data: com.lagradost.cloudstream3.MainPageData) {
+                        runCatching {
+                            withTimeout(stageTimeout(api.getMainPageTimeoutMs, DEFAULT_DISCOVERY_TIMEOUT_MS)) {
+                                api.getMainPage(
+                                    page.coerceAtLeast(1),
+                                    MainPageRequest(data.name, data.data, data.horizontalImages),
+                                )
+                            }
+                        }.onSuccess { response ->
+                            response?.items.orEmpty().forEach { section ->
+                                val title = if (providers.size > 1) "${api.name} · ${section.name}" else section.name
+                                val items = section.list.map { it.toNuvioSearchItem(api) }
+                                if (items.isNotEmpty()) sections += title to items
+                            }
+                        }.onFailure { error ->
+                            if (error is kotlinx.coroutines.CancellationException) throw error
+                            errors += error
+                            log.w(error) { "CloudStream main page failed api=${api.name}" }
+                        }
+                    }
 
-            if (api.sequentialMainPage) {
-                requests.forEachIndexed { index, data ->
-                    if (index > 0 && api.sequentialMainPageDelay > 0) {
-                        delay(api.sequentialMainPageDelay)
+                    if (api.sequentialMainPage) {
+                        requests.forEachIndexed { index, data ->
+                            if (index > 0 && api.sequentialMainPageDelay > 0) {
+                                delay(api.sequentialMainPageDelay)
+                            }
+                            loadRequest(data)
+                        }
+                    } else {
+                        coroutineScope {
+                            requests.map { data -> async { loadRequest(data) } }.awaitAll()
+                        }
                     }
-                    loadRequest(data)
-                }
-            } else {
-                coroutineScope {
-                    requests.map { data -> async { loadRequest(data) } }.awaitAll()
                 }
             }
-            }
-        } }.awaitAll()
-        if (sections.isEmpty()) throw lastError ?: return@withContext emptyList()
+        }.awaitAll()
+        if (sections.isEmpty()) throw errors.lastOrNull() ?: return@withContext emptyList()
         synchronized(sections) { sections.toList() }
     }
 
     override suspend fun search(query: String): List<CloudStreamSearchItem> = withContext(Dispatchers.IO) {
-        val results = mutableListOf<CloudStreamSearchItem>()
-        var lastError: Throwable? = null
         val providerSemaphore = Semaphore(3)
-        providers.map { api -> async {
-            providerSemaphore.withPermit {
-            runCatching {
-                withTimeout(stageTimeout(api.searchTimeoutMs, DEFAULT_DISCOVERY_TIMEOUT_MS)) {
-                    api.search(query, 1)?.items.orEmpty()
-                    }
-        } }.awaitAll()
-            }.onSuccess { items ->
-                log.d {
-                    "CloudStream search api=${api.name} query=$query returned=${items.size} " +
-                        "sample=${items.take(3).joinToString { it.name }}"
+        val results = providers.map { api ->
+            async {
+                providerSemaphore.withPermit {
+                    runCatching {
+                        withTimeout(stageTimeout(api.searchTimeoutMs, DEFAULT_DISCOVERY_TIMEOUT_MS)) {
+                            api.search(query, 1)?.items.orEmpty()
+                        }
+                    }.onSuccess { items ->
+                        log.d {
+                            "CloudStream search api=${api.name} query=$query returned=${items.size} " +
+                                "sample=${items.take(3).joinToString { it.name }}"
+                        }
+                    }.onFailure { error ->
+                        if (error is kotlinx.coroutines.CancellationException) throw error
+                        log.w(error) { "CloudStream search failed api=${api.name}" }
+                    }.map { items -> items.map { it.toNuvioSearchItem(api) } }
                 }
-                results += items.map { it.toNuvioSearchItem(api) }
             }
-                .onFailure { error ->
-                    if (error is kotlinx.coroutines.CancellationException) throw error
-                    lastError = error
-                    log.w(error) { "CloudStream search failed api=${api.name}" }
-                }
+        }.awaitAll()
+        val successfulResults = results.mapNotNull { it.getOrNull() }.flatten()
+        if (successfulResults.isEmpty()) {
+            val lastError = results.lastNotNullOfOrNull { it.exceptionOrNull() }
+            throw lastError ?: return@withContext emptyList()
         }
-        if (results.isEmpty()) throw lastError ?: return@withContext emptyList()
-        results.distinctBy { it.data }
+        successfulResults.distinctBy { it.data }
     }
 
     override suspend fun loadByExternalId(externalId: String): CloudStreamLoadItem? = withContext(Dispatchers.IO) {
