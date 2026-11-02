@@ -218,27 +218,43 @@ private fun weightedMerge(
     popularityWeight: Double,
     ratingWeight: Double,
 ): List<MetaPreview> {
-    val unique = if (deduplicate) sourceItems.flatten().distinctBy { it.stableKey() } else sourceItems.flatten()
-    if (unique.isEmpty()) return emptyList()
-    val freshness = percentileStringScores(unique.map { it.releaseDateKey() }, true)
-    val popularity = percentileScores(unique.map { it.popularity }, true)
-    val ratings = percentileScores(unique.map { it.ratingValue() }, true)
-    val scores = unique.indices.map { i -> freshness[i] * freshnessWeight + popularity[i] * popularityWeight + ratings[i] * ratingWeight }
-    val ranked = unique.indices.sortedWith(compareByDescending<Int> { scores[it] }.thenBy { it })
-    // Rank within a stable round-robin provider schedule to avoid one provider monopolising the front.
-    val providerByKey = mutableMapOf<String, Int>()
-    sourceItems.forEachIndexed { provider, items -> items.forEach { providerByKey.putIfAbsent(it.stableKey(), provider) } }
-    val queues = sourceItems.indices.map { provider -> ranked.filter { providerByKey[unique[it].stableKey()] == provider }.iterator() }
-    val result = ArrayList<MetaPreview>(minOf(maxItems, unique.size))
+    data class Candidate(val provider: Int, val item: MetaPreview, val order: Int)
+    val seen = mutableSetOf<String>()
+    val queues = Array(sourceItems.size) { mutableListOf<Candidate>() }
+    var order = 0
+    sourceItems.forEachIndexed { provider, items ->
+        items.forEach { item ->
+            if (!deduplicate || seen.add(item.stableKey())) {
+                queues[provider] += Candidate(provider, item, order++)
+            }
+        }
+    }
+    val all = queues.flatMap { it }
+    if (all.isEmpty()) return emptyList()
+    val freshness = percentileStringScores(all.map { it.item.releaseDateKey() }, true)
+    val popularity = percentileScores(all.map { it.item.popularity }, true)
+    val ratings = percentileScores(all.map { it.item.ratingValue() }, true)
+    var globalIndex = 0
+    queues.forEach { queue ->
+        val scored = queue.map { candidate ->
+            val score = freshness[globalIndex] * freshnessWeight +
+                popularity[globalIndex] * popularityWeight +
+                ratings[globalIndex] * ratingWeight
+            globalIndex++
+            candidate to score
+        }.sortedWith(compareByDescending<Pair<Candidate, Double>> { it.second }.thenBy { it.first.order })
+        queue.clear()
+        queue.addAll(scored.map { it.first })
+    }
     val positions = IntArray(queues.size)
+    val result = ArrayList<MetaPreview>(minOf(maxItems, all.size))
     while (result.size < maxItems) {
         var added = false
         queues.indices.forEach { provider ->
-            val queue = queues[provider]
-            if (queue.hasNext() && result.size < maxItems) {
-                result += unique[queue.next()]
-                added = true
-            }
+            val candidate = queues[provider].getOrNull(positions[provider]) ?: return@forEach
+            result += candidate.item
+            positions[provider]++
+            added = true
         }
         if (!added) break
     }
