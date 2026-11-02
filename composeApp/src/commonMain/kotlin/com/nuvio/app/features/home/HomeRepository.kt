@@ -324,9 +324,9 @@ object HomeRepository {
                     deduplicate = mergedRow.deduplicate,
                     maxItems = HOME_MERGED_ROW_ITEM_LIMIT,
                     blendMode = mergedRow.resolvedBlendMode(),
-                    sortMode = mergedRow.resolvedSortMode(),
+                    sortMode = MergedHomeRowSortMode.OFF,
                     contentType = contentType,
-                    hideTitlesWithoutPosters = mergedRow.hideTitlesWithoutPosters,
+                    hideTitlesWithoutPosters = snapshot.hideMergedTitlesWithoutPosters || mergedRow.hideTitlesWithoutPosters,
                 )
                 val hasMore = sourceSections.any(HomeCatalogSection::hasMore)
                 // Keep the home entry reachable when the preview page has no items matching
@@ -348,7 +348,7 @@ object HomeRepository {
                             val sourceItems = filterMergedHomeItems(
                                 items = source.items,
                                 contentType = contentType,
-                                hideTitlesWithoutPosters = mergedRow.hideTitlesWithoutPosters,
+                                hideTitlesWithoutPosters = snapshot.hideMergedTitlesWithoutPosters || mergedRow.hideTitlesWithoutPosters,
                             )
                             add(
                                 HomeCatalogTab(
