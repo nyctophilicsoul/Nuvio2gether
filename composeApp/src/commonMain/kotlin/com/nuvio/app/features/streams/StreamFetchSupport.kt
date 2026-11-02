@@ -494,7 +494,11 @@ internal fun pluginStreamIdentity(stream: StreamItem): String {
         .sortedWith(compareBy({ it.key.lowercase() }, { it.value }))
         .joinToString("\u001f") { "${it.key.lowercase()}=${it.value}" }
     val subtitleIdentity = stream.externalSubtitles.joinToString("\u001e") { subtitle ->
-        listOf(subtitle.url, subtitle.language, subtitle.name.orEmpty()).joinToString("\u001d")
+        val subtitleHeaders = subtitle.headers.orEmpty().entries
+            .sortedWith(compareBy({ it.key.lowercase() }, { it.value }))
+            .joinToString("\u001f") { "${it.key.lowercase()}=${it.value}" }
+        listOf(subtitle.url, subtitle.language, subtitle.name.orEmpty(), subtitleHeaders)
+            .joinToString("\u001d")
     }
     return listOf(
         stream.url?.trim().orEmpty(),
