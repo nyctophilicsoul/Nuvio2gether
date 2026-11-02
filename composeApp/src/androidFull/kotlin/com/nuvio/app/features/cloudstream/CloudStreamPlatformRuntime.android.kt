@@ -79,6 +79,29 @@ internal actual object CloudStreamPlatformRuntime {
         }
     }
 
+    actual suspend fun openSettings(plugin: CloudStreamPluginItem): Boolean {
+        if (plugin.compatibility.runtimeKind != CloudStreamRuntimeKind.AndroidDex || !plugin.isInstalled) {
+            return false
+        }
+
+        // Loading is lazy, just like provider discovery. This also guarantees the plugin
+        // instance and its openSettings callback belong to the currently installed package.
+        provider(plugin)
+        val loadedPlugin = synchronized(loadedLock) { loaded[plugin.metadata.id.value] }
+            ?: return false
+        val cloudStreamPlugin = loadedPlugin.instance as? Plugin ?: return false
+        val callback = cloudStreamPlugin.openSettings ?: return false
+        val context = activityReference?.get() ?: appContext ?: return false
+
+        return try {
+            callback.invoke(context)
+            true
+        } catch (error: Throwable) {
+            log.e(error) { "Failed to open CloudStream settings id=${plugin.metadata.id.value}" }
+            false
+        }
+    }
+
     actual fun unload(pluginId: String) {
         synchronized(loadedLock) { loaded.remove(pluginId) }?.unload()
         val remainingContext = synchronized(loadedLock) { loaded.values.lastOrNull()?.context }
