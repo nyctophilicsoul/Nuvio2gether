@@ -70,6 +70,7 @@ import com.nuvio.app.core.ui.NuvioCardDepthSurface
 import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.PosterCardStyleRepository
 import com.nuvio.app.core.ui.PosterCardStyleUiState
+import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.core.ui.cardDepthVisual
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_reset
@@ -155,6 +156,8 @@ internal fun LazyListScope.posterCustomizationSettingsContent(
     uiState: PosterCardStyleUiState,
 ) {
     item {
+        HomeCatalogSettingsRepository.ensureLoaded()
+        val catalogSettings by HomeCatalogSettingsRepository.uiState.collectAsState()
         SettingsSection(
             title = stringResource(Res.string.settings_poster_card_style),
             isTablet = isTablet,
@@ -178,6 +181,14 @@ internal fun LazyListScope.posterCustomizationSettingsContent(
                     onCatalogLandscapeModeChange = PosterCardStyleRepository::setCatalogLandscapeModeEnabled,
                     onHideLabelsChange = PosterCardStyleRepository::setHideLabelsEnabled,
                     onAlwaysShowLandscapeClearlogoChange = PosterCardStyleRepository::setAlwaysShowLandscapeClearlogo,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = "Hide titles without posters",
+                    description = "Hide posterless titles across Nuvio, including addon and CloudStream catalog listings.",
+                    checked = catalogSettings.hideMergedTitlesWithoutPosters,
+                    isTablet = isTablet,
+                    onCheckedChange = HomeCatalogSettingsRepository::setHideMergedTitlesWithoutPosters,
                 )
             }
         }
