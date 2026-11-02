@@ -1418,8 +1418,6 @@ internal fun MainAppContent(
                                         streamTitle = channel.name,
                                         providerName = "Live TV",
                                         providerAddonId = "live-tv",
-                                        contentType = "live",
-                                        videoId = channel.id,
                                         parentMetaId = channel.id,
                                         parentMetaType = "live-tv",
                                     )
