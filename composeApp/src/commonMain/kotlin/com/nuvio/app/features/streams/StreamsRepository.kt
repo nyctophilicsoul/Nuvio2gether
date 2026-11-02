@@ -712,6 +712,46 @@ object StreamsRepository {
                         publishAddonGroupAfterCacheCheck(result)
                     }
 
+                    is StreamLoadCompletion.CloudStreamProvider -> {
+                        val remaining = (cloudStreamRemainingByAddonId[completion.addonId] ?: 1) - 1
+                        cloudStreamRemainingByAddonId[completion.addonId] = remaining.coerceAtLeast(0)
+                        if (!completion.error.isNullOrBlank() &&
+                            cloudStreamFirstErrorByAddonId[completion.addonId].isNullOrBlank()
+                        ) {
+                            cloudStreamFirstErrorByAddonId[completion.addonId] = completion.error
+                        }
+                        _uiState.update { current ->
+                            val updated = StreamAutoPlaySelector.orderAddonStreams(
+                                groups = current.groups.map { group ->
+                                    if (group.addonId != completion.addonId) {
+                                        group
+                                    } else {
+                                        val mergedStreams = group.streams + completion.streams
+                                        val stillLoading = remaining > 0
+                                        group.copy(
+                                            streams = if (stillLoading) mergedStreams else mergedStreams.sortedForGroupedDisplay(),
+                                            isLoading = stillLoading,
+                                            error = if (mergedStreams.isEmpty() && !stillLoading) {
+                                                cloudStreamFirstErrorByAddonId[completion.addonId]
+                                            } else {
+                                                null
+                                            },
+                                        )
+                                    }
+                                },
+                                installedOrder = installedAddonOrder,
+                                preferredGroupIds = preferredGroupIds,
+                            )
+                            val anyLoading = updated.any { it.isLoading }
+                            current.copy(
+                                groups = updated,
+                                isAnyLoading = anyLoading,
+                                emptyStateReason = updated.toEmptyStateReason(anyLoading),
+                            )
+                        }
+                        updateAutoPlayAfterStreamsChanged()
+                    }
+
                     is StreamLoadCompletion.PluginScraper -> {
                         val uniquePluginStreams = completion.streams.filter { stream ->
                             seenPluginStreamIdentities.add(pluginStreamIdentity(stream))
