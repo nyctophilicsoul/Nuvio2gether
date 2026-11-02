@@ -335,7 +335,7 @@ object StreamsRepository {
                     streams = emptyList(),
                     isLoading = true,
                 )
-            } + cloudStreamProviderGroups.map { providerGroup ->
+            } + cloudStreamProviderGroups.distinctBy { it.addonId }.map { providerGroup ->
                 AddonStreamGroup(
                     addonName = providerGroup.addonName,
                     addonId = providerGroup.addonId,
@@ -364,6 +364,11 @@ object StreamsRepository {
                 .associate { it.addonId to it.scrapers.size }
                 .toMutableMap()
             val pluginFirstErrorByAddonId = mutableMapOf<String, String>()
+            val cloudStreamRemainingByAddonId = cloudStreamProviderGroups
+                .groupingBy { it.addonId }
+                .eachCount()
+                .toMutableMap()
+            val cloudStreamFirstErrorByAddonId = mutableMapOf<String, String>()
             val seenPluginStreamIdentities = mutableSetOf<String>()
             val totalTasks = streamAddons.size +
                 pluginProviderGroups.sumOf { it.scrapers.size } +
@@ -689,7 +694,14 @@ object StreamsRepository {
                         providerGroup = providerGroup,
                         request = cloudStreamSearchRequest,
                     )
-                    publishCompletion(StreamLoadCompletion.Addon(group))
+                    publishCompletion(
+                        StreamLoadCompletion.CloudStreamProvider(
+                            addonId = providerGroup.addonId,
+                            addonName = providerGroup.addonName,
+                            streams = group.streams,
+                            error = group.error,
+                        ),
+                    )
                 }
             }
 
