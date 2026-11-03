@@ -61,10 +61,12 @@ internal class TelegramStreamingProxy(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mutex = Mutex()
     private val requestStates = mutableMapOf<Int, ActiveRequests>()
-    private val registeredFileIds = mutableSetOf<Int>().apply {
+    private val registeredFileIds = mutableSetOf<Int>().also { ids ->
         runCatching {
-            fileRegistry.takeIf(File::exists)?.forEachLine { line ->
-                line.trim().toIntOrNull()?.takeIf { it > 0 }?.let(::add)
+            if (fileRegistry.exists()) {
+                fileRegistry.forEachLine { line ->
+                    line.trim().toIntOrNull()?.takeIf { it > 0 }?.let(ids::add)
+                }
             }
         }.onFailure { error -> Log.w(TAG, "Could not restore Telegram proxy file registry", error) }
     }
@@ -175,7 +177,10 @@ internal class TelegramStreamingProxy(
         }
         deletable.forEach { fileId ->
             deleteFile(fileId)
-            synchronized(registeredFileIds) { registeredFileIds.remove(fileId) }
+            synchronized(registeredFileIds) {
+                registeredFileIds.remove(fileId)
+                persistFileRegistryLocked()
+            }
             synchronized(mimeTypes) { mimeTypes.remove(fileId) }
         }
     }
