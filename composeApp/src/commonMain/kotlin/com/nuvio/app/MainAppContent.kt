@@ -87,6 +87,7 @@ import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.platformExitApp
 import com.nuvio.app.features.addons.AddAddonResult
 import com.nuvio.app.features.addons.AddonRepository
+import com.nuvio.app.features.cloudstream.CloudStreamRepository
 import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.addons.isWaitingForFirstEnabledManifest
 import com.nuvio.app.features.plugins.PluginRepository
@@ -251,8 +252,9 @@ internal fun MainAppContent(
         LaunchedEffect(ownsAppRuntime) {
             if (!ownsAppRuntime) return@LaunchedEffect
             AddonRepository.initialize()
-            AddonRepository.refreshAll()
             PluginRepository.refreshAll()
+            CloudStreamRepository.initialize()
+            CloudStreamRepository.refreshAll()
         }
         val hapticFeedback = LocalHapticFeedback.current
         val focusManager = LocalFocusManager.current
@@ -395,16 +397,17 @@ internal fun MainAppContent(
     val homeCatalogRefreshKey = remember(addonsUiState.addons) {
         buildAddonCatalogRefreshSignature(addonsUiState.addons)
     }
+    val addonsWaitingForFirstManifest = addonsUiState.addons.isWaitingForFirstEnabledManifest()
 
     val serversUiState by remember {
         ServerRepository.ensureLoaded()
         ServerRepository.uiState
     }.collectAsStateWithLifecycle()
 
-    LaunchedEffect(appContentGeneration, homeCatalogRefreshKey, serversUiState.revision) {
+    LaunchedEffect(appContentGeneration, homeCatalogRefreshKey, serversUiState.revision, addonsWaitingForFirstManifest) {
         if (!ownsAppRuntime) return@LaunchedEffect
         val enabledAddons = addonsUiState.addons.enabledAddons()
-        if (enabledAddons.isWaitingForFirstEnabledManifest()) return@LaunchedEffect
+        if (addonsWaitingForFirstManifest) return@LaunchedEffect
         HomeCatalogSettingsRepository.syncCatalogs(enabledAddons)
         HomeRepository.refresh(enabledAddons)
     }

@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.serialization.encodeToString
@@ -34,6 +36,7 @@ actual object CloudStreamRepository {
     private var initialized = false
     private var currentProfileId = 1
     private val refreshJobs = mutableMapOf<String, Job>()
+    private val repositoryRefreshSemaphore = Semaphore(2)
 
     private fun profileGenerationSnapshot(): Long = synchronized(profileLock) { profileGeneration }
 
@@ -181,7 +184,7 @@ actual object CloudStreamRepository {
                     job = scope.launch(start = CoroutineStart.LAZY) {
                         try {
                             val refreshed = try {
-                                fetchRepository(normalizedUrl)
+                                repositoryRefreshSemaphore.withPermit { fetchRepository(normalizedUrl) }
                             } catch (error: CancellationException) {
                                 commitForProfile(expectedProfileGeneration) {
                                     if (refreshJobs[normalizedUrl] === job) {
@@ -218,6 +221,7 @@ actual object CloudStreamRepository {
                                 return@launch
                             }
 
+                            var applied = false
                             commitForProfile(expectedProfileGeneration) {
                                 if (
                                     refreshJobs[normalizedUrl] === job &&
@@ -225,8 +229,10 @@ actual object CloudStreamRepository {
                                 ) {
                                     applyRepositoryRefresh(refreshed.first, refreshed.second)
                                     persist()
+                                    applied = true
                                 }
                             }
+                            if (applied) HomeRepository.applyCurrentSettings()
                         } finally {
                             commitForProfile(expectedProfileGeneration) {
                                 if (refreshJobs[normalizedUrl] === job) refreshJobs.remove(normalizedUrl)

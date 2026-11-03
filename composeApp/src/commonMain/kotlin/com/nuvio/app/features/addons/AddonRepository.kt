@@ -8,7 +8,10 @@ import com.nuvio.app.features.profiles.ProfileRepository
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.postgrest.rpc
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -21,6 +24,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -59,6 +64,8 @@ object AddonRepository {
     private var initialized = false
     private var currentProfileId: Int = 1
     private val activeRefreshJobs = mutableMapOf<String, Job>()
+    private val activeRefreshJobsLock = SynchronizedObject()
+    private val refreshSemaphore = Semaphore(3)
     private val pushJobsByProfile = mutableMapOf<Int, Job>()
 
     fun initialize() {
@@ -87,7 +94,7 @@ object AddonRepository {
             val existing = existingByUrl[manifestUrl]
             val addon = _uiState.value.addons.firstOrNull { it.manifestUrl == manifestUrl }
             if (addon?.enabled == true && (existing == null || (addon.manifest == null && !addon.isRefreshing))) {
-                refreshAddon(manifestUrl)
+                refreshAddon(manifestUrl, forceRefresh = true)
             }
         }
     }
@@ -192,6 +199,8 @@ object AddonRepository {
                     payload = payload,
                 )
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (error: Throwable) {
             return AddAddonResult.Error(error.message ?: getString(Res.string.addon_load_manifest_failed))
         }
@@ -221,6 +230,10 @@ object AddonRepository {
             if (changed) current.copy(addons = updatedAddons) else current
         }
         if (!changed) return
+        val refreshJob = synchronized(activeRefreshJobsLock) {
+            activeRefreshJobs.remove(manifestUrl)
+        }
+        refreshJob?.cancel()
         persist()
         pushToServer()
     }
@@ -288,37 +301,32 @@ object AddonRepository {
         forceRefresh: Boolean = false,
         notifyOnSuccess: Boolean = false,
     ) {
-        val existingJob = activeRefreshJobs[manifestUrl]
-        if (existingJob?.isActive == true) return
-
-        markRefreshing(manifestUrl)
-        var refreshJob: Job? = null
-        refreshJob = scope.launch {
-            try {
-                val result = runCatching {
-                    val payload = fetchAddonResponseText(
-                        url = manifestUrl,
-                        forceRefresh = forceRefresh,
-                    )
-                    AddonManifestParser.parse(
-                        manifestUrl = manifestUrl,
-                        payload = payload,
-                    )
-                }
-
-                _uiState.update { current ->
-                    current.copy(
-                        addons = current.addons.map { addon ->
-                            if (addon.manifestUrl != manifestUrl) {
-                                addon
-                            } else {
-                                result.fold(
+        var jobToStart: Job? = null
+        synchronized(activeRefreshJobsLock) {
+            val existingJob = activeRefreshJobs[manifestUrl]
+            if (existingJob != null && !existingJob.isCompleted) return
+            markRefreshing(manifestUrl)
+            lateinit var refreshJob: Job
+            refreshJob = scope.launch(start = CoroutineStart.LAZY) {
+                try {
+                    val result: Result<AddonManifest> = try {
+                        refreshSemaphore.withPermit {
+                            val payload = fetchAddonResponseText(url = manifestUrl, forceRefresh = forceRefresh)
+                            Result.success(AddonManifestParser.parse(manifestUrl = manifestUrl, payload = payload))
+                        }
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Throwable) {
+                        log.w(error) { "refreshAddon() failed manifestUrl=" + manifestUrl }
+                        Result.failure(error)
+                    }
+                    _uiState.update { current ->
+                        current.copy(
+                            addons = current.addons.map { addon ->
+                                if (addon.manifestUrl != manifestUrl) addon
+                                else result.fold(
                                     onSuccess = { manifest ->
-                                        addon.copy(
-                                            manifest = manifest,
-                                            isRefreshing = false,
-                                            errorMessage = null,
-                                        )
+                                        addon.copy(manifest = manifest, isRefreshing = false, errorMessage = null)
                                     },
                                     onFailure = { error ->
                                         addon.copy(
@@ -327,20 +335,22 @@ object AddonRepository {
                                         )
                                     },
                                 )
-                            }
-                        },
-                    )
-                }
-                if (notifyOnSuccess && result.isSuccess) {
-                    NuvioToastController.show(getString(Res.string.addons_and_plugins_refreshed))
-                }
-            } finally {
-                if (activeRefreshJobs[manifestUrl] === refreshJob) {
-                    activeRefreshJobs.remove(manifestUrl)
+                            },
+                        )
+                    }
+                    if (notifyOnSuccess && result.isSuccess) {
+                        NuvioToastController.show(getString(Res.string.addons_and_plugins_refreshed))
+                    }
+                } finally {
+                    synchronized(activeRefreshJobsLock) {
+                        if (activeRefreshJobs[manifestUrl] === refreshJob) activeRefreshJobs.remove(manifestUrl)
+                    }
                 }
             }
+            activeRefreshJobs[manifestUrl] = refreshJob
+            jobToStart = refreshJob
         }
-        activeRefreshJobs[manifestUrl] = refreshJob
+        jobToStart?.start()
     }
 
     private fun pushToServer() {
@@ -416,8 +426,10 @@ object AddonRepository {
             .mapKeys { (url, _) -> ensureManifestSuffix(url) }
 
     private fun cancelActiveRefreshes() {
-        activeRefreshJobs.values.forEach(Job::cancel)
-        activeRefreshJobs.clear()
+        val jobs = synchronized(activeRefreshJobsLock) {
+            activeRefreshJobs.values.toList().also { activeRefreshJobs.clear() }
+        }
+        jobs.forEach(Job::cancel)
     }
 
     private fun resolveEffectiveProfileId(profileId: Int): Int {

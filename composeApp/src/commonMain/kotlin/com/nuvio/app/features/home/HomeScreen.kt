@@ -103,6 +103,7 @@ import com.nuvio.app.features.watching.domain.isReleasedBy
 import com.nuvio.app.features.collection.CollectionRepository
 import com.nuvio.app.features.cloudstream.CloudStreamRepository
 import com.nuvio.app.features.profiles.ProfileRepository
+import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.home.components.HomeCollectionRowSection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -206,6 +207,9 @@ fun HomeScreen(
             NetworkCondition.Online -> {
                 if (observedOfflineState) {
                     observedOfflineState = false
+                    AddonRepository.refreshAll()
+                    PluginRepository.refreshAll()
+                    CloudStreamRepository.refreshAll()
                     HomeRepository.refresh(addonsUiState.addons.enabledAddons(), force = true)
                 }
             }

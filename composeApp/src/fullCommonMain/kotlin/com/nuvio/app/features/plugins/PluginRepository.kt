@@ -25,7 +25,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
@@ -91,6 +93,7 @@ actual object PluginRepository {
     private var currentProfileId = 1
     private val profileLock = SynchronizedObject()
     private val activeRefreshJobs = mutableMapOf<String, Job>()
+    private val repositoryRefreshSemaphore = Semaphore(2)
     private val activeRefreshJobsLock = SynchronizedObject()
     private val serverPushLock = SynchronizedObject()
     private val latestServerPushRevisionByProfile = mutableMapOf<Int, Long>()
@@ -390,7 +393,11 @@ actual object PluginRepository {
                     refreshJob = scope.launch(start = CoroutineStart.LAZY) {
                         try {
                             val result = try {
-                                Result.success(fetchRepositoryData(manifestUrl, snapshot.profileId, snapshot.previousScrapers))
+                                Result.success(
+                                    repositoryRefreshSemaphore.withPermit {
+                                        fetchRepositoryData(manifestUrl, snapshot.profileId, snapshot.previousScrapers)
+                                    },
+                                )
                             } catch (cancelled: CancellationException) {
                                 throw cancelled
                             } catch (error: Throwable) {

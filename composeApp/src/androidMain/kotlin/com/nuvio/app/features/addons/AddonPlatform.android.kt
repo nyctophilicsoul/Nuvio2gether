@@ -26,6 +26,7 @@ import java.io.File
 import java.io.InputStream
 import kotlin.text.Charsets
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.coroutineContext
 
 actual object AddonStorage {
     private const val preferencesName = "nuvio_addons"
@@ -208,15 +209,26 @@ private suspend fun executeTextRequest(
         builder.method(normalizedMethod, null)
     }.build()
 
-    AddonHttpClientProvider.get().newCall(request).execute().use { response ->
-        val payload = readResponseBody(response.body)
-        if (!response.isSuccessful) {
-            error(runBlocking { getString(Res.string.network_request_failed_http, response.code) })
+    val call = AddonHttpClientProvider.get().newCall(request)
+    val cancelHandle = coroutineContext[Job]?.invokeOnCompletion { cause ->
+        if (cause is CancellationException) call.cancel()
+    }
+    try {
+        call.execute().use { response ->
+            val payload = readResponseBody(response.body)
+            if (!response.isSuccessful) {
+                error(runBlocking { getString(Res.string.network_request_failed_http, response.code) })
+            }
+            if (payload.isBlank()) {
+                throw IllegalStateException(runBlocking { getString(Res.string.network_empty_response_body) })
+            }
+            payload
         }
-        if (payload.isBlank()) {
-            throw IllegalStateException(runBlocking { getString(Res.string.network_empty_response_body) })
-        }
-        payload
+    } catch (error: IOException) {
+        if (call.isCanceled()) throw CancellationException("Cancelled HTTP request", error)
+        throw error
+    } finally {
+        cancelHandle?.dispose()
     }
 }
 
