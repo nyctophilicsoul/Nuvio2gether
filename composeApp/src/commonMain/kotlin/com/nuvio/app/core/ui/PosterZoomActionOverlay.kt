@@ -43,7 +43,6 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.drawOutline
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -614,7 +613,7 @@ fun NuvioMediaActionOverlay(
 fun Modifier.nuvioKeyboardFocusIndicator(
     shape: androidx.compose.ui.graphics.Shape,
     enabled: Boolean = true,
-): Modifier = androidx.compose.ui.composed {
+): Modifier = composed {
     var isFocused by remember { mutableStateOf(false) }
     val density = androidx.compose.ui.platform.LocalDensity.current
     val layoutDirection = androidx.compose.ui.platform.LocalLayoutDirection.current
