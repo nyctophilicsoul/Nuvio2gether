@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -470,7 +471,12 @@ object TraktAuthRepository : TrackingAuthProvider {
             createdAt = parsed.createdAt,
             expiresIn = parsed.expiresIn,
         )
-        persist(profileId)
+        val persisted = withContext(Dispatchers.IO) {
+            TraktAuthStorage.savePayloadDurably(profileId, json.encodeToString(authState))
+        }
+        if (!persisted) {
+            log.e { "Failed to durably persist the rotated Trakt token pair for profile $profileId" }
+        }
         publish()
         true
     }
