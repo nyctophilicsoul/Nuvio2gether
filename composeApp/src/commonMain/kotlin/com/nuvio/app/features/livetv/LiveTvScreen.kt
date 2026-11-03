@@ -60,6 +60,7 @@ import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.nuvioKeyboardFocusIndicator
 import com.nuvio.app.features.settings.NuvioEnhancedBackupFileBridge
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.live_tv_add_source
@@ -261,7 +262,13 @@ fun LiveTvScreen(
     }
     val playChannel: (LiveTvChannel) -> Unit = { channel ->
         scope.launch {
-            onChannelClick(LiveTvRepository.prepareForPlayback(channel))
+            try {
+                onChannelClick(LiveTvRepository.prepareForPlayback(channel))
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                LiveTvRepository.reportPlaybackError(error)
+            }
         }
     }
 
@@ -424,6 +431,23 @@ fun LiveTvScreen(
                     }
                 },
             )
+        }
+
+        if (
+            !editingSource &&
+            uiState.channels.isNotEmpty() &&
+            !uiState.errorMessage.isNullOrBlank()
+        ) {
+            item {
+                Text(
+                    text = uiState.errorMessage.orEmpty(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.nuvio.colors.danger,
+                )
+            }
         }
 
         if (editingSource || uiState.sourceUrl.isBlank()) {
