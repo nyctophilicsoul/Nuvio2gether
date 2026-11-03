@@ -46,6 +46,7 @@ import com.nuvio.app.features.servers.ServerStreams
 import com.nuvio.app.features.livetv.LiveTvRepository
 import com.nuvio.app.features.streams.streamAddonInstanceId
 import com.nuvio.app.isIos
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -689,7 +690,16 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
         currentStreamUrl = activeSourceUrl,
         onChannelSelected = { channel ->
             scope.launch {
-                switchToLiveTvChannel(LiveTvRepository.prepareForPlayback(channel))
+                try {
+                    switchToLiveTvChannel(LiveTvRepository.prepareForPlayback(channel))
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    showLiveTvChannelsPanel = false
+                    errorMessage = error.message?.takeIf(String::isNotBlank)
+                        ?: "Could not prepare this channel for playback."
+                    controlsVisible = !playerControlsLocked
+                }
             }
         },
         onDismiss = {
