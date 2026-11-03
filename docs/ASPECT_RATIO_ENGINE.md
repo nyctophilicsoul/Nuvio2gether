@@ -17,7 +17,7 @@ For corrected source dimensions Ws = Wc * SAR, Hs = Hc, and viewport Wv,Hv:
 Best Fit uses corrected DAR and sFit. Fit uses coded square-pixel geometry and sFit. Full uses independent scales sx = Wv / Ws and sy = Hv / Hs. Zoom uses corrected DAR and sZoom. 16:9 replaces source DAR with 16/9 before fitting.
 
 ## Five modes
-| Mode | Geometry source | Scale policy | Crop | Distortion |
+| Player / mode family | Modes / controls | DAR/SAR correction | Crop behavior | Subtitle behavior | Cost / overhead |\n|---|---|---|---|---|---|\n| VLC / LibVLC | Auto fit, scale factor, aspect override, crop ratio/window | Decoder/video-output metadata plus explicit aspect override | Separate crop ratio/window; crop and aspect override are not interchangeable | Video/subtitle output is engine-managed; crop may alter subtitle positioning depending on output/filter path | Usually video-output scaling; behavior depends on platform vout and hardware path |\n| Media3 / ExoPlayer | FIT, FIXED_WIDTH, FIXED_HEIGHT, FILL, ZOOM | VideoSize.pixelWidthHeightRatio / Format pixel ratio informs DAR | FIT letterboxes; ZOOM expands measured content frame; FILL stretches | SubtitleView is attached to PlayerView/content frame | SurfaceView path is efficient; TextureView/matrix transforms may require GPU composition |\n| mpv / libmpv | aspect override, unscaled, panscan, zoom, align | container/bitstream/ignore selection and explicit override | panscan / zoom / crop options | mpv OSD/libass generally follows mpv video output transform | GPU video output; scaler and hwdec choice affect performance |\n\n| Nuvio mode | Geometry source | Scale policy | Crop | Distortion |
 |---|---|---|---|---|
 | Best Fit (default) | Bitstream/container DAR and SAR | Uniform min scale | No | No |
 | Fit | Coded width/height, square-pixel interpretation | Uniform min scale | No | No |
@@ -27,7 +27,7 @@ Best Fit uses corrected DAR and sFit. Fit uses coded square-pixel geometry and s
 
 There is no universally safe crop threshold. Crop fraction can be reported as a diagnostic, but must not block Zoom. For automated recommendations, a warning above 15% cropped source area can be explored as a UX heuristic, not a standards-derived or community-consensus limit.
 
-## Engine mapping
+## VLC / LibVLC notes\n\nVLC exposes distinct aspect-ratio override, scale, and crop controls. `libvlc_video_set_aspect_ratio()` changes the requested display aspect ratio; `libvlc_video_set_scale()` sets a scale factor (zero requests automatic fitting); LibVLC 4 adds crop-ratio/window APIs. Desktop UI presets such as 4:3, 16:9 and 2.35:1 are not all the same operation: selecting a display aspect ratio can reshape the image, while selecting Crop removes pixels to fit the chosen crop window. VLC's default/automatic fit should preserve the source geometry.\n\n## Engine mapping
 ### Media3 / ExoPlayer
 - Best Fit: RESIZE_MODE_FIT; use Media3 corrected VideoSize.pixelWidthHeightRatio / Format.pixelWidthHeightRatio.
 - Fit: RESIZE_MODE_FIT with coded width/height ratio supplied to the content frame, deliberately bypassing SAR correction.
