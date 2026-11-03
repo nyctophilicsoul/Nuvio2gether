@@ -71,7 +71,7 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
     override val snapshot: StateFlow<TelegramIntegrationSnapshot> = _snapshot.asStateFlow()
 
     init {
-        proxy.start()
+        // The loopback server starts lazily when a Telegram stream URL is registered.
         tdClient.authState.collectInBackground()
         if (preferences.getInt(API_ID, 0) > 0 &&
             preferences.getString(API_HASH, "").orEmpty().matches(Regex("[a-fA-F0-9]{32}"))
