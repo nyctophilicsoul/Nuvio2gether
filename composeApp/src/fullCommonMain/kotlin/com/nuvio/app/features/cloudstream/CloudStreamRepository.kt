@@ -836,15 +836,15 @@ actual object CloudStreamRepository {
             val manifestUrl = runCatching { normalizeCloudStreamRepositoryUrl(repository.manifestUrl) }
                 .getOrDefault(repository.manifestUrl)
             CloudStreamRepositoryItem(
-                CloudStreamRepositoryManifest(
+                manifest = CloudStreamRepositoryManifest(
                     sourceUrl = manifestUrl,
                     name = repository.name,
                     description = repository.description,
                     iconUrl = repository.iconUrl,
                     manifestVersion = repository.manifestVersion,
                     pluginListUrls = repository.pluginListUrls,
-                    lastRefreshedAtEpochMs = repository.lastRefreshedAtEpochMs,
                 ),
+                lastRefreshedAtEpochMs = repository.lastRefreshedAtEpochMs,
             )
         }
         val plugins = stored.plugins.map { plugin ->
