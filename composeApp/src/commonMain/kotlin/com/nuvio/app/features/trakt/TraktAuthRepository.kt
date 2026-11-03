@@ -471,8 +471,11 @@ object TraktAuthRepository : TrackingAuthProvider {
             createdAt = parsed.createdAt,
             expiresIn = parsed.expiresIn,
         )
+        // Capture the profile's complete rotated token pair before suspending so a
+        // concurrent profile switch cannot serialize a different profile's auth state.
+        val refreshedPayload = json.encodeToString(authState)
         val persisted = withContext(Dispatchers.IO) {
-            TraktAuthStorage.savePayloadDurably(profileId, json.encodeToString(authState))
+            TraktAuthStorage.savePayloadDurably(profileId, refreshedPayload)
         }
         if (!persisted) {
             log.e { "Failed to durably persist the rotated Trakt token pair for profile $profileId" }
