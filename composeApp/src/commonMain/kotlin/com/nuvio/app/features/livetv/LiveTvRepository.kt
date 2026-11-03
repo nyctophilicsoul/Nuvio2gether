@@ -112,7 +112,7 @@ object LiveTvRepository {
     suspend fun load(sourceUrl: String): Result<List<LiveTvChannel>> {
         if (!featureEnabled) return liveTvDisabledResult()
         val normalizedUrl = sourceUrl.trim()
-        if (!normalizedUrl.startsWith("http://") && !normalizedUrl.startsWith("https://")) {
+        if (!normalizedUrl.startsWith("http://", ignoreCase = true) && !normalizedUrl.startsWith("https://")) {
             val error = IllegalArgumentException("Geçerli bir HTTP veya HTTPS M3U bağlantısı girin.")
             mutableUiState.value = mutableUiState.value.copy(errorMessage = error.message)
             return Result.failure(error)
@@ -179,7 +179,9 @@ object LiveTvRepository {
             loadEpgInBackground(normalizedUrl, playlist.epgUrls)
             channels
         }.onFailure { error ->
-            mutableUiState.value = mutableUiState.value.copy(
+            
+            if (error is CancellationException) throw error
+mutableUiState.value = mutableUiState.value.copy(
                 isLoading = false,
                 isLoaded = mutableUiState.value.channels.isNotEmpty(),
                 errorMessage = error.message ?: "M3U listesi yüklenemedi.",
@@ -227,7 +229,9 @@ object LiveTvRepository {
             loadEpgInBackground(displayName, playlist.epgUrls)
             channels
         }.onFailure { error ->
-            mutableUiState.value = mutableUiState.value.copy(
+            
+            if (error is CancellationException) throw error
+mutableUiState.value = mutableUiState.value.copy(
                 isLoading = false,
                 isLoaded = mutableUiState.value.channels.isNotEmpty(),
                 errorMessage = error.message ?: "M3U dosyası yüklenemedi.",
@@ -257,7 +261,7 @@ object LiveTvRepository {
             mutableUiState.value = mutableUiState.value.copy(errorMessage = error.message)
             return Result.failure(error)
         }
-        if (!normalizedSettings.portalUrl.startsWith("http://") && !normalizedSettings.portalUrl.startsWith("https://")) {
+        if (!normalizedSettings.portalUrl.startsWith("http://", ignoreCase = true) && !normalizedSettings.portalUrl.startsWith("https://")) {
             val error = IllegalArgumentException("Geçerli bir HTTP veya HTTPS portal bağlantısı girin.")
             mutableUiState.value = mutableUiState.value.copy(errorMessage = error.message)
             return Result.failure(error)
@@ -292,7 +296,9 @@ object LiveTvRepository {
             loadEpgInBackground(normalizedSettings.portalUrl, emptyList())
             channels
         }.onFailure { error ->
-            mutableUiState.value = mutableUiState.value.copy(
+            
+            if (error is CancellationException) throw error
+mutableUiState.value = mutableUiState.value.copy(
                 isLoading = false,
                 isLoaded = mutableUiState.value.channels.isNotEmpty(),
                 errorMessage = error.message ?: "Stalker Portal yüklenemedi.",
@@ -308,7 +314,7 @@ object LiveTvRepository {
             mutableUiState.value = mutableUiState.value.copy(errorMessage = error.message)
             return Result.failure(error)
         }
-        if (!normalizedSettings.serverUrl.startsWith("http://") && !normalizedSettings.serverUrl.startsWith("https://")) {
+        if (!normalizedSettings.serverUrl.startsWith("http://", ignoreCase = true) && !normalizedSettings.serverUrl.startsWith("https://")) {
             val error = IllegalArgumentException("Enter a valid HTTP or HTTPS Xtream server URL.")
             mutableUiState.value = mutableUiState.value.copy(errorMessage = error.message)
             return Result.failure(error)
@@ -343,7 +349,9 @@ object LiveTvRepository {
             loadEpgInBackground(normalizedSettings.serverUrl, emptyList())
             channels
         }.onFailure { error ->
-            mutableUiState.value = mutableUiState.value.copy(
+            
+            if (error is CancellationException) throw error
+mutableUiState.value = mutableUiState.value.copy(
                 isLoading = false,
                 isLoaded = mutableUiState.value.channels.isNotEmpty(),
                 errorMessage = error.message ?: "Xtream provider could not be loaded.",
@@ -746,7 +754,7 @@ private object LiveTvRepositoryStalker {
         genres: Map<String, String>,
     ): List<LiveTvChannel> {
         val channels = mutableListOf<LiveTvChannel>()
-        repeat(20) { pageIndex ->
+        for (pageIndex in 0 until 20) {
             val page = pageIndex + 1
             val data = request(
                 settings = session.settings,
@@ -755,7 +763,7 @@ private object LiveTvRepositoryStalker {
                 action = "get_ordered_list",
                 extraParameters = mapOf("p" to page.toString()),
             ).stalkerJs().arrayValue("data")
-            if (data.isEmpty()) return@repeat
+            if (data.isEmpty()) break
             data.forEachIndexed { index, element ->
                 val obj = element as? JsonObject ?: return@forEachIndexed
                 val name = obj.stringValue("name")
