@@ -51,10 +51,6 @@ internal class TelegramStreamingProxy(
         private const val DOWNLOAD_PRIORITY = 32
     }
 
-    private data class ByteRange(val start: Long, val end: Long) {
-        val length: Long get() = end - start + 1L
-    }
-
     private data class ActiveRequests(
         var count: Int = 0,
         var cleanup: Job? = null,
@@ -100,7 +96,7 @@ internal class TelegramStreamingProxy(
                         }
 
                         val rangeHeader = call.request.headers[HttpHeaders.Range]
-                        val byteRange = parseRange(rangeHeader, totalSize)
+                        val byteRange = TelegramByteRangeParser.parse(rangeHeader, totalSize)
                         if (byteRange == null) {
                             call.response.header(HttpHeaders.AcceptRanges, "bytes")
                             call.response.header(HttpHeaders.ContentRange, "bytes */$totalSize")
@@ -194,32 +190,6 @@ internal class TelegramStreamingProxy(
             }
         }
         synchronized(mimeTypes) { mimeTypes.clear() }
-    }
-
-    private fun parseRange(header: String?, totalSize: Long): ByteRange? {
-        if (totalSize <= 0L) return null
-        if (header.isNullOrBlank()) return ByteRange(0L, totalSize - 1L)
-        if (!header.startsWith("bytes=", ignoreCase = true)) return null
-        val value = header.substringAfter("bytes=", "").trim()
-        if (value.isBlank() || value.contains(',')) return null
-        val separator = value.indexOf('-')
-        if (separator < 0) return null
-
-        val left = value.substring(0, separator).trim()
-        val right = value.substring(separator + 1).trim()
-        return when {
-            left.isBlank() -> {
-                val suffixLength = right.toLongOrNull()?.takeIf { it > 0L } ?: return null
-                val length = minOf(suffixLength, totalSize)
-                ByteRange(totalSize - length, totalSize - 1L)
-            }
-            else -> {
-                val start = left.toLongOrNull()?.takeIf { it >= 0L && it < totalSize } ?: return null
-                val requestedEnd = if (right.isBlank()) totalSize - 1L
-                else right.toLongOrNull()?.takeIf { it >= start } ?: return null
-                ByteRange(start, minOf(requestedEnd, totalSize - 1L))
-            }
-        }
     }
 
     private suspend fun beginRequest(fileId: Int) {
