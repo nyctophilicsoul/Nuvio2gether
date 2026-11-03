@@ -134,18 +134,15 @@ internal fun playerTimelineBottomInsets(metrics: PlayerLayoutMetrics): WindowIns
     return if (isIos) safeInsets.union(contentInsets) else safeInsets.add(contentInsets)
 }
 
-internal fun PlayerResizeMode.next(): PlayerResizeMode =
-    when (this) {
-        PlayerResizeMode.Fit -> PlayerResizeMode.Fill
-        PlayerResizeMode.Fill -> PlayerResizeMode.Zoom
-        PlayerResizeMode.Zoom -> PlayerResizeMode.Fit
-    }
+internal fun PlayerResizeMode.next(): PlayerResizeMode = next()
 
 internal val PlayerResizeMode.labelRes: StringResource
     get() = when (this) {
+        PlayerResizeMode.BestFit -> Res.string.compose_player_resize_best_fit
         PlayerResizeMode.Fit -> Res.string.compose_player_resize_fit
-        PlayerResizeMode.Fill -> Res.string.compose_player_resize_fill
+        PlayerResizeMode.Full -> Res.string.compose_player_resize_fill
         PlayerResizeMode.Zoom -> Res.string.compose_player_resize_zoom
+        PlayerResizeMode.Ratio16x9 -> Res.string.compose_player_resize_16_9
     }
 
 internal fun formatPlaybackTime(positionMs: Long): String {
