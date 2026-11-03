@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -186,7 +185,7 @@ object AddonRepository {
         }
         log.i { "addAddon() — rawUrl=$rawUrl" }
         val manifestUrl = try {
-            withContext(Dispatchers.IO) { normalizeManifestUrl(rawUrl) }
+            normalizeManifestUrl(rawUrl)
         } catch (error: IllegalArgumentException) {
             return AddAddonResult.Error(error.message ?: getString(Res.string.addon_invalid_url))
         }
@@ -497,9 +496,11 @@ private fun ensureManifestSuffix(url: String): String {
     return if (query.isEmpty()) withSuffix else "$withSuffix?$query"
 }
 
-private fun normalizeManifestUrl(rawUrl: String): String {
+private suspend fun normalizeManifestUrl(rawUrl: String): String {
     val trimmed = rawUrl.trim()
-    require(trimmed.isNotEmpty()) { runBlocking { getString(Res.string.addons_error_enter_url) } }
+    if (trimmed.isEmpty()) {
+        throw IllegalArgumentException(getString(Res.string.addons_error_enter_url))
+    }
 
     val normalizedScheme = when {
         trimmed.startsWith("http://") || trimmed.startsWith("https://") -> trimmed
