@@ -240,6 +240,10 @@ internal fun MainAppContent(
         // Load local snapshots away from the UI thread. These repositories perform
         // synchronous preference/file reads and some decode sizable JSON payloads.
         // State collection below remains pure and reacts when each snapshot is ready.
+        var localRepositoriesLoaded by remember { mutableStateOf(false) }
+        var runtimeRepositoriesInitialized by remember(ownsAppRuntime) {
+            mutableStateOf(!ownsAppRuntime)
+        }
         LaunchedEffect(Unit) {
             withContext(Dispatchers.IO) {
                 MetaScreenSettingsRepository.ensureLoaded()
@@ -251,9 +255,13 @@ internal fun MainAppContent(
                 ServerRepository.ensureLoaded()
                 ContinueWatchingPreferencesRepository.ensureLoaded()
             }
+            localRepositoriesLoaded = true
         }
         LaunchedEffect(ownsAppRuntime) {
-            if (!ownsAppRuntime) return@LaunchedEffect
+            if (!ownsAppRuntime) {
+                runtimeRepositoriesInitialized = true
+                return@LaunchedEffect
+            }
             withContext(Dispatchers.IO) {
                 EpisodeReleaseNotificationsRepository.ensureLoaded()
                 AddonRepository.initialize()
@@ -264,6 +272,7 @@ internal fun MainAppContent(
             }
             // CloudStream repository refreshes schedule their network jobs internally.
             CloudStreamRepository.refreshAll()
+            runtimeRepositoriesInitialized = true
         }
         val hapticFeedback = LocalHapticFeedback.current
         val focusManager = LocalFocusManager.current
@@ -392,8 +401,17 @@ internal fun MainAppContent(
 
     val serversUiState by ServerRepository.uiState.collectAsStateWithLifecycle()
 
-    LaunchedEffect(appContentGeneration, homeCatalogRefreshKey, serversUiState.revision, addonsWaitingForFirstManifest) {
-        if (!ownsAppRuntime) return@LaunchedEffect
+    LaunchedEffect(
+        appContentGeneration,
+        homeCatalogRefreshKey,
+        serversUiState.revision,
+        addonsWaitingForFirstManifest,
+        localRepositoriesLoaded,
+        runtimeRepositoriesInitialized,
+    ) {
+        if (!ownsAppRuntime || !localRepositoriesLoaded || !runtimeRepositoriesInitialized) {
+            return@LaunchedEffect
+        }
         val enabledAddons = addonsUiState.addons.enabledAddons()
         if (addonsWaitingForFirstManifest) return@LaunchedEffect
         HomeCatalogSettingsRepository.syncCatalogs(enabledAddons)
