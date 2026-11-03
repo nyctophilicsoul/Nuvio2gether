@@ -30,6 +30,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.drinkless.tdlib.TdApi
 import java.net.ServerSocket
+import java.util.UUID
 
 /**
  * Local loopback HTTP bridge for TDLib files.
@@ -67,6 +68,7 @@ internal class TelegramStreamingProxy(
 
     @Volatile private var server: ApplicationEngine? = null
     @Volatile private var port: Int = 0
+    @Volatile private var accessToken: String = UUID.randomUUID().toString().replace("-", "")
 
     @Synchronized
     fun start() {
@@ -80,7 +82,7 @@ internal class TelegramStreamingProxy(
                         call.respond(HttpStatusCode.BadRequest)
                         return@get
                     }
-                    if (!client.isAuthenticated()) {
+                    if (call.request.queryParameters["key"] != accessToken || !client.isAuthenticated()) {
                         call.respond(HttpStatusCode.Unauthorized)
                         return@get
                     }
@@ -155,13 +157,14 @@ internal class TelegramStreamingProxy(
     fun streamUrl(fileId: Int, mimeType: String?): String {
         start()
         if (!mimeType.isNullOrBlank()) synchronized(mimeTypes) { mimeTypes[fileId] = mimeType }
-        return "http://127.0.0.1:$port/file/$fileId"
+        return "http://127.0.0.1:$port/file/$fileId?key=$accessToken"
     }
 
     @Synchronized
     fun stop() {
         val current = server ?: return
         server = null
+        accessToken = UUID.randomUUID().toString().replace("-", "")
         current.stop(250, 1_000)
         scope.launch {
             val ids = mutex.withLock {
