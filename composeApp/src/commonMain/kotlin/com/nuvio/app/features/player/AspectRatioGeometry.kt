@@ -70,6 +70,10 @@ object AspectRatioGeometry {
 
         val scale = when (mode) {
             PlayerResizeMode.Zoom -> max(sx, sy)
+            // Fit uses the coded (square-pixel) geometry and never enlarges a
+            // source beyond its native dimensions. BestFit remains the
+            // metadata-corrected mode that can upscale to fill the available area.
+            PlayerResizeMode.Fit -> min(1f, min(sx, sy))
             else -> min(sx, sy)
         }
         val renderedWidth = sourceWidth * scale
