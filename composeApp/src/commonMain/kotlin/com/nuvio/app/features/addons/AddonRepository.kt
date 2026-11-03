@@ -241,23 +241,30 @@ object AddonRepository {
             return AddAddonResult.Error(error.message ?: getString(Res.string.addon_load_manifest_failed))
         }
 
+        var duplicateAtCommit = false
         val appliedAddons = synchronized(activeRefreshJobsLock) {
             if (!isProfileGenerationCurrentLocked(expectedProfile.first, expectedProfile.second)) {
                 null
             } else {
-                _uiState.update { current ->
-                    current.copy(
-                        addons = current.addons + ManagedAddon(
-                            manifestUrl = manifestUrl,
-                            manifest = manifest,
-                            isRefreshing = false,
-                            errorMessage = null,
-                        ),
-                    )
+                duplicateAtCommit = _uiState.value.addons.any { it.manifestUrl == manifestUrl }
+                if (!duplicateAtCommit) {
+                    _uiState.update { current ->
+                        current.copy(
+                            addons = current.addons + ManagedAddon(
+                                manifestUrl = manifestUrl,
+                                manifest = manifest,
+                                isRefreshing = false,
+                                errorMessage = null,
+                            ),
+                        )
+                    }
                 }
                 _uiState.value.addons
             }
         } ?: return AddAddonResult.Error("Active profile changed while adding the add-on")
+        if (duplicateAtCommit) {
+            return AddAddonResult.Error(getString(Res.string.addon_already_installed))
+        }
         persistSnapshot(expectedProfile.first, appliedAddons)
         pushToServer(expectedProfile.first, expectedProfile.second)
         return AddAddonResult.Success(manifest)
@@ -379,7 +386,10 @@ object AddonRepository {
                         null
                     }
                     val applied = synchronized(activeRefreshJobsLock) {
-                        if (!isProfileGenerationCurrentLocked(expectedProfile.first, expectedProfile.second)) {
+                        if (
+                            !isProfileGenerationCurrentLocked(expectedProfile.first, expectedProfile.second) ||
+                            activeRefreshJobs[manifestUrl] !== refreshJob
+                        ) {
                             false
                         } else {
                             _uiState.update { current ->
