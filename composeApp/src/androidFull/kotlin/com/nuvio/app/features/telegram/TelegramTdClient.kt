@@ -63,6 +63,8 @@ internal class TelegramTdClient(
         return available
     }
 
+    fun isAuthenticated(): Boolean = _authState.value is TelegramTdAuthState.Ready
+
     fun initialize() {
         if (client != null) return
         scope.launch {
@@ -133,7 +135,7 @@ internal class TelegramTdClient(
 
     private fun handleAuthorizationState(state: TdApi.AuthorizationState) {
         when (state) {
-            is TdApi.AuthorizationStateWaitTdlibParameters -> initialize()
+            is TdApi.AuthorizationStateWaitTdlibParameters -> client?.let { sendTdlibParameters(it, apiIdProvider(), apiHashProvider()) }
             is TdApi.AuthorizationStateWaitPhoneNumber -> _authState.value = TelegramTdAuthState.WaitPhone
             is TdApi.AuthorizationStateWaitCode -> {
                 val length = when (val type = state.codeInfo.type) {
