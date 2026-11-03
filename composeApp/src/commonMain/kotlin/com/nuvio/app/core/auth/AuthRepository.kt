@@ -73,7 +73,10 @@ object AuthRepository {
                         }
                     }
                     is SessionStatus.RefreshFailure -> {
-                        _state.value = AuthState.Unauthenticated
+                        // Supabase can emit this while retrying an expired session after
+                        // a transient network/server failure. Only NotAuthenticated is
+                        // the terminal sign-out signal; do not flicker to logged-out here.
+                        log.w { "Supabase session refresh is pending; retaining the last known auth state" }
                     }
                 }
             }
