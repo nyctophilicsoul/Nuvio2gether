@@ -64,6 +64,7 @@ internal class TelegramStreamingProxy(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mutex = Mutex()
     private val requestStates = mutableMapOf<Int, ActiveRequests>()
+    private val registeredFileIds = mutableSetOf<Int>()
     private val mimeTypes = mutableMapOf<Int, String>()
 
     @Volatile private var server: ApplicationEngine? = null
@@ -157,7 +158,20 @@ internal class TelegramStreamingProxy(
     fun streamUrl(fileId: Int, mimeType: String?): String {
         start()
         if (!mimeType.isNullOrBlank()) synchronized(mimeTypes) { mimeTypes[fileId] = mimeType }
+        synchronized(registeredFileIds) { registeredFileIds += fileId }
         return "http://127.0.0.1:$port/file/$fileId?key=$accessToken"
+    }
+
+    suspend fun clearCache() {
+        val activeIds = mutex.withLock { requestStates.filterValues { it.count > 0 }.keys.toSet() }
+        val deletable = synchronized(registeredFileIds) {
+            registeredFileIds.filterNot { it in activeIds }.toList()
+        }
+        deletable.forEach { fileId ->
+            deleteFile(fileId)
+            synchronized(registeredFileIds) { registeredFileIds.remove(fileId) }
+            synchronized(mimeTypes) { mimeTypes.remove(fileId) }
+        }
     }
 
     @Synchronized
@@ -173,7 +187,11 @@ internal class TelegramStreamingProxy(
                 requestStates.clear()
                 keys
             }
-            ids.forEach { deleteFile(it) }
+            ids.forEach {
+                deleteFile(it)
+                synchronized(registeredFileIds) { registeredFileIds.remove(it) }
+                synchronized(mimeTypes) { mimeTypes.remove(it) }
+            }
         }
         synchronized(mimeTypes) { mimeTypes.clear() }
     }
@@ -227,6 +245,8 @@ internal class TelegramStreamingProxy(
                         // Drop state before the TDLib calls so a fresh request can establish a new lease.
                         requestStates.remove(fileId)
                         deleteFile(fileId)
+                        synchronized(registeredFileIds) { registeredFileIds.remove(fileId) }
+                        synchronized(mimeTypes) { mimeTypes.remove(fileId) }
                     }
                 }
             }
