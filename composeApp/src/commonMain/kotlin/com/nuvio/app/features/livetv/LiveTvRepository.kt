@@ -112,7 +112,7 @@ object LiveTvRepository {
     suspend fun load(sourceUrl: String): Result<List<LiveTvChannel>> {
         if (!featureEnabled) return liveTvDisabledResult()
         val normalizedUrl = sourceUrl.trim()
-        if (!normalizedUrl.startsWith("http://", ignoreCase = true) && !normalizedUrl.startsWith("https://")) {
+        if (!normalizedUrl.startsWith("http://", ignoreCase = true) && !normalizedUrl.startsWith("https://", ignoreCase = true)) {
             val error = IllegalArgumentException("Geçerli bir HTTP veya HTTPS M3U bağlantısı girin.")
             mutableUiState.value = mutableUiState.value.copy(errorMessage = error.message)
             return Result.failure(error)
@@ -267,7 +267,7 @@ mutableUiState.value = mutableUiState.value.copy(
             mutableUiState.value = mutableUiState.value.copy(errorMessage = error.message)
             return Result.failure(error)
         }
-        if (!normalizedSettings.portalUrl.startsWith("http://", ignoreCase = true) && !normalizedSettings.portalUrl.startsWith("https://")) {
+        if (!normalizedSettings.portalUrl.startsWith("http://", ignoreCase = true) && !normalizedSettings.portalUrl.startsWith("https://", ignoreCase = true)) {
             val error = IllegalArgumentException("Geçerli bir HTTP veya HTTPS portal bağlantısı girin.")
             mutableUiState.value = mutableUiState.value.copy(errorMessage = error.message)
             return Result.failure(error)
@@ -323,7 +323,7 @@ mutableUiState.value = mutableUiState.value.copy(
             mutableUiState.value = mutableUiState.value.copy(errorMessage = error.message)
             return Result.failure(error)
         }
-        if (!normalizedSettings.serverUrl.startsWith("http://", ignoreCase = true) && !normalizedSettings.serverUrl.startsWith("https://")) {
+        if (!normalizedSettings.serverUrl.startsWith("http://", ignoreCase = true) && !normalizedSettings.serverUrl.startsWith("https://", ignoreCase = true)) {
             val error = IllegalArgumentException("Enter a valid HTTP or HTTPS Xtream server URL.")
             mutableUiState.value = mutableUiState.value.copy(errorMessage = error.message)
             return Result.failure(error)
