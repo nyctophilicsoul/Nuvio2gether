@@ -68,6 +68,7 @@ object HomeRepository {
     private var lastErrorMessage: String? = null
 
     fun refresh(addons: List<ManagedAddon>, force: Boolean = false) {
+        applySettingsGeneration++
         val activeAddons = addons.enabledAddons()
         val lifecycle = lifecycleGeneration
         val requestGeneration = ++refreshRequestGeneration
