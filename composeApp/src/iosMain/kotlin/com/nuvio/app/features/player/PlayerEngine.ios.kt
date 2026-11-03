@@ -327,7 +327,7 @@ actual fun PlatformPlayerSurface(
             when (resizeMode) {
                 PlayerResizeMode.BestFit -> 0
                 PlayerResizeMode.Fit -> 1
-                PlayerResizeMode.Full -> 2
+                PlayerResizeMode.Fill -> 2
                 PlayerResizeMode.Zoom -> 3
                 PlayerResizeMode.Ratio16x9 -> 4
             }
