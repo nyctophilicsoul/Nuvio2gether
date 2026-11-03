@@ -878,7 +878,7 @@ internal fun MainAppContent(
                     streamType = channel.streamType,
                     logo = channel.logoUrl,
                     streamTitle = channel.name,
-                    streamSubtitle = channel.group.takeIf(String::isNotBlank),
+                    streamSubtitle = channel.group.takeIf { it.isNotBlank() },
                     providerName = providerName,
                     providerAddonId = "live-tv",
                     contentType = "live-tv",
