@@ -26,6 +26,8 @@ internal object ChapterSkipIntervals {
     private val RECAP_PATTERN = Regex("^\\s*(recap|previously(\\s+on.*)?)\\s*$", RegexOption.IGNORE_CASE)
     private val INTRO_PATTERN = Regex("^\\s*intro\\s*$", RegexOption.IGNORE_CASE)
 
+    private val POST_CREDITS_SCENE_PATTERN =
+        Regex("(post|mid|after)[\\s-]credits\\s+(scene|sequence|stinger)\\b", RegexOption.IGNORE_CASE)
     private val POST_CREDITS_PATTERN = Regex("(post|mid|after)[\\s-]credits", RegexOption.IGNORE_CASE)
 
     fun fromChapters(
@@ -76,6 +78,8 @@ internal object ChapterSkipIntervals {
 
     private fun classifyTitle(title: String?): ChapterType? {
         if (title.isNullOrBlank()) return null
+        // A chapter marking the scene itself is not a credits segment to skip.
+        if (POST_CREDITS_SCENE_PATTERN.containsMatchIn(title)) return null
         if (POST_CREDITS_PATTERN.containsMatchIn(title)) return ChapterType.POST_CREDITS
         if (OPENING_PATTERN.matches(title)) return ChapterType.OPENING
         if (ENDING_PATTERN.matches(title)) return ChapterType.ENDING
