@@ -180,7 +180,10 @@ object LiveTvRepository {
             channels
         }.onFailure { error ->
             
-            if (error is CancellationException) throw error
+            if (error is CancellationException) {
+                mutableUiState.value = mutableUiState.value.copy(isLoading = false)
+                throw error
+            }
 mutableUiState.value = mutableUiState.value.copy(
                 isLoading = false,
                 isLoaded = mutableUiState.value.channels.isNotEmpty(),
@@ -230,7 +233,10 @@ mutableUiState.value = mutableUiState.value.copy(
             channels
         }.onFailure { error ->
             
-            if (error is CancellationException) throw error
+            if (error is CancellationException) {
+                mutableUiState.value = mutableUiState.value.copy(isLoading = false)
+                throw error
+            }
 mutableUiState.value = mutableUiState.value.copy(
                 isLoading = false,
                 isLoaded = mutableUiState.value.channels.isNotEmpty(),
@@ -297,7 +303,10 @@ mutableUiState.value = mutableUiState.value.copy(
             channels
         }.onFailure { error ->
             
-            if (error is CancellationException) throw error
+            if (error is CancellationException) {
+                mutableUiState.value = mutableUiState.value.copy(isLoading = false)
+                throw error
+            }
 mutableUiState.value = mutableUiState.value.copy(
                 isLoading = false,
                 isLoaded = mutableUiState.value.channels.isNotEmpty(),
@@ -350,7 +359,10 @@ mutableUiState.value = mutableUiState.value.copy(
             channels
         }.onFailure { error ->
             
-            if (error is CancellationException) throw error
+            if (error is CancellationException) {
+                mutableUiState.value = mutableUiState.value.copy(isLoading = false)
+                throw error
+            }
 mutableUiState.value = mutableUiState.value.copy(
                 isLoading = false,
                 isLoaded = mutableUiState.value.channels.isNotEmpty(),
@@ -892,12 +904,18 @@ private fun LiveTvStalkerSettings.portalEndpoint(): String {
 private fun LiveTvStalkerSettings.portalBaseUrl(): String =
     portalUrl.trim().substringBefore("/portal.php").trimEnd('/') + "/c/"
 
-private fun String.toStalkerPlayableUrl(): String =
-    trim()
-        .removePrefix("ffmpeg ")
-        .removePrefix("auto ")
-        .substringBefore(' ')
-        .trim()
+internal fun String.toStalkerPlayableUrl(): String {
+    var normalized = trim()
+    while (true) {
+        val prefix = when {
+            normalized.startsWith("ffmpeg ", ignoreCase = true) -> "ffmpeg "
+            normalized.startsWith("auto ", ignoreCase = true) -> "auto "
+            else -> null
+        } ?: break
+        normalized = normalized.substring(prefix.length).trimStart()
+    }
+    return normalized.substringBefore(' ').trim()
+}
 
 private fun JsonObject.stalkerJs(): JsonObject =
     (this["js"] as? JsonObject) ?: this
