@@ -116,7 +116,7 @@ private fun watchPartyRow(onClick: () -> Unit): (() -> Unit)? {
 private fun SettingsPage.isEnabledByPolicy(): Boolean =
     when (this) {
         SettingsPage.SupportersContributors -> AppFeaturePolicy.supportersContributorsPageEnabled
-        SettingsPage.CloudStream -> AppFeaturePolicy.pluginsEnabled
+        SettingsPage.CloudStream, SettingsPage.Telegram -> AppFeaturePolicy.pluginsEnabled
         SettingsPage.PlaybackP2p -> P2pSettingsRepository.isVisible
         SettingsPage.PlaybackBuffer -> !isIos
         else -> true
@@ -796,6 +796,9 @@ private fun MobileSettingsScreen(
                     onTmdbClick = { onPageChange(SettingsPage.TmdbEnrichment) },
                     onMdbListClick = { onPageChange(SettingsPage.MdbListRatings) },
                     onDebridClick = { onPageChange(SettingsPage.Debrid) },
+                    onTelegramClick = if (AppFeaturePolicy.pluginsEnabled) {
+                        { onPageChange(SettingsPage.Telegram) }
+                    } else null,
                 )
                 SettingsPage.TmdbEnrichment -> tmdbSettingsContent(
                     isTablet = false,
@@ -809,6 +812,7 @@ private fun MobileSettingsScreen(
                     isTablet = false,
                     settings = debridSettings,
                 )
+                SettingsPage.Telegram -> telegramSettingsContent(isTablet = false)
                 SettingsPage.TraktAuthentication -> trackingSettingsContent(
                     isTablet = false,
                     traktUiState = traktAuthUiState,
@@ -1212,6 +1216,9 @@ private fun TabletSettingsScreen(
                         onTmdbClick = { onPageChange(SettingsPage.TmdbEnrichment) },
                         onMdbListClick = { onPageChange(SettingsPage.MdbListRatings) },
                         onDebridClick = { onPageChange(SettingsPage.Debrid) },
+                        onTelegramClick = if (AppFeaturePolicy.pluginsEnabled) {
+                            { onPageChange(SettingsPage.Telegram) }
+                        } else null,
                     )
                     SettingsPage.TmdbEnrichment -> tmdbSettingsContent(
                         isTablet = true,
@@ -1225,6 +1232,7 @@ private fun TabletSettingsScreen(
                         isTablet = true,
                         settings = debridSettings,
                     )
+                    SettingsPage.Telegram -> telegramSettingsContent(isTablet = true)
                     SettingsPage.TraktAuthentication -> trackingSettingsContent(
                         isTablet = true,
                         traktUiState = traktAuthUiState,
