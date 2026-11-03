@@ -197,11 +197,22 @@ fun LiveTvScreen(
             fileImportError = null
             if (sourceUrl.trim().startsWith("magnet:", ignoreCase = true)) {
                 fileImportError = stringResource(Res.string.live_tv_magnet_unsupported)
-            } else if (LiveTvRepository.load(sourceUrl).isSuccess) {
-                editingSource = false
-                showingAdvancedSettings = false
-                selectedGroup = ""
-                favoritesOnly = false
+            } else {
+                val isUnchangedSavedLocalPlaylist =
+                    uiState.sourceType == LiveTvSourceType.M3u &&
+                        sourceUrl.trim() == uiState.sourceUrl &&
+                        LiveTvStorage.loadLocalPlaylistData().orEmpty().isNotBlank()
+                val result = if (isUnchangedSavedLocalPlaylist) {
+                    LiveTvRepository.loadStoredLocalPlaylist()
+                } else {
+                    LiveTvRepository.load(sourceUrl)
+                }
+                if (result.isSuccess) {
+                    editingSource = false
+                    showingAdvancedSettings = false
+                    selectedGroup = ""
+                    favoritesOnly = false
+                }
             }
         }
         Unit
