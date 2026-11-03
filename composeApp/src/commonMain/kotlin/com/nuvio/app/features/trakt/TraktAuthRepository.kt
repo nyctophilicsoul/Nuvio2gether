@@ -369,6 +369,7 @@ object TraktAuthRepository : TrackingAuthProvider {
         )
         persist(profileId)
         refreshUserSettings(profileId)
+        if (!isCurrentProfile(profileId, expectedProfileGeneration)) return
         publish(
             isLoading = false,
             statusMessage = localizedString(Res.string.trakt_connected_status),
