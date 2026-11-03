@@ -158,20 +158,6 @@ internal class TelegramTdClient(
         when (state) {
             is TdApi.AuthorizationStateWaitTdlibParameters ->
                 client?.let { sendTdlibParameters(it, apiIdProvider(), apiHashProvider()) }
-            is TdApi.AuthorizationStateWaitEncryptionKey -> {
-                // We intentionally use TDLib's empty database key: the database lives inside
-                // Android's private app sandbox. This state must be acknowledged on every fresh
-                // TDLib database initialization or authorization never advances to phone login.
-                val current = client ?: return
-                current.send(TdApi.CheckDatabaseEncryptionKey("")) { result ->
-                    if (result is TdApi.Error && client === current) {
-                        Log.e(TAG, "TDLib rejected the database encryption key: ${result.message}")
-                        _authState.value = TelegramTdAuthState.Failed(
-                            result.message ?: "Could not unlock the Telegram local database.",
-                        )
-                    }
-                }
-            }
             is TdApi.AuthorizationStateWaitPhoneNumber -> _authState.value = TelegramTdAuthState.WaitPhone
             is TdApi.AuthorizationStateWaitCode -> {
                 val length = when (val type = state.codeInfo.type) {
