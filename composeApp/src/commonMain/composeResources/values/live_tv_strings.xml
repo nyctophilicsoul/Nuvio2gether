@@ -22,7 +22,7 @@
 <string name="live_tv_load">Load channels</string>
 <string name="live_tv_load_file">Choose M3U file</string>
 <string name="live_tv_add_source">Edit source</string>
-<string name="live_tv_disconnect">Remove playlist</string>
+<string name="live_tv_disconnect">Disconnect source</string>
 <string name="live_tv_refresh">Refresh playlist</string>
 <string name="live_tv_search">Search channels</string>
 <string name="live_tv_all">All</string>
@@ -39,7 +39,7 @@
 <string name="live_tv_no_favorites">Favorite channels will appear here.</string>
 <string name="live_tv_player_channels">Channels</string>
 <string name="live_tv_empty_title">Add your channel list</string>
-<string name="live_tv_empty_description">Enter an M3U URL to bring your live channels into Nuvio.</string>
+<string name="live_tv_empty_description">Connect an IPTV source with an M3U playlist, Stalker portal, or Xtream credentials.</string>
 <string name="live_tv_guide_title">Favorites TV Guide</string>
 <string name="live_tv_guide_next_24_hours">Now · next 24 hours</string>
 <string name="live_tv_guide_hour_range">+%1$d to +%2$d hours</string>
