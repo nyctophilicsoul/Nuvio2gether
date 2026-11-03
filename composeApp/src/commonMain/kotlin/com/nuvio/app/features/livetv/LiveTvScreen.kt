@@ -195,8 +195,7 @@ fun LiveTvScreen(
         scope.launch {
             fileImportError = null
             if (sourceUrl.trim().startsWith("magnet:", ignoreCase = true)) {
-                LiveTvIncomingSourceRepository.submitText(sourceUrl)
-                editingSource = false
+                fileImportError = "Torrent magnet links are not supported as Live TV sources yet."
             } else if (LiveTvRepository.load(sourceUrl).isSuccess) {
                 editingSource = false
                 showingAdvancedSettings = false
