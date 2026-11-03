@@ -186,7 +186,7 @@ object AddonRepository {
         }
         log.i { "addAddon() — rawUrl=$rawUrl" }
         val manifestUrl = try {
-            normalizeManifestUrl(rawUrl)
+            withContext(Dispatchers.IO) { normalizeManifestUrl(rawUrl) }
         } catch (error: IllegalArgumentException) {
             return AddAddonResult.Error(error.message ?: getString(Res.string.addon_invalid_url))
         }

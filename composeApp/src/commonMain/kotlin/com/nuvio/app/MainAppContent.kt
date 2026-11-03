@@ -765,7 +765,7 @@ internal fun MainAppContent(
                             launchSingleTop = true
                         }
                         NuvioToastController.show(getString(Res.string.addons_modal_checking_title))
-                        AddonRepository.initialize()
+                        withContext(Dispatchers.IO) { AddonRepository.initialize() }
                         when (val result = AddonRepository.addAddon(deepLink.manifestUrl)) {
                             is AddAddonResult.Success -> {
                                 NuvioToastController.show(
