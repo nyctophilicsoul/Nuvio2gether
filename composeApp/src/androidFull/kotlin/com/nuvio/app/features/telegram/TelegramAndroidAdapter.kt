@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import org.drinkless.tdlib.TdApi
 import java.io.File
@@ -34,6 +36,11 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
     }
 
     private data class CachedLookup(val expiresAt: Long, val streams: List<StreamItem>)
+
+    private data class ChatSearchResult(
+        val candidates: List<VideoCandidate>,
+        val complete: Boolean,
+    )
 
     private data class VideoCandidate(
         val chatId: Long,
@@ -355,13 +362,16 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
         lookupCache[key]?.takeIf { System.currentTimeMillis() < it.expiresAt }?.let { return it.streams }
 
         val queries = buildQueries(title, year, season, episode, normalizedType)
-        val candidates = coroutineScope {
+        val semaphore = Semaphore(permits = 3)
+        val chatResults = coroutineScope {
             selectedChatIds.map { chatId ->
                 async(Dispatchers.IO) {
-                    searchChat(chatId, queries)
+                    semaphore.withPermit { searchChat(chatId, queries) }
                 }
-            }.flatMap { deferred -> deferred.await() }
+            }.map { deferred -> deferred.await() }
         }
+        val searchComplete = chatResults.all(ChatSearchResult::complete)
+        val candidates = chatResults.flatMap(ChatSearchResult::candidates)
 
         val matched = candidates
             .distinctBy { "${it.chatId}:${it.messageId}:${it.fileId}" }
@@ -377,7 +387,7 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
             )
             .map { (candidate, _) -> candidate.toStreamItem() }
 
-        if (matched.isNotEmpty()) {
+        if (searchComplete) {
             lookupCache[key] = CachedLookup(System.currentTimeMillis() + CACHE_TTL_MS, matched)
             if (lookupCache.size > CACHE_MAX_ENTRIES) {
                 val oldestKeys = lookupCache.entries.sortedBy { it.value.expiresAt }
@@ -388,11 +398,11 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
         return matched
     }
 
-    private suspend fun searchChat(chatId: Long, queries: List<String>): List<VideoCandidate> {
+    private suspend fun searchChat(chatId: Long, queries: List<String>): ChatSearchResult {
         val found = linkedMapOf<String, VideoCandidate>()
         for (query in queries) {
             for (filter in listOf(TdApi.SearchMessagesFilterVideo(), TdApi.SearchMessagesFilterDocument())) {
-                val result = try {
+                val response = try {
                     tdClient.sendRequest(TdApi.SearchChatMessages().also { request ->
                         request.chatId = chatId
                         request.query = query
@@ -400,13 +410,19 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
                         request.offset = 0
                         request.limit = SEARCH_LIMIT
                         request.filter = filter
-                    }, timeoutMs = 20_000L) as? TdApi.FoundChatMessages
+                    }, timeoutMs = 20_000L)
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
                     Log.w(TAG, "Telegram search failed for chat $chatId and query '$query'", error)
-                    null
-                } ?: continue
+                    return ChatSearchResult(found.values.toList(), complete = false)
+                } ?: run {
+                    Log.w(TAG, "Telegram search timed out for chat $chatId and query '$query'")
+                    return ChatSearchResult(found.values.toList(), complete = false)
+                }
+
+                val result = response as? TdApi.FoundChatMessages
+                    ?: return ChatSearchResult(found.values.toList(), complete = false)
                 result.messages.forEach { message ->
                     extractCandidate(message)?.let { candidate ->
                         found["${candidate.chatId}:${candidate.messageId}:${candidate.fileId}"] = candidate
@@ -414,7 +430,7 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
                 }
             }
         }
-        return found.values.toList()
+        return ChatSearchResult(found.values.toList(), complete = true)
     }
 
     private fun extractCandidate(message: TdApi.Message): VideoCandidate? {
