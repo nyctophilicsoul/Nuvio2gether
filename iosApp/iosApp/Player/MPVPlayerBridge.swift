@@ -835,12 +835,15 @@ final class MPVPlayerViewController: UIViewController {
             setStringProperty("keepaspect", "yes")
             setStringProperty("video-aspect-method", "ignore")
             setStringProperty("video-aspect-override", "no")
-            setStringProperty("video-unscaled", "downscale-big")
+            setStringProperty("video-unscaled", "no")
             setStringProperty("video-zoom", "0")
             setStringProperty("panscan", "0")
         case 2: // Full: non-uniform stretch to the viewport.
             setStringProperty("video-unscaled", "no")
+            setStringProperty("video-zoom", "0")
             setStringProperty("panscan", "0")
+            setStringProperty("video-aspect-override", "no")
+            setStringProperty("video-aspect-method", "container")
             setStringProperty("keepaspect", "no")
         case 3: // Zoom: preserve DAR and crop to fill.
             setStringProperty("keepaspect", "yes")
