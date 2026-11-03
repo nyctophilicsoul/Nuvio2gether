@@ -499,12 +499,6 @@ kotlin {
             defaultSourceSet.dependencies {
                 implementation(libs.ktor.client.darwin)
                 if (iosDistribution == "full") {
-                    // TDLib-backed Telegram streaming (Full Android only).
-                    // Pinned to an immutable prebuilt AAR commit: generated Java API + JNI libraries for
-                    // arm64-v8a, armeabi-v7a, x86 and x86_64. The app uses the same org.drinkless.tdlib API as ARVIO.
-                    implementation("com.github.capullo-tech:lib-tdlib-android:11850efeb5791d4fd386c0eeec1ebce4c5080435")
-                    implementation("io.ktor:ktor-server-core:${libs.versions.ktor.get()}")
-                    implementation("io.ktor:ktor-server-cio:${libs.versions.ktor.get()}")
                     implementation(libs.quickjs.kt)
                     implementation(libs.ksoup)
                 }
@@ -594,6 +588,10 @@ kotlin {
                     ),
                 )
                 if (androidDistribution == "full") {
+                    // TDLib-backed Telegram streaming; native JNI and generated Java API are shipped in this pinned AAR.
+                    implementation("com.github.capullo-tech:lib-tdlib-android:11850efeb5791d4fd386c0eeec1ebce4c5080435")
+                    implementation("io.ktor:ktor-server-core:${libs.versions.ktor.get()}")
+                    implementation("io.ktor:ktor-server-cio:${libs.versions.ktor.get()}")
                     implementation(files("libs/quickjs-kt-android-1.0.5-nuvio.aar"))
                     implementation(files(cloudStreamRuntimeAar).builtBy(downloadCloudStreamRuntime))
                     implementation(libs.ksoup)
