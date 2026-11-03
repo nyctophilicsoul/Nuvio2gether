@@ -43,12 +43,25 @@ object CloudStreamRepositoryParser {
         val normalizedRepositoryUrl = normalizeCloudStreamRepositoryUrl(repositoryManifestUrl)
         val normalizedPluginListUrl = resolveCloudStreamUrl(normalizedRepositoryUrl, pluginListUrl)
         val elements = json.parseToJsonElement(payload).jsonArray
-        val plugins = elements.mapNotNull { element ->
-            runCatching { json.decodeFromJsonElement<CloudStreamPluginMetadataDto>(element) }
-                .getOrNull()
-                ?.toDomainOrNull(normalizedRepositoryUrl, normalizedPluginListUrl)
+        val decoded = elements.map { element ->
+            runCatching { json.decodeFromJsonElement<CloudStreamPluginMetadataDto>(element) }.getOrNull()
         }
-        require(plugins.size == elements.size) {
+        require(decoded.all { it != null }) {
+            "CloudStream plugin list contains invalid entries; refusing a partial refresh"
+        }
+
+        // A malformed declared checksum makes that package entry unusable, but it
+        // must not discard otherwise valid entries from the same provider list.
+        // Structural/identity errors still reject the list to avoid destructive
+        // partial refreshes.
+        val validHashEntries = decoded.filterNotNull().filter { dto ->
+            val declaredHash = dto.fileHash?.trim()?.takeIf(String::isNotBlank)
+            declaredHash == null || CloudStreamFileHash.parse(declaredHash) != null
+        }
+        val plugins = validHashEntries.mapNotNull {
+            it.toDomainOrNull(normalizedRepositoryUrl, normalizedPluginListUrl)
+        }
+        require(plugins.size == validHashEntries.size) {
             "CloudStream plugin list contains invalid entries; refusing a partial refresh"
         }
         return plugins
