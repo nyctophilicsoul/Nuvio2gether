@@ -221,6 +221,41 @@ internal class TelegramTdClient(
         }
     }
 
+    suspend fun resetAndWait(logOut: Boolean = false) {
+        val current = client ?: run {
+            _authState.value = TelegramTdAuthState.Idle
+            return
+        }
+        try {
+            if (logOut) {
+                // TDLib invalidates the authorization state and removes the server-side session.
+                runCatching { sendRequest(TdApi.LogOut(), timeoutMs = 15_000L) }
+            }
+            withTimeoutOrNull(15_000L) {
+                suspendCancellableCoroutine { continuation ->
+                    current.send(TdApi.Close()) { result ->
+                        if (continuation.isActive) {
+                            if (result is TdApi.Error) {
+                                continuation.resumeWithException(
+                                    TelegramTdApiException(result.code, result.message ?: "Could not close Telegram session."),
+                                )
+                            } else {
+                                continuation.resume(Unit)
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            Log.w(TAG, "TDLib close request did not complete cleanly", error)
+        } finally {
+            client = null
+            _authState.value = TelegramTdAuthState.Idle
+        }
+    }
+
     fun reset() {
         val current = client
         client = null
