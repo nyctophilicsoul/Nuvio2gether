@@ -18,6 +18,7 @@ import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.plugins.pluginContentId
 import com.nuvio.app.features.plugins.PluginsUiState
 import com.nuvio.app.features.servers.ServerStreams
+import com.nuvio.app.features.telegram.TelegramIntegrationBridge
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -265,6 +266,7 @@ object StreamsRepository {
 
         val isNativeServerRequest = ServerStreams.isNativeRequest(videoId)
         val serverSources = ServerStreams.sources(type, videoId, season, episode, forceRefresh)
+        val telegramAvailable = !isNativeServerRequest && TelegramIntegrationBridge.isAuthenticated()
         val preferredGroupIds = serverSources.filter { it.preferred }.mapTo(mutableSetOf()) { it.addonId }
         val installedAddons = if (isNativeServerRequest) emptyList() else AddonRepository.uiState.value.addons.enabledAddons()
         val pluginScrapers = if (AppFeaturePolicy.pluginsEnabled && !isNativeServerRequest) {
@@ -290,7 +292,7 @@ object StreamsRepository {
         } else {
             emptyList()
         }
-        if (installedAddons.isEmpty() && pluginProviderGroups.isEmpty() && cloudStreamProviderGroups.isEmpty() && serverSources.isEmpty()) {
+        if (installedAddons.isEmpty() && pluginProviderGroups.isEmpty() && cloudStreamProviderGroups.isEmpty() && serverSources.isEmpty() && !telegramAvailable) {
             _uiState.value = StreamsUiState(
                 requestToken = requestToken,
                 isAnyLoading = false,
@@ -314,7 +316,7 @@ object StreamsRepository {
 
         log.d { "Found ${streamAddons.size} addons for stream type=$type id=$videoId" }
 
-        if (streamAddons.isEmpty() && pluginProviderGroups.isEmpty() && cloudStreamProviderGroups.isEmpty() && serverSources.isEmpty()) {
+        if (streamAddons.isEmpty() && pluginProviderGroups.isEmpty() && cloudStreamProviderGroups.isEmpty() && serverSources.isEmpty() && !telegramAvailable) {
             _uiState.value = StreamsUiState(
                 requestToken = requestToken,
                 isAnyLoading = false,
@@ -348,7 +350,18 @@ object StreamsRepository {
                     streams = emptyList(),
                     isLoading = true,
                 )
-            } + serverSources.map { it.loadingGroup() },
+            } + serverSources.map { it.loadingGroup() } + if (telegramAvailable) {
+                listOf(
+                    AddonStreamGroup(
+                        addonName = "Telegram",
+                        addonId = "telegram_native",
+                        streams = emptyList(),
+                        isLoading = true,
+                    ),
+                )
+            } else {
+                emptyList()
+            },
             installedOrder = installedAddonOrder,
             preferredGroupIds = preferredGroupIds,
         )
@@ -379,7 +392,8 @@ object StreamsRepository {
             val totalTasks = streamAddons.size +
                 pluginProviderGroups.sumOf { it.scrapers.size } +
                 cloudStreamProviderGroups.size +
-                serverSources.size
+                serverSources.size +
+                if (telegramAvailable) 1 else 0
 
             val installedAddonNames = installedAddonOrder.toSet()
             val installedAddonIds = streamAddons.map { it.addonId }.toSet()
@@ -708,6 +722,54 @@ object StreamsRepository {
                             error = group.error,
                         ),
                     )
+                }
+            }
+
+            if (telegramAvailable) {
+                launch {
+                    val completion = try {
+                        val details = MetaDetailsRepository.peek(type, parentMetaId ?: videoId)
+                            ?: MetaDetailsRepository.peek(type, videoId)
+                        val searchTitle = details?.name?.takeIf { it.isNotBlank() }
+                        val year = details?.releaseInfo
+                            ?.let { Regex("\\b(19\\d{2}|20\\d{2})\\b").find(it)?.value?.toIntOrNull() }
+                        val streams = if (searchTitle.isNullOrBlank()) {
+                            emptyList()
+                        } else {
+                            TelegramIntegrationBridge.resolveStreams(
+                                type = type,
+                                videoId = videoId,
+                                title = searchTitle,
+                                year = year,
+                                season = season,
+                                episode = episode,
+                                imdbId = details.imdbId,
+                            )
+                        }
+                        StreamLoadCompletion.Addon(
+                            AddonStreamGroup(
+                                addonName = "Telegram",
+                                addonId = "telegram_native",
+                                streams = streams,
+                                isLoading = false,
+                                error = if (searchTitle.isNullOrBlank()) "Media title is not available for Telegram search." else null,
+                            ),
+                        )
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        log.w(error) { "Telegram stream lookup failed for $videoId" }
+                        StreamLoadCompletion.Addon(
+                            AddonStreamGroup(
+                                addonName = "Telegram",
+                                addonId = "telegram_native",
+                                streams = emptyList(),
+                                isLoading = false,
+                                error = error.message ?: "Telegram search failed.",
+                            ),
+                        )
+                    }
+                    publishCompletion(completion)
                 }
             }
 
