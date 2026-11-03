@@ -1,7 +1,6 @@
 package com.nuvio.app.features.home.components
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.ui.NuvioPosterCard
@@ -13,14 +12,14 @@ import com.nuvio.app.features.home.PosterShape
 fun HomePosterCard(
     item: MetaPreview,
     modifier: Modifier = Modifier,
-    hideWithoutPoster: Boolean = false,
     useLandscapeBackdropMode: Boolean = false,
-    hideLabels: Boolean = false,
-    alwaysShowLandscapeClearlogo: Boolean = false,
     isWatched: Boolean = false,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
     showLandscapeOverlay: Boolean = true,
+    hideWithoutPoster: Boolean = false,
+    hideLabels: Boolean = false,
+    alwaysShowLandscapeClearlogo: Boolean = false,
 ) {
     if (hideWithoutPoster && item.poster.isNullOrBlank()) return
     val isLandscapeMode = useLandscapeBackdropMode
