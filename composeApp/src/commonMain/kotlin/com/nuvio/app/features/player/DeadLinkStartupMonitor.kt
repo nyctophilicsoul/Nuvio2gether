@@ -238,26 +238,12 @@ internal class DeadLinkStartupMonitor(
                     candidateKey != null && candidateKey !in attemptedKeys
                 }
                 .toList()
-            // Semi-auto supplies an explicit quality/provider order. Exhaust the
-            // current quality tier before stepping down, but keep discovery live:
-            // a lower-quality link must not pre-empt a same-tier link that a slower
-            // provider is still fetching. Once the tier is exhausted and discovery
-            // completes, advance the ceiling so later results can never promote it.
+            // Semi-auto's candidate provider already supplies the authoritative
+            // quality-first order (including the selected quality ceiling and lower
+            // tiers). Re-sorting or filtering here can discard unlabelled-but-ranked
+            // candidates and override the user's configured provider order.
             val semiAuto = preserveCandidateOrder()
-            val currentTierHeight = fallbackQualityHeight
-            val next = if (semiAuto && currentTierHeight != null) {
-                eligibleCandidates.firstOrNull {
-                    QualityFirstAutoPlayPolicy.detectQualityHeight(it) == currentTierHeight
-                } ?: if (sourceDiscoveryLoading()) {
-                    null
-                } else {
-                    eligibleCandidates.firstOrNull {
-                        QualityFirstAutoPlayPolicy.detectQualityHeight(it)?.let { height ->
-                            height < currentTierHeight
-                        } == true
-                    }
-                }
-            } else if (semiAuto) {
+            val next = if (semiAuto) {
                 eligibleCandidates.firstOrNull()
             } else {
                 eligibleCandidates.sortedBy(::deadLinkSourcePriority).firstOrNull()
