@@ -464,7 +464,7 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
                 caption = content.caption.text
                 val videoAttribute = document.documentTypeAttributes().firstOrNull { it is TdApi.DocumentAttributeVideo } as? TdApi.DocumentAttributeVideo
                 if (videoAttribute != null) {
-                    duration = videoAttribute.duration
+                    duration = videoAttribute.duration.toInt()
                     width = videoAttribute.width
                     height = videoAttribute.height
                 }
