@@ -408,17 +408,22 @@ object SimklAuthRepository : TrackingAuthProvider {
             return@withLock null
         }
 
-        if (response.status !in 200..299) {
-            val oauthError = runCatching {
+        when (simklTokenRefreshResponseAction(
+            status = response.status,
+            oauthErrorCode = runCatching {
                 json.decodeFromString<SimklOAuthError>(response.body).error
-            }.getOrNull()?.lowercase()
-            if (oauthError == "invalid_grant" || oauthError == "invalid_token") {
+            }.getOrNull(),
+        )) {
+            SimklTokenRefreshResponseAction.INVALIDATE -> {
                 log.w { "Simkl refresh grant was rejected; reconnect is required" }
                 invalidateCredentials(SimklAuthError.AUTHORIZATION_REVOKED)
-            } else {
-                log.w { "Simkl token refresh failed with HTTP ${response.status}; retaining credentials" }
+                return@withLock null
             }
-            return@withLock null
+            SimklTokenRefreshResponseAction.TRANSIENT_FAILURE -> {
+                log.w { "Simkl token refresh failed with HTTP ${response.status}; retaining credentials" }
+                return@withLock null
+            }
+            SimklTokenRefreshResponseAction.ACCEPT -> Unit
         }
 
         val refreshed = runCatching { json.decodeFromString<SimklTokenResponse>(response.body) }
@@ -593,6 +598,23 @@ object SimklAuthRepository : TrackingAuthProvider {
 
     private const val ACCESS_TOKEN_REFRESH_SKEW_MS = 24L * 60L * 60L * 1_000L
     private const val REFRESH_TOKEN_LIFETIME_MS = 180L * 24L * 60L * 60L * 1_000L
+}
+
+internal enum class SimklTokenRefreshResponseAction {
+    ACCEPT,
+    INVALIDATE,
+    TRANSIENT_FAILURE,
+}
+
+internal fun simklTokenRefreshResponseAction(
+    status: Int,
+    oauthErrorCode: String? = null,
+): SimklTokenRefreshResponseAction = when {
+    status in 200..299 -> SimklTokenRefreshResponseAction.ACCEPT
+    oauthErrorCode.equals("invalid_grant", ignoreCase = true) ||
+        oauthErrorCode.equals("invalid_token", ignoreCase = true) ->
+        SimklTokenRefreshResponseAction.INVALIDATE
+    else -> SimklTokenRefreshResponseAction.TRANSIENT_FAILURE
 }
 
 @Serializable
