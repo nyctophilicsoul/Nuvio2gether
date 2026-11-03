@@ -462,6 +462,8 @@
     <string name="compose_player_resize_fill">Fill</string>
     <string name="compose_player_resize_fit">Fit</string>
     <string name="compose_player_resize_zoom">Zoom</string>
+    <string name="compose_player_resize_best_fit">Best Fit</string>
+    <string name="compose_player_resize_16_9">16:9</string>
     <string name="compose_player_seek_back_10">Seek backward 10 seconds</string>
     <string name="compose_player_seek_delta_backward">-%1$ds</string>
     <string name="compose_player_seek_delta_forward">+%1$ds</string>
