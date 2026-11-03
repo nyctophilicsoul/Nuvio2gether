@@ -474,7 +474,10 @@ private fun ExoPlayerSurface(
                 else subtitlePresenter.present(cues, format?.sampleMimeType != MimeTypes.TEXT_SSA && format?.codecs != MimeTypes.TEXT_SSA)
             },
             videoBoundsFractionProvider = {
-                playerViewRef?.videoBoundsFraction(latestVideoAspectRatio.value)
+                playerViewRef?.videoBoundsFraction(
+                    mode = latestResizeMode.value,
+                    aspectRatio = latestVideoAspectRatio.value,
+                )
             },
         )
             .setExtensionRendererMode(effectiveDecoderPriority)
@@ -3033,13 +3036,19 @@ private fun ExoPlayer.logCurrentTracks(context: String) {
 }
 
 @androidx.annotation.OptIn(UnstableApi::class)
-private fun PlayerView.videoBoundsFraction(aspectRatio: Float): RectF? {
+private fun PlayerView.videoBoundsFraction(
+    mode: PlayerResizeMode,
+    aspectRatio: Float,
+): RectF? {
     val subtitleView = this.subtitleView ?: return null
     val viewWidth = subtitleView.width.toFloat()
     val viewHeight = subtitleView.height.toFloat()
     if (viewWidth <= 0f || viewHeight <= 0f) return null
 
-    if (aspectRatio > 0f) {
+    // Zoom deliberately crops the source beyond the viewport. Its actual transformed
+    // bounds (including negative offsets and dimensions larger than the viewport) are
+    // required to remap bitmap subtitle coordinates correctly.
+    if (aspectRatio > 0f && mode != PlayerResizeMode.Zoom) {
         val parentRatio = viewWidth / viewHeight
         return if (parentRatio > aspectRatio) {
             val fitW = viewHeight * aspectRatio
@@ -3058,8 +3067,10 @@ private fun PlayerView.videoBoundsFraction(aspectRatio: Float): RectF? {
         ?: return null
     val transformedBounds = transformedChildBoundsInParent(contentFrame) ?: return null
     if (
-        transformedBounds.left < 0f || transformedBounds.top < 0f ||
-        transformedBounds.right > viewWidth || transformedBounds.bottom > viewHeight
+        mode != PlayerResizeMode.Zoom && (
+            transformedBounds.left < 0f || transformedBounds.top < 0f ||
+            transformedBounds.right > viewWidth || transformedBounds.bottom > viewHeight
+        )
     ) return null
     return RectF(
         transformedBounds.left / viewWidth,
