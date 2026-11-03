@@ -49,11 +49,15 @@ object CloudStreamRepositoryParser {
         require(decoded.all { it != null }) {
             "CloudStream plugin list contains malformed entries; refusing a partial refresh"
         }
+        val structurallyValid = decoded.filterNotNull()
+        require(structurallyValid.all { !it.internalName.isNullOrBlank() && !it.url.isNullOrBlank() }) {
+            "CloudStream plugin list contains entries without a package identity or URL"
+        }
 
         // Invalid declared hashes make an individual package unsafe to install, but
         // should not invalidate an otherwise well-formed repository response. Missing
         // hashes remain supported for legacy repositories.
-        val hashValidated = decoded.filterNotNull().filter { plugin ->
+        val hashValidated = structurallyValid.filter { plugin ->
             val declaredHash = plugin.fileHash?.trim().orEmpty()
             declaredHash.isBlank() || CloudStreamFileHash.parse(declaredHash) != null
         }
