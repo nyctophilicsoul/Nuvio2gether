@@ -11,6 +11,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.drinkless.tdlib.TdApi
@@ -343,14 +344,21 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
         val found = linkedMapOf<String, VideoCandidate>()
         for (query in queries) {
             for (filter in listOf(TdApi.SearchMessagesFilterVideo(), TdApi.SearchMessagesFilterDocument())) {
-                val result = tdClient.sendRequest(TdApi.SearchChatMessages().also { request ->
-                    request.chatId = chatId
-                    request.query = query
-                    request.fromMessageId = 0L
-                    request.offset = 0
-                    request.limit = SEARCH_LIMIT
-                    request.filter = filter
-                }, timeoutMs = 20_000L) as? TdApi.FoundChatMessages ?: continue
+                val result = try {
+                    tdClient.sendRequest(TdApi.SearchChatMessages().also { request ->
+                        request.chatId = chatId
+                        request.query = query
+                        request.fromMessageId = 0L
+                        request.offset = 0
+                        request.limit = SEARCH_LIMIT
+                        request.filter = filter
+                    }, timeoutMs = 20_000L) as? TdApi.FoundChatMessages
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    Log.w(TAG, "Telegram search failed for chat $chatId and query '$query'", error)
+                    null
+                } ?: continue
                 result.messages.forEach { message ->
                     extractCandidate(message)?.let { candidate ->
                         found["${candidate.chatId}:${candidate.messageId}:${candidate.fileId}"] = candidate
@@ -467,7 +475,7 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
         if (normalizedTitle.isBlank()) return 0
         val tokens = normalizedTitle.split(' ').filter { it.length > 1 }
         if (tokens.isEmpty()) return 0
-        val matchedTokens = tokens.count(searchable::contains)
+        val matchedTokens = tokens.count { token -> searchable.contains(token) }
         if (matchedTokens < tokens.size) return 0
 
         val seasonValue = season
