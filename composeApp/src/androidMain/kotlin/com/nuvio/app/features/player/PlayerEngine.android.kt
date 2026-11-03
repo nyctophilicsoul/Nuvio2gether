@@ -843,7 +843,10 @@ private fun ExoPlayerSurface(
                     videoAspectRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
                 }
                 playerViewRef?.post {
-                    playerViewRef?.syncLibassOverlayGeometry()
+                    playerViewRef?.let { view ->
+                        view.applyNuvioAspectRatio(resizeMode, videoSize)
+                        view.syncLibassOverlayGeometry()
+                    }
                 }
             }
 
