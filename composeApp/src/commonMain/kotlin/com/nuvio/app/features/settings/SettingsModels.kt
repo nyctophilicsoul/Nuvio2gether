@@ -231,6 +231,11 @@ internal enum class SettingsPage(
         category = SettingsCategory.Services,
         parentPage = Integrations,
     ),
+    Telegram(
+        titleRes = Res.string.settings_telegram_title,
+        category = SettingsCategory.Services,
+        parentPage = Integrations,
+    ),
     TraktAuthentication(
         titleRes = Res.string.compose_settings_page_tracking,
         category = SettingsCategory.Services,
@@ -278,6 +283,7 @@ internal val SettingsPage.icon: ImageVector
         SettingsPage.TmdbEnrichment -> Icons.Default.Link
         SettingsPage.MdbListRatings -> Icons.Default.Link
         SettingsPage.Debrid -> Icons.Default.Link
+        SettingsPage.Telegram -> Icons.Default.Send
         SettingsPage.TraktAuthentication -> Icons.Default.Sync
         SettingsPage.PlaybackPlayer -> Icons.Default.SmartDisplay
         SettingsPage.PlaybackStreamSelection -> Icons.AutoMirrored.Filled.PlaylistPlay
