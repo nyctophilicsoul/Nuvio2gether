@@ -7,7 +7,6 @@ import com.nuvio.app.core.network.IPv4FirstDns
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import nuvio.composeapp.generated.resources.Res
@@ -214,16 +213,20 @@ private suspend fun executeTextRequest(
         if (cause is CancellationException) call.cancel()
     }
     try {
-        call.execute().use { response ->
-            val payload = readResponseBody(response.body)
-            if (!response.isSuccessful) {
-                error(runBlocking { getString(Res.string.network_request_failed_http, response.code) })
-            }
-            if (payload.isBlank()) {
-                throw IllegalStateException(runBlocking { getString(Res.string.network_empty_response_body) })
-            }
-            payload
+        val (isSuccessful, responseCode, payload) = call.execute().use { response ->
+            Triple(
+                response.isSuccessful,
+                response.code,
+                readResponseBody(response.body),
+            )
         }
+        if (!isSuccessful) {
+            error(getString(Res.string.network_request_failed_http, responseCode))
+        }
+        if (payload.isBlank()) {
+            throw IllegalStateException(getString(Res.string.network_empty_response_body))
+        }
+        payload
     } catch (error: IOException) {
         if (call.isCanceled()) throw CancellationException("Cancelled HTTP request", error)
         throw error
