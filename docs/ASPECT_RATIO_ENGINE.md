@@ -39,11 +39,11 @@ Prefer changing the existing content frame's measure ratio; do not replace the d
 ### mpv / libmpv
 Apply properties after file load and whenever the mode changes. Reset every property that the previous mode may have changed.
 - Best Fit: keepaspect=yes, video-aspect-method=container, video-aspect-override=no, video-unscaled=no, video-zoom=0, panscan=0.
-- Fit: keepaspect=yes, video-aspect-method=ignore, video-aspect-override=no, video-unscaled=downscale-big, video-zoom=0, panscan=0.
+- Fit: keepaspect=yes, video-aspect-method=ignore, video-aspect-override=no, video-unscaled=no, video-zoom=0, panscan=0.
 - Full: keepaspect=no, video-unscaled=no, panscan=0.
 - Zoom: keepaspect=yes, video-aspect-method=container, video-aspect-override=no, video-unscaled=no, video-zoom=0, panscan=1.
 - 16:9: keepaspect=yes, video-aspect-override=16:9, video-unscaled=no, video-zoom=0, panscan=0.
-libmpv C API uses mpv_set_property_string / mpv_set_property and mpv_command with the same property names. mpv video-unscaled disables panscan, so it must only be enabled for Fit. panscan is crop-to-fill, not a generic zoom multiplier.
+libmpv C API uses mpv_set_property_string / mpv_set_property and mpv_command with the same property names. Keep `video-unscaled=no` for all scalable modes so smaller sources can still fit the viewport. panscan is crop-to-fill, not a generic zoom multiplier.
 
 ## Screen adaptation
 | Viewport | Best Fit | Fit | Full | Zoom | 16:9 |
