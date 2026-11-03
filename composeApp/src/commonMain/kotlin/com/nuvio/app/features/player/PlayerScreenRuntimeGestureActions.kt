@@ -256,13 +256,7 @@ internal fun PlayerScreenRuntime.cycleResizeMode() {
     resizeMode = nextMode
     lastSyncedSettingsResizeMode = nextMode
     PlayerSettingsRepository.setResizeMode(nextMode)
-    showGestureMessage(
-        when (nextMode) {
-            PlayerResizeMode.Fit -> resizeModeFitLabel
-            PlayerResizeMode.Fill -> resizeModeFillLabel
-            PlayerResizeMode.Zoom -> resizeModeZoomLabel
-        },
-    )
+    showGestureMessage(nextMode.label)
     controlsVisible = true
 }
 
