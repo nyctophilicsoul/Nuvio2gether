@@ -2,7 +2,6 @@ package com.nuvio.app.features.player
 
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.debrid.DebridSettingsRepository
-import com.nuvio.app.features.streams.QualityFirstAutoPlayPolicy
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.isSelectableForPlayback
 import kotlinx.coroutines.CancellationException
@@ -36,7 +35,6 @@ internal class DeadLinkStartupMonitor(
     private val attemptedKeys = linkedSetOf<String>()
     private val deadMarkedKeys = linkedSetOf<String>()
     private var currentStream: StreamItem? = null
-    private var fallbackQualityHeight: Int? = null
     private var playbackStarted = false
     private var buffering = false
     private var awaitingActivation = false
@@ -50,7 +48,6 @@ internal class DeadLinkStartupMonitor(
         attemptedKeys.clear()
         deadMarkedKeys.clear()
         currentStream = null
-        fallbackQualityHeight = null
         playbackStarted = false
         buffering = false
         awaitingActivation = false
@@ -68,9 +65,6 @@ internal class DeadLinkStartupMonitor(
         if (closed) return
         val key = identityKeyOverride ?: stream.playerSourceIdentityKey() ?: return
         currentStream = stream
-        if (preserveCandidateOrder() && fallbackQualityHeight == null) {
-            fallbackQualityHeight = QualityFirstAutoPlayPolicy.detectQualityHeight(stream)
-        }
         if (!timeoutEnabled()) {
             cancelTimer()
             generation++
@@ -259,9 +253,6 @@ internal class DeadLinkStartupMonitor(
                 attemptedKeys += nextKey
                 currentKey = nextKey
                 currentStream = next
-                if (semiAuto) {
-                    QualityFirstAutoPlayPolicy.detectQualityHeight(next)?.let { fallbackQualityHeight = it }
-                }
                 generation++
                 playbackStarted = false
                 buffering = false
