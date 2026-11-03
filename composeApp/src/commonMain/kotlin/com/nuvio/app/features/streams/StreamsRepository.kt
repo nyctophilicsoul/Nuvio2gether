@@ -750,6 +750,7 @@ object StreamsRepository {
                         val noResultReason = when {
                             searchTitle.isNullOrBlank() -> "Media title is not available for Telegram search."
                             selectedChats.isEmpty() -> "No Telegram channels or groups are selected. Configure sources in Settings > Integrations > Telegram."
+                            streams.isEmpty() -> "No matching Telegram video was found in the selected sources."
                             else -> null
                         }
                         StreamLoadCompletion.Addon(
