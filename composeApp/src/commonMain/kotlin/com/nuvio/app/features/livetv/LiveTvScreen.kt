@@ -75,6 +75,7 @@ import nuvio.composeapp.generated.resources.live_tv_favorites
 import nuvio.composeapp.generated.resources.live_tv_guide_title
 import nuvio.composeapp.generated.resources.live_tv_load
 import nuvio.composeapp.generated.resources.live_tv_load_file
+import nuvio.composeapp.generated.resources.live_tv_magnet_unsupported
 import nuvio.composeapp.generated.resources.live_tv_recent_channel_cta
 import nuvio.composeapp.generated.resources.live_tv_recent_channel_title
 import nuvio.composeapp.generated.resources.live_tv_refresh
@@ -195,7 +196,7 @@ fun LiveTvScreen(
         scope.launch {
             fileImportError = null
             if (sourceUrl.trim().startsWith("magnet:", ignoreCase = true)) {
-                fileImportError = "Torrent magnet links are not supported as Live TV sources yet."
+                fileImportError = stringResource(Res.string.live_tv_magnet_unsupported)
             } else if (LiveTvRepository.load(sourceUrl).isSuccess) {
                 editingSource = false
                 showingAdvancedSettings = false
