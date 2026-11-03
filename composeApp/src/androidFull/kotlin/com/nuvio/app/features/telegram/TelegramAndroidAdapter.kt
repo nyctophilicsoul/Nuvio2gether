@@ -297,14 +297,9 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
     }
 
     override suspend fun clearCache() {
-        // This directory contains only Telegram's TDLib file cache, never user downloads.
-        withContext(Dispatchers.IO) {
-            val directory = cacheDirectory
-            if (directory.exists()) {
-                directory.listFiles()?.forEach { file -> file.deleteRecursively() }
-            }
-            directory.mkdirs()
-        }
+        // Evict only TDLib file IDs known to this proxy; never touch Nuvio downloads or account data.
+        proxy.clearCache()
+        lookupCache.clear()
         _snapshot.value = _snapshot.value.copy(cacheSizeBytes = calculateCacheSize())
     }
 
