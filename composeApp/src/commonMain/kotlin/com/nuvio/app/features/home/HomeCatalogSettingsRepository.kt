@@ -52,7 +52,8 @@ enum class HomeCatalogRowPlacement(val storageValue: String) {
 
     companion object {
         fun fromStorage(value: String?): HomeCatalogRowPlacement =
-            values().firstOrNull { it.storageValue == value } ?: NORMAL
+            if (value == "pinned_position") NORMAL
+            else values().firstOrNull { it.storageValue == value } ?: NORMAL
     }
 }
 
@@ -460,13 +461,14 @@ object HomeCatalogSettingsRepository {
     fun setRowPlacement(key: String, placement: HomeCatalogRowPlacement) {
         ensureLoaded()
         val current = preferences[key] ?: defaultPreferenceForMissingKey(key) ?: return
-        if (current.rowPlacement == placement.storageValue) return
-        if (placement == HomeCatalogRowPlacement.PINNED_POSITION) {
-            val visibleKeys = _uiState.value.items.map { it.key }
-            if (key in visibleKeys) persistVisibleOrder(visibleKeys)
+        val effectivePlacement = if (placement == HomeCatalogRowPlacement.PINNED_POSITION) {
+            HomeCatalogRowPlacement.NORMAL
+        } else {
+            placement
         }
+        if (current.rowPlacement == effectivePlacement.storageValue) return
         updatePreference(key) { preference ->
-            preference.copy(rowPlacement = placement.storageValue)
+            preference.copy(rowPlacement = effectivePlacement.storageValue)
         }
     }
 
@@ -886,8 +888,7 @@ object HomeCatalogSettingsRepository {
         val start = minOf(fromIndex, toIndex)
         val end = maxOf(fromIndex, toIndex)
         return cohort.subList(start, end + 1).none { item ->
-            item.rowPlacement == HomeCatalogRowPlacement.PINNED_POSITION ||
-                pinSection(item) != fromSection
+            pinSection(item) != fromSection
         }
     }
 
@@ -1109,7 +1110,7 @@ object HomeCatalogSettingsRepository {
                 enabled = stored?.enabled ?: true,
                 heroSourceEnabled = heroSourceEnabled,
                 order = stored?.order ?: nextOrder++,
-                rowPlacement = stored?.rowPlacement ?: HomeCatalogRowPlacement.NORMAL.storageValue,
+                rowPlacement = HomeCatalogRowPlacement.fromStorage(stored?.rowPlacement).storageValue,
             )
         }
         preferences = normalized.toMap()
