@@ -43,8 +43,8 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -625,11 +625,8 @@ fun Modifier.nuvioKeyboardFocusIndicator(
     focusModifier.drawWithContent {
         drawContent()
         if (enabled && isFocused) {
-            val outline = shape.createOutline(size, layoutDirection, density)
-            val path = when (outline) {
-                is Outline.Rectangle -> Path().apply { addRect(outline.rect) }
-                is Outline.Rounded -> Path().apply { addRoundRect(outline.roundRect) }
-                is Outline.Generic -> outline.path
+            val path = Path().apply {
+                addOutline(shape.createOutline(size, layoutDirection, density))
             }
             drawPath(
                 path = path,
