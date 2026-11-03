@@ -283,7 +283,7 @@ internal val SettingsPage.icon: ImageVector
         SettingsPage.TmdbEnrichment -> Icons.Default.Link
         SettingsPage.MdbListRatings -> Icons.Default.Link
         SettingsPage.Debrid -> Icons.Default.Link
-        SettingsPage.Telegram -> Icons.Default.Send
+        SettingsPage.Telegram -> Icons.Default.Link
         SettingsPage.TraktAuthentication -> Icons.Default.Sync
         SettingsPage.PlaybackPlayer -> Icons.Default.SmartDisplay
         SettingsPage.PlaybackStreamSelection -> Icons.AutoMirrored.Filled.PlaylistPlay
