@@ -202,7 +202,9 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
         try {
             val response = tdClient.sendRequest(TdApi.GetChats().also { it.limit = CHAT_LIMIT }) as? TdApi.Chats
             val selected = readSelectedChatIds()
-            val chatList = response?.chatIds.orEmpty().mapNotNull { chatId ->
+            // Preserve explicitly selected sources even when they are outside the first chat-list page.
+            val listedChatIds = (response?.chatIds?.toList().orEmpty() + selected).distinct()
+            val chatList = listedChatIds.mapNotNull { chatId ->
                 val chat = tdClient.sendRequest(TdApi.GetChat(chatId)) as? TdApi.Chat ?: return@mapNotNull null
                 val isChannel = when (val kind = chat.type) {
                     is TdApi.ChatTypeSupergroup -> kind.isChannel
