@@ -153,8 +153,10 @@ enum class PlayerResizeMode(val label: String) {
 
     companion object {
         fun fromStoredName(value: String?): PlayerResizeMode = when (value) {
+            // "Fit" is also the current enum name. Do not remap it to BestFit:
+            // doing so makes a user's Fit selection disappear after app restart.
+            // The only legacy alias retained here is the old "Fill" value.
             "Fill" -> Full
-            "Fit" -> BestFit
             else -> entries.firstOrNull { it.name == value } ?: BestFit
         }
     }
