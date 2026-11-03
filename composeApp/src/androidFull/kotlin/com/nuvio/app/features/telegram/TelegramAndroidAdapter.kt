@@ -46,6 +46,8 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
         val durationSeconds: Int = 0,
         val width: Int = 0,
         val height: Int = 0,
+        val hasAudioTag: Boolean = false,
+        val hasSubtitleTag: Boolean = false,
     )
 
     private val appContext = context.applicationContext
@@ -469,6 +471,10 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
             durationSeconds = duration,
             width = width,
             height = height,
+            hasAudioTag = Regex("(?i)\\b(dual[ ._-]?audio|multi[ ._-]?audio|dubbed|aac|ac3|eac3|dts|truehd|atmos)\\b")
+                .containsMatchIn("$fileName $caption"),
+            hasSubtitleTag = Regex("(?i)\\b(subs?|subbed|subtitle|softsubs?|hardsubs?|engsub|multisub)\\b")
+                .containsMatchIn("$fileName $caption"),
         )
     }
 
@@ -493,6 +499,8 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
             if (codec != null) add(codec)
             add(humanBytes(fileSize))
             if (durationSeconds > 0) add("${durationSeconds / 60} min")
+            if (hasAudioTag) add("Audio tagged")
+            if (hasSubtitleTag) add("Subs tagged")
         }.joinToString(" · ")
         return StreamItem(
             name = "[Telegram] $details",
