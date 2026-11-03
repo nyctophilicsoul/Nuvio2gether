@@ -47,8 +47,8 @@ private fun TelegramSettingsContent(isTablet: Boolean) {
 
     var apiId by rememberSaveable { mutableStateOf("") }
     var apiHash by remember { mutableStateOf("") }
-    var phone by rememberSaveable { mutableStateOf("") }
-    var loginCode by rememberSaveable { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var loginCode by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var botToken by remember { mutableStateOf("") }
     var channelInput by rememberSaveable { mutableStateOf("") }
