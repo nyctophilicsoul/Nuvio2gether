@@ -429,8 +429,8 @@ object AddonRepository {
     }
 
     private fun pushToServer(
-        profileId: Int = currentProfileId,
-        generation: Long = profileGeneration,
+        profileId: Int,
+        generation: Long,
     ) {
         if (isUsingPrimaryAddonsFromSecondaryProfile()) return
         val addons = synchronized(activeRefreshJobsLock) {
