@@ -247,6 +247,7 @@ internal fun MainAppContent(
         LaunchedEffect(Unit) {
             withContext(Dispatchers.IO) {
                 MetaScreenSettingsRepository.ensureLoaded()
+                HomeCatalogSettingsRepository.ensureLoaded()
                 LibraryRepository.ensureLoaded()
                 PlayerSettingsRepository.ensureLoaded()
                 P2pSettingsRepository.ensureLoaded()
