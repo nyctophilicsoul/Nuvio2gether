@@ -47,7 +47,7 @@ class MergedHomeRowsTest {
         )
 
         assertEquals(listOf("all", "movies", "series"), tabs.map { it.key })
-        assertEquals(listOf("movie-a", "series-a", "movie-b", "series-b"), tabs[0].items.map { it.id })
+        assertEquals(listOf("movie-a", "movie-b", "series-a", "series-b"), tabs[0].items.map { it.id })
         assertEquals(listOf("movie-a", "movie-b"), tabs[1].items.map { it.id })
         assertEquals(listOf("series-a", "series-b"), tabs[2].items.map { it.id })
         assertTrue(tabs.all { it.hasMore })
