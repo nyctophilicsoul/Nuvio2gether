@@ -273,66 +273,66 @@ object AddonRepository {
     fun removeAddon(manifestUrl: String) {
         if (isUsingPrimaryAddonsFromSecondaryProfile()) return
         log.i { "removeAddon() — $manifestUrl" }
-        var changed = false
-        _uiState.update { current ->
+        val mutation = synchronized(activeRefreshJobsLock) {
+            val profileId = currentProfileId
+            val generation = profileGeneration
+            if (!isProfileGenerationCurrentLocked(profileId, generation)) return
+            val current = _uiState.value
             val updatedAddons = current.addons.filterNot { it.manifestUrl == manifestUrl }
-            changed = updatedAddons.size != current.addons.size
-            if (changed) current.copy(addons = updatedAddons) else current
+            if (updatedAddons.size == current.addons.size) return
+            _uiState.value = current.copy(addons = updatedAddons)
+            val refreshJob = activeRefreshJobs.remove(manifestUrl)
+            Triple(profileId to generation, updatedAddons, refreshJob)
         }
-        if (!changed) return
-        val refreshJob = synchronized(activeRefreshJobsLock) {
-            activeRefreshJobs.remove(manifestUrl)
-        }
-        refreshJob?.cancel()
-        persist()
-        pushToServer()
+        mutation.third?.cancel()
+        persistSnapshot(mutation.first.first, mutation.second)
+        pushToServer(mutation.first.first, mutation.first.second)
     }
 
     fun moveAddon(fromIndex: Int, toIndex: Int) {
         if (isUsingPrimaryAddonsFromSecondaryProfile()) return
-        var changed = false
-        _uiState.update { current ->
-            val addons = current.addons
+        val mutation = synchronized(activeRefreshJobsLock) {
+            val profileId = currentProfileId
+            val generation = profileGeneration
+            if (!isProfileGenerationCurrentLocked(profileId, generation)) return
+            val addons = _uiState.value.addons
             if (
                 fromIndex !in addons.indices ||
                 toIndex !in addons.indices ||
                 fromIndex == toIndex
             ) {
-                return@update current
+                return
             }
-
             val reordered = addons.toMutableList()
             val movingAddon = reordered.removeAt(fromIndex)
             reordered.add(toIndex, movingAddon)
-            changed = true
-            current.copy(addons = reordered)
+            _uiState.value = _uiState.value.copy(addons = reordered)
+            Triple(profileId to generation, reordered, Unit)
         }
-        if (!changed) return
-        persist()
-        pushToServer()
+        persistSnapshot(mutation.first.first, mutation.second)
+        pushToServer(mutation.first.first, mutation.first.second)
     }
 
     fun setAddonEnabled(manifestUrl: String, enabled: Boolean) {
         if (isUsingPrimaryAddonsFromSecondaryProfile()) return
-        var shouldRefresh = false
-        var changed = false
-        _uiState.update { current ->
-            current.copy(
-                addons = current.addons.map { addon ->
-                    if (addon.manifestUrl != manifestUrl || addon.enabled == enabled) {
-                        addon
-                    } else {
-                        changed = true
-                        shouldRefresh = enabled && addon.manifest == null && !addon.isRefreshing
-                        addon.copy(enabled = enabled)
-                    }
-                },
-            )
+        val mutation = synchronized(activeRefreshJobsLock) {
+            val profileId = currentProfileId
+            val generation = profileGeneration
+            if (!isProfileGenerationCurrentLocked(profileId, generation)) return
+            val current = _uiState.value
+            val index = current.addons.indexOfFirst { it.manifestUrl == manifestUrl }
+            if (index < 0 || current.addons[index].enabled == enabled) return
+            val existing = current.addons[index]
+            val shouldRefresh = enabled && existing.manifest == null && !existing.isRefreshing
+            val updatedAddons = current.addons.toMutableList().apply {
+                this[index] = existing.copy(enabled = enabled)
+            }
+            _uiState.value = current.copy(addons = updatedAddons)
+            Triple(profileId to generation, updatedAddons, shouldRefresh)
         }
-        if (!changed) return
-        persist()
-        pushToServer()
-        if (shouldRefresh) {
+        persistSnapshot(mutation.first.first, mutation.second)
+        pushToServer(mutation.first.first, mutation.first.second)
+        if (mutation.third) {
             refreshAddon(manifestUrl)
         }
     }
