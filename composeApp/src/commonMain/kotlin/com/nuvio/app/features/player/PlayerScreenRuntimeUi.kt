@@ -358,7 +358,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
                         showLiveTvChannelsPanel = true
                         controlsVisible = true
                     },
-                    modifier = Modifier.align(Alignment.TopStart).padding(start = 24.dp, top = 72.dp),
+                    modifier = Modifier.align(Alignment.TopStart).padding(start = 24.dp, top = 56.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Tv,
