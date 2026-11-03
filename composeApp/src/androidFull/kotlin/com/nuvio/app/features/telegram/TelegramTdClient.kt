@@ -6,6 +6,7 @@ import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -48,6 +49,7 @@ internal class TelegramTdClient(
     val authState: StateFlow<TelegramTdAuthState> = _authState.asStateFlow()
 
     @Volatile private var client: Client? = null
+    @Volatile private var initializationJob: Job? = null
     @Volatile private var nativeAvailable: Boolean? = null
 
     fun isNativeAvailable(): Boolean {
@@ -65,36 +67,41 @@ internal class TelegramTdClient(
 
     fun isAuthenticated(): Boolean = _authState.value is TelegramTdAuthState.Ready
 
+    @Synchronized
     fun initialize() {
-        if (client != null) return
-        scope.launch {
-            if (client != null) return@launch
-            val apiId = apiIdProvider()
-            val apiHash = apiHashProvider()
-            if (!isNativeAvailable()) {
-                _authState.value = TelegramTdAuthState.Failed("TDLib native library is unavailable on this device.")
-                return@launch
-            }
-            if (apiId <= 0 || !apiHash.matches(Regex("[a-fA-F0-9]{32}"))) {
-                _authState.value = TelegramTdAuthState.Failed("Enter a valid Telegram API ID and 32-character API hash.")
-                return@launch
-            }
-
-            _authState.value = TelegramTdAuthState.Initializing
+        if (client != null || initializationJob?.isActive == true) return
+        initializationJob = scope.launch {
             try {
-                runCatching { Client.execute(TdApi.SetLogVerbosityLevel(1)) }
-                val created = Client.create(
-                    { update -> handleUpdate(update) },
-                    { error -> Log.e(TAG, "TDLib update exception", error) },
-                    { error -> Log.e(TAG, "TDLib default exception", error) },
-                )
-                // TDLib first emits AuthorizationStateWaitTdlibParameters; the state handler
-                // sends configuration exactly once instead of racing the startup sequence.
-                client = created
-            } catch (error: Throwable) {
-                Log.e(TAG, "TDLib initialization failed", error)
-                client = null
-                _authState.value = TelegramTdAuthState.Failed(error.message ?: "Unable to initialize Telegram.")
+                if (client != null) return@launch
+                val apiId = apiIdProvider()
+                val apiHash = apiHashProvider()
+                if (!isNativeAvailable()) {
+                    _authState.value = TelegramTdAuthState.Failed("TDLib native library is unavailable on this device.")
+                    return@launch
+                }
+                if (apiId <= 0 || !apiHash.matches(Regex("[a-fA-F0-9]{32}"))) {
+                    _authState.value = TelegramTdAuthState.Failed("Enter a valid Telegram API ID and 32-character API hash.")
+                    return@launch
+                }
+
+                _authState.value = TelegramTdAuthState.Initializing
+                try {
+                    runCatching { Client.execute(TdApi.SetLogVerbosityLevel(1)) }
+                    val created = Client.create(
+                        { update -> handleUpdate(update) },
+                        { error -> Log.e(TAG, "TDLib update exception", error) },
+                        { error -> Log.e(TAG, "TDLib default exception", error) },
+                    )
+                    // TDLib first emits AuthorizationStateWaitTdlibParameters; the state handler
+                    // sends configuration exactly once instead of racing the startup sequence.
+                    client = created
+                } catch (error: Throwable) {
+                    Log.e(TAG, "TDLib initialization failed", error)
+                    client = null
+                    _authState.value = TelegramTdAuthState.Failed(error.message ?: "Unable to initialize Telegram.")
+                }
+            } finally {
+                initializationJob = null
             }
         }
     }
@@ -258,6 +265,7 @@ internal class TelegramTdClient(
     }
 
     suspend fun resetAndWait(logOut: Boolean = false) {
+        initializationJob?.join()
         val current = client ?: run {
             _authState.value = TelegramTdAuthState.Idle
             return
@@ -298,7 +306,10 @@ internal class TelegramTdClient(
         }
     }
 
+    @Synchronized
     fun reset() {
+        initializationJob?.cancel()
+        initializationJob = null
         val current = client
         client = null
         if (current != null) {
