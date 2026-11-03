@@ -100,13 +100,19 @@ internal class TelegramTdClient(
     }
 
     private fun sendTdlibParameters(target: Client, apiId: Int, apiHash: String) {
-        val databaseDirectory = File(appContext.filesDir, "telegram/tdlib").absolutePath
-        val filesDirectory = File(appContext.filesDir, "telegram/files").absolutePath
+        val databaseDirectoryFile = File(appContext.filesDir, "telegram/tdlib")
+        val filesDirectoryFile = File(appContext.filesDir, "telegram/files")
+        databaseDirectoryFile.mkdirs()
+        filesDirectoryFile.mkdirs()
+        val databaseDirectory = databaseDirectoryFile.absolutePath
+        val filesDirectory = filesDirectoryFile.absolutePath
         val parameters = TdApi.SetTdlibParameters().also { value ->
             value.apiId = apiId
             value.apiHash = apiHash
             value.databaseDirectory = databaseDirectory
             value.filesDirectory = filesDirectory
+            value.useFileDatabase = true
+            value.useChatInfoDatabase = true
             value.useMessageDatabase = false
             value.useSecretChats = false
             value.systemLanguageCode = Locale.getDefault().toLanguageTag().ifBlank { "en" }
