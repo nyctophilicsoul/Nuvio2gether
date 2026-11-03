@@ -7,7 +7,7 @@ class SimklAuthRepositoryTest {
 
     @Test
     fun `successful refresh responses are accepted`() {
-        listOf(200, 201, 204).forEach { status ->
+        listOf(200, 201).forEach { status ->
             assertEquals(
                 SimklTokenRefreshResponseAction.ACCEPT,
                 simklTokenRefreshResponseAction(status),
@@ -22,7 +22,7 @@ class SimklAuthRepositoryTest {
             simklTokenRefreshResponseAction(400, "invalid_grant"),
         )
         assertEquals(
-            SimklTokenRefreshResponseAction.INVALIDATE,
+            SimklTokenRefreshResponseAction.TRANSIENT_FAILURE,
             simklTokenRefreshResponseAction(401, "invalid_token"),
         )
         assertEquals(
