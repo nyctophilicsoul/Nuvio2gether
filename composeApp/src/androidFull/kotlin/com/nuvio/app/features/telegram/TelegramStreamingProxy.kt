@@ -57,10 +57,17 @@ internal class TelegramStreamingProxy(
     )
 
     private val appContext = context.applicationContext
+    private val fileRegistry = File(appContext.filesDir, "telegram/proxy_file_ids.txt")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mutex = Mutex()
     private val requestStates = mutableMapOf<Int, ActiveRequests>()
-    private val registeredFileIds = mutableSetOf<Int>()
+    private val registeredFileIds = mutableSetOf<Int>().apply {
+        runCatching {
+            fileRegistry.takeIf(File::exists)?.forEachLine { line ->
+                line.trim().toIntOrNull()?.takeIf { it > 0 }?.let(::add)
+            }
+        }.onFailure { error -> Log.w(TAG, "Could not restore Telegram proxy file registry", error) }
+    }
     private val mimeTypes = mutableMapOf<Int, String>()
 
     @Volatile private var server: ApplicationEngine? = null
@@ -154,7 +161,10 @@ internal class TelegramStreamingProxy(
     fun streamUrl(fileId: Int, mimeType: String?): String {
         start()
         if (!mimeType.isNullOrBlank()) synchronized(mimeTypes) { mimeTypes[fileId] = mimeType }
-        synchronized(registeredFileIds) { registeredFileIds += fileId }
+        synchronized(registeredFileIds) {
+            registeredFileIds += fileId
+            persistFileRegistryLocked()
+        }
         return "http://127.0.0.1:$port/file/$fileId?key=$accessToken"
     }
 
@@ -185,7 +195,10 @@ internal class TelegramStreamingProxy(
             }
             ids.forEach {
                 deleteFile(it)
-                synchronized(registeredFileIds) { registeredFileIds.remove(it) }
+                synchronized(registeredFileIds) {
+                    registeredFileIds.remove(it)
+                    persistFileRegistryLocked()
+                }
                 synchronized(mimeTypes) { mimeTypes.remove(it) }
             }
         }
@@ -215,7 +228,10 @@ internal class TelegramStreamingProxy(
                         // Drop state before the TDLib calls so a fresh request can establish a new lease.
                         requestStates.remove(fileId)
                         deleteFile(fileId)
-                        synchronized(registeredFileIds) { registeredFileIds.remove(fileId) }
+                        synchronized(registeredFileIds) {
+                            registeredFileIds.remove(fileId)
+                            persistFileRegistryLocked()
+                        }
                         synchronized(mimeTypes) { mimeTypes.remove(fileId) }
                     }
                 }
@@ -270,6 +286,15 @@ internal class TelegramStreamingProxy(
             attempts += 1
         }
         null
+    }
+
+    private fun persistFileRegistryLocked() {
+        runCatching {
+            fileRegistry.parentFile?.mkdirs()
+            fileRegistry.writeText(registeredFileIds.sorted().joinToString("\n"))
+        }.onFailure { error ->
+            Log.w(TAG, "Could not persist Telegram proxy file registry", error)
+        }
     }
 
     private suspend fun deleteFile(fileId: Int) {
