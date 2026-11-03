@@ -293,7 +293,7 @@ private fun TelegramSettingsContent(isTablet: Boolean) {
 }
 
 private fun formatTelegramCacheSize(bytes: Long): String = when {
-    bytes >= 1024L * 1024L * 1024L -> "%.2f GB".format(bytes / (1024.0 * 1024.0 * 1024.0))
-    bytes >= 1024L * 1024L -> "%.1f MB".format(bytes / (1024.0 * 1024.0))
+    bytes >= 1024L * 1024L * 1024L -> "${((bytes * 100L) / (1024L * 1024L * 1024L)) / 100.0} GB"
+    bytes >= 1024L * 1024L -> "${((bytes * 10L) / (1024L * 1024L)) / 10.0} MB"
     else -> "${bytes / 1024L} KB"
 }
