@@ -2535,19 +2535,19 @@ private fun PlayerView.applyNuvioAspectRatio(mode: PlayerResizeMode, videoSize: 
         ?: return
     val codedRatio = if (videoSize.width > 0 && videoSize.height > 0) {
         videoSize.width.toFloat() / videoSize.height.toFloat()
-    } else {
-        0f
-    }
+    } else 0f
+    val correctedRatio = if (codedRatio > 0f && videoSize.pixelWidthHeightRatio > 0f) {
+        codedRatio * videoSize.pixelWidthHeightRatio
+    } else codedRatio
     when (mode) {
-        PlayerResizeMode.BestFit -> {
-            // Media3's VideoSize pixelWidthHeightRatio remains authoritative for SAR correction.
-        }
-        PlayerResizeMode.Fit -> if (codedRatio > 0f) contentFrame.setAspectRatio(codedRatio)
-        PlayerResizeMode.Full -> contentFrame.setAspectRatio(0f)
-        PlayerResizeMode.Zoom -> {
-            // Keep Media3's source DAR; RESIZE_MODE_ZOOM expands the measured frame.
-        }
-        PlayerResizeMode.Ratio16x9 -> contentFrame.setAspectRatio(16f / 9f)
+        PlayerResizeMode.BestFit, PlayerResizeMode.Zoom ->
+            contentFrame.setAspectRatio(correctedRatio)
+        PlayerResizeMode.Fit ->
+            contentFrame.setAspectRatio(codedRatio)
+        PlayerResizeMode.Full ->
+            contentFrame.setAspectRatio(0f)
+        PlayerResizeMode.Ratio16x9 ->
+            contentFrame.setAspectRatio(16f / 9f)
     }
 }
 
