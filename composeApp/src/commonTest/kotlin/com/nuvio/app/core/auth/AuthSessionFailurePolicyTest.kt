@@ -6,7 +6,7 @@ import kotlin.test.assertTrue
 
 class AuthSessionFailurePolicyTest {
     @Test
-    fun `401 response is treated as an invalid remote session`() {
+    fun `401 remaining after refresh retry is treated as an invalid remote session`() {
         assertTrue(isInvalidRemoteSessionFailure(401, "Unauthorized"))
     }
 
