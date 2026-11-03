@@ -617,13 +617,15 @@ fun Modifier.nuvioKeyboardFocusIndicator(
     var isFocused by remember { mutableStateOf(false) }
     val density = androidx.compose.ui.platform.LocalDensity.current
     val layoutDirection = androidx.compose.ui.platform.LocalLayoutDirection.current
+    // Resolve composition-local theme values during composition, not in the draw callback.
+    val accentColor = MaterialTheme.nuvio.colors.accent
     val focusModifier = this.onFocusChanged { isFocused = it.isFocused }
     focusModifier.drawWithContent {
         drawContent()
         if (enabled && isFocused) {
             drawOutline(
                 outline = shape.createOutline(size, layoutDirection, density),
-                color = MaterialTheme.nuvio.colors.accent,
+                color = accentColor,
                 style = androidx.compose.ui.graphics.drawscope.Stroke(width = with(density) { 2.dp.toPx() }),
             )
         }
