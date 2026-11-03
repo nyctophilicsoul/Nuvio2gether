@@ -247,7 +247,11 @@ internal class DeadLinkStartupMonitor(
             val currentTierHeight = fallbackQualityHeight
             val next = if (semiAuto && currentTierHeight != null) {
                 eligibleCandidates.firstOrNull {
-                    QualityFirstAutoPlayPolicy.detectQualityHeight(it) == currentTierHeight
+                    val height = QualityFirstAutoPlayPolicy.detectQualityHeight(it)
+                    // Semi-auto ranking has already ordered the selected quality tier.
+                    // Keep unlabelled candidates in that order rather than dropping
+                    // them merely because their provider omitted resolution metadata.
+                    height == currentTierHeight || height == null
                 } ?: if (sourceDiscoveryLoading()) {
                     null
                 } else {
