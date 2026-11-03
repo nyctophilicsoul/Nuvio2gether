@@ -2010,17 +2010,41 @@ private class NuvioLibmpvView(
     fun applyResizeMode(resizeMode: PlayerResizeMode) {
         executeMpv {
             when (resizeMode) {
-                PlayerResizeMode.Fit -> {
+                PlayerResizeMode.BestFit -> {
+                    mpv.setPropertyString("keepaspect", "yes")
+                    mpv.setPropertyString("video-aspect-method", "container")
+                    mpv.setPropertyString("video-aspect-override", "no")
+                    mpv.setPropertyString("video-unscaled", "no")
+                    mpv.setPropertyDouble("video-zoom", 0.0)
                     mpv.setPropertyDouble("panscan", 0.0)
-                    mpv.setPropertyString("video-aspect-override", "no")
                 }
-                PlayerResizeMode.Fill -> {
-                    mpv.setPropertyDouble("panscan", 1.0)
+                PlayerResizeMode.Fit -> {
+                    mpv.setPropertyString("keepaspect", "yes")
+                    mpv.setPropertyString("video-aspect-method", "ignore")
                     mpv.setPropertyString("video-aspect-override", "no")
+                    mpv.setPropertyString("video-unscaled", "downscale-big")
+                    mpv.setPropertyDouble("video-zoom", 0.0)
+                    mpv.setPropertyDouble("panscan", 0.0)
+                }
+                PlayerResizeMode.Full -> {
+                    mpv.setPropertyString("video-unscaled", "no")
+                    mpv.setPropertyDouble("panscan", 0.0)
+                    mpv.setPropertyString("keepaspect", "no")
                 }
                 PlayerResizeMode.Zoom -> {
-                    mpv.setPropertyDouble("panscan", 0.5)
+                    mpv.setPropertyString("keepaspect", "yes")
+                    mpv.setPropertyString("video-aspect-method", "container")
                     mpv.setPropertyString("video-aspect-override", "no")
+                    mpv.setPropertyString("video-unscaled", "no")
+                    mpv.setPropertyDouble("video-zoom", 0.0)
+                    mpv.setPropertyDouble("panscan", 1.0)
+                }
+                PlayerResizeMode.Ratio16x9 -> {
+                    mpv.setPropertyString("keepaspect", "yes")
+                    mpv.setPropertyString("video-unscaled", "no")
+                    mpv.setPropertyString("video-aspect-override", "16:9")
+                    mpv.setPropertyDouble("video-zoom", 0.0)
+                    mpv.setPropertyDouble("panscan", 0.0)
                 }
             }
         }
@@ -2506,8 +2530,8 @@ private fun PlaybackException.isDecoderFailure(): Boolean =
 
 private fun PlayerResizeMode.toExoResizeMode(): Int =
     when (this) {
-        PlayerResizeMode.Fit -> AspectRatioFrameLayout.RESIZE_MODE_FIT
-        PlayerResizeMode.Fill -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+        PlayerResizeMode.BestFit, PlayerResizeMode.Fit, PlayerResizeMode.Ratio16x9 -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+        PlayerResizeMode.Full -> AspectRatioFrameLayout.RESIZE_MODE_FILL
         PlayerResizeMode.Zoom -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
     }
 
