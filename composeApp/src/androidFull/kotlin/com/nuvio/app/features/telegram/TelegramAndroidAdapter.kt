@@ -462,12 +462,6 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
                 fileSize = document.document.size
                 mimeType = document.mimeType
                 caption = content.caption.text
-                val videoAttribute = document.documentTypeAttributes().firstOrNull { it is TdApi.DocumentAttributeVideo } as? TdApi.DocumentAttributeVideo
-                if (videoAttribute != null) {
-                    duration = videoAttribute.duration.toInt()
-                    width = videoAttribute.width
-                    height = videoAttribute.height
-                }
             }
             else -> return null
         }
@@ -493,9 +487,6 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
                 .containsMatchIn("$fileName $caption"),
         )
     }
-
-    private fun TdApi.Document.documentTypeAttributes(): List<TdApi.DocumentAttribute> =
-        attributes?.toList().orEmpty()
 
     private fun VideoCandidate.toStreamItem(): StreamItem {
         val heightValue = max(height, parseHeight(fileName))
