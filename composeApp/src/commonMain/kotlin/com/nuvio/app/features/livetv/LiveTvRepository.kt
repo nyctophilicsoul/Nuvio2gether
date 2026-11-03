@@ -432,15 +432,28 @@ mutableUiState.value = mutableUiState.value.copy(
 
     fun recordRecentChannel(channel: LiveTvChannel) {
         if (!featureEnabled) return
+        val state = mutableUiState.value
+        // Stalker create_link returns a short-lived playback URL. Persist the
+        // original channel URL/identity so Continue can resolve a fresh link.
+        val channelToPersist = if (
+            state.sourceType == LiveTvSourceType.Stalker &&
+            !channel.stalkerCommand.isNullOrBlank()
+        ) {
+            state.channels.firstOrNull { it.id == channel.id }
+                ?: state.channels.firstOrNull { it.stalkerCommand == channel.stalkerCommand }
+                ?: channel
+        } else {
+            channel
+        }
         val recentChannel = LiveTvRecentChannel(
-            streamUrl = channel.streamUrl,
-            name = channel.name,
-            logoUrl = channel.logoUrl,
-            group = channel.group,
-            tvgId = channel.tvgId,
+            streamUrl = channelToPersist.streamUrl,
+            name = channelToPersist.name,
+            logoUrl = channelToPersist.logoUrl,
+            group = channelToPersist.group,
+            tvgId = channelToPersist.tvgId,
         )
         LiveTvStorage.saveRecentChannel(recentChannel)
-        mutableUiState.value = mutableUiState.value.copy(recentChannel = recentChannel)
+        mutableUiState.value = state.copy(recentChannel = recentChannel)
     }
 
     private fun loadEpgInBackground(sourceUrl: String, epgUrls: List<String>) {
