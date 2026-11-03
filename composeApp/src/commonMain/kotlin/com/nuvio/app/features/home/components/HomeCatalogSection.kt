@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,6 +25,8 @@ import com.nuvio.app.core.ui.NuvioShelfSection
 import com.nuvio.app.core.ui.NuvioViewAllPillSize
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.features.home.HomeCatalogSection
+import com.nuvio.app.features.home.HomeCatalogSettingsRepository
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.stableKey
 import com.nuvio.app.features.home.cleanMergedSourceTabTitle
@@ -41,10 +44,13 @@ fun HomeCatalogRowSection(
     onPosterClick: ((MetaPreview) -> Unit)? = null,
     onPosterLongClick: ((MetaPreview) -> Unit)? = null,
 ) {
+    val catalogSettings by HomeCatalogSettingsRepository.uiState.collectAsStateWithLifecycle()
+    val hideMergedTitlesWithoutPosters = catalogSettings.hideMergedTitlesWithoutPosters
     if (sectionPadding != null) {
         HomeCatalogRowSectionContent(
             section = section,
             entries = entries,
+            hideMergedTitlesWithoutPosters = hideMergedTitlesWithoutPosters,
             watchedKeys = watchedKeys,
             fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
             modifier = modifier.fillMaxWidth(),
@@ -58,6 +64,7 @@ fun HomeCatalogRowSection(
             HomeCatalogRowSectionContent(
                 section = section,
                 entries = entries,
+                hideMergedTitlesWithoutPosters = hideMergedTitlesWithoutPosters,
                 watchedKeys = watchedKeys,
                 fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
                 modifier = Modifier.fillMaxWidth(),
@@ -76,6 +83,7 @@ private const val HOME_MERGED_ROW_TAB_PREVIEW_LIMIT = 18
 private fun HomeCatalogRowSectionContent(
     section: HomeCatalogSection,
     entries: List<MetaPreview>,
+    hideMergedTitlesWithoutPosters: Boolean,
     watchedKeys: Set<String>,
     fullyWatchedSeriesKeys: Set<String>,
     modifier: Modifier,
@@ -138,6 +146,7 @@ private fun HomeCatalogRowSectionContent(
         ) { item ->
             HomePosterCard(
                 item = item,
+                hideWithoutPoster = hideMergedTitlesWithoutPosters,
                 useLandscapeBackdropMode = posterCardStyle.catalogLandscapeModeEnabled,
                 isWatched = WatchingState.isPosterWatched(
                     watchedKeys = watchedKeys,
