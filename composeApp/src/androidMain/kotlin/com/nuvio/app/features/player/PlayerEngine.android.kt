@@ -2589,6 +2589,10 @@ private fun PlayerView.applyNuvioAspectRatio(mode: PlayerResizeMode, videoSize: 
         return
     }
 
+    // Clear the previous stream/viewport's native-size transform before the next layout.
+    contentFrame.scaleX = 1f
+    contentFrame.scaleY = 1f
+
     // Keep the coded-size image at native pixel size when it is smaller than the
     // available video rectangle. Large sources are still downscaled to fit.
     contentFrame.post {
