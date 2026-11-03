@@ -86,6 +86,7 @@ internal class TelegramStreamingProxy(
                     }
 
                     beginRequest(fileId)
+                    var responseStarted = false
                     try {
                         val file = client.sendRequest(TdApi.GetFile(fileId), REQUEST_TIMEOUT_MS) as? TdApi.File
                         val totalSize = file?.size?.takeIf { it > 0L }
@@ -116,6 +117,7 @@ internal class TelegramStreamingProxy(
 
                         val mime = mimeTypes[fileId]?.let { runCatching { ContentType.parse(it) }.getOrNull() }
                             ?: ContentType.Application.OctetStream
+                        responseStarted = true
                         call.respondBytesWriter(
                             contentType = mime,
                             status = if (isPartial) HttpStatusCode.PartialContent else HttpStatusCode.OK,
@@ -136,7 +138,7 @@ internal class TelegramStreamingProxy(
                         throw cancelled
                     } catch (error: Exception) {
                         Log.w(TAG, "Telegram range request failed for file $fileId", error)
-                        if (!call.response.isCommitted) {
+                        if (!responseStarted) {
                             call.respond(HttpStatusCode.BadGateway)
                         }
                     } finally {
