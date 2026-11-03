@@ -49,6 +49,7 @@ object HomeRepository {
     private var activeJob: Job? = null
     private var refreshPreparationJob: Job? = null
     private var refreshRequestGeneration = 0L
+    private var activeFetchGeneration = 0L
     private var lifecycleGeneration = 0L
     private var activeRequestKey: String? = null
     private var currentRequestKey: String? = null
@@ -83,6 +84,7 @@ object HomeRepository {
                 currentRequestKey = requestKey
                 refreshCloudStreamHomeSections()
                 if (!force && activeRequestKey == requestKey && activeJob?.isActive == true) return@launch
+                val fetchGeneration = ++activeFetchGeneration
                 activeJob?.cancel()
                 activeJob = null
                 activeRequestKey = requestKey
@@ -113,7 +115,7 @@ object HomeRepository {
                         prioritizedRequests.chunked(HOME_CATALOG_FETCH_BATCH_SIZE).forEach { batch ->
                             if (
                                 lifecycle != lifecycleGeneration ||
-                                requestGeneration != refreshRequestGeneration ||
+                                fetchGeneration != activeFetchGeneration ||
                                 activeRequestKey != requestKey
                             ) return@launch
                             val results = batch.map { request ->
@@ -130,7 +132,7 @@ object HomeRepository {
                             }.awaitAll()
                             if (
                                 lifecycle != lifecycleGeneration ||
-                                requestGeneration != refreshRequestGeneration ||
+                                fetchGeneration != activeFetchGeneration ||
                                 activeRequestKey != requestKey
                             ) return@launch
                             results.mapNotNull { (request, result) ->
@@ -150,7 +152,7 @@ object HomeRepository {
                         }
                         if (
                             lifecycle != lifecycleGeneration ||
-                            requestGeneration != refreshRequestGeneration ||
+                            fetchGeneration != activeFetchGeneration ||
                             activeRequestKey != requestKey
                         ) return@launch
                         cachedSections = loadedSections.toMap()
@@ -204,7 +206,7 @@ object HomeRepository {
             }
         if (
             cloudStreamHomeRequestKey == requestKey &&
-            (cloudStreamHomeJob?.isActive == true || cloudStreamHomeCompletedKey == requestKey)
+            (cloudStreamHomeJob?.let { !it.isCompleted } == true || cloudStreamHomeCompletedKey == requestKey)
         ) return
         cloudStreamHomeJob?.cancel()
         cloudStreamHomeRequestKey = requestKey
@@ -219,32 +221,34 @@ object HomeRepository {
         lateinit var loadJob: Job
         loadJob = scope.launch(start = CoroutineStart.LAZY) {
             try {
-                val sections = coroutineScope {
+                val providerResults: List<Result<List<HomeCatalogSection>>> = coroutineScope {
                     val pluginSemaphore = Semaphore(3)
                     plugins.map { plugin ->
                         async {
                             pluginSemaphore.withPermit {
                                 try {
-                                    CloudStreamRepository.getMainPage(plugin.metadata.id.value, 1).getOrThrow()
-                                        .mapNotNull { (sectionName, items) ->
-                                            if (items.isEmpty()) return@mapNotNull null
-                                            val contentType = items.firstOrNull()?.type?.nuvioType ?: "other"
-                                            HomeCatalogSection(
-                                                key = "cloudstream:" + plugin.metadata.id.value + ":" + sectionName,
-                                                title = sectionName,
-                                                subtitle = plugin.metadata.name,
-                                                addonName = plugin.metadata.name,
-                                                target = CatalogTarget.CloudStream(
-                                                    plugin.metadata.id.value,
-                                                    sectionName,
-                                                    contentType,
-                                                ),
-                                                items = items.map { it.toMetaPreview() },
-                                                availableItemCount = items.size,
-                                                hasMore = true,
-                                                supportsViewAll = true,
-                                            )
-                                        }
+                                    Result.success(
+                                        CloudStreamRepository.getMainPage(plugin.metadata.id.value, 1).getOrThrow()
+                                            .mapNotNull { (sectionName, items) ->
+                                                if (items.isEmpty()) return@mapNotNull null
+                                                val contentType = items.firstOrNull()?.type?.nuvioType ?: "other"
+                                                HomeCatalogSection(
+                                                    key = "cloudstream:" + plugin.metadata.id.value + ":" + sectionName,
+                                                    title = sectionName,
+                                                    subtitle = plugin.metadata.name,
+                                                    addonName = plugin.metadata.name,
+                                                    target = CatalogTarget.CloudStream(
+                                                        plugin.metadata.id.value,
+                                                        sectionName,
+                                                        contentType,
+                                                    ),
+                                                    items = items.map { it.toMetaPreview() },
+                                                    availableItemCount = items.size,
+                                                    hasMore = true,
+                                                    supportsViewAll = true,
+                                                )
+                                            },
+                                    )
                                 } catch (cancelled: CancellationException) {
                                     throw cancelled
                                 } catch (error: Throwable) {
@@ -252,12 +256,15 @@ object HomeRepository {
                                         "CloudStream home catalog failed for " + plugin.metadata.name +
                                             " id=" + plugin.metadata.id.value
                                     }
-                                    emptyList()
+                                    Result.failure(error)
                                 }
                             }
                         }
-                    }.awaitAll().flatten()
+                    }.awaitAll()
                 }
+                val allProvidersSucceeded = providerResults.all { it.isSuccess }
+                val sections = providerResults.mapNotNull { it.getOrNull() }.flatten()
+
                 if (lifecycle != lifecycleGeneration || cloudStreamHomeRequestKey != requestKey) return@launch
                 val latestState = CloudStreamRepository.uiState.value
                 val latestRunnableIds = if (latestState.hideAllHomeCatalogs) emptySet() else
@@ -272,7 +279,7 @@ object HomeRepository {
                     }
                 HomeCatalogSettingsRepository.syncCloudStreamCatalogs(visibleSections)
                 cachedCloudStreamSections = visibleSections
-                cloudStreamHomeCompletedKey = requestKey
+                cloudStreamHomeCompletedKey = requestKey.takeIf { allProvidersSucceeded }
                 publishCurrentState(isLoading = _uiState.value.isLoading, requestKey = currentRequestKey)
             } finally {
                 if (cloudStreamHomeJob === loadJob) cloudStreamHomeJob = null
@@ -300,6 +307,7 @@ object HomeRepository {
     fun clear() {
         lifecycleGeneration++
         refreshRequestGeneration++
+        activeFetchGeneration++
         refreshPreparationJob?.cancel()
         refreshPreparationJob = null
         activeJob?.cancel()
