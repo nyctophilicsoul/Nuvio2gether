@@ -187,10 +187,12 @@ import com.nuvio.app.navigation.*
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import com.nuvio.app.features.servers.ServerRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
@@ -216,10 +218,7 @@ internal fun MainAppContent(
 ) {
         val navBackStack = rememberNavBackStack(navigationSavedStateConfiguration, initialRoute)
         val posterNavigation = remember { PosterNavigationState() }
-        val metaScreenSettings by remember {
-            MetaScreenSettingsRepository.ensureLoaded()
-            MetaScreenSettingsRepository.uiState
-        }.collectAsStateWithLifecycle()
+        val metaScreenSettings by MetaScreenSettingsRepository.uiState.collectAsStateWithLifecycle()
         val posterNavigationEnabled = supportsPosterNavigationMotion &&
             metaScreenSettings.posterTransitionEnabled && onNavigate == null
         val routeDisposalDecorator = remember {
@@ -238,22 +237,32 @@ internal fun MainAppContent(
             )
         }
         val appUpdaterController = rememberAppUpdaterController()
-        if (ownsAppRuntime) {
-            remember {
-                EpisodeReleaseNotificationsRepository.ensureLoaded()
-            }
-            remember {
-                CollectionSyncService.startObserving()
-            }
-            remember {
-                ProfileSettingsSync.startObserving()
+        // Load local snapshots away from the UI thread. These repositories perform
+        // synchronous preference/file reads and some decode sizable JSON payloads.
+        // State collection below remains pure and reacts when each snapshot is ready.
+        LaunchedEffect(Unit) {
+            withContext(Dispatchers.IO) {
+                MetaScreenSettingsRepository.ensureLoaded()
+                LibraryRepository.ensureLoaded()
+                PlayerSettingsRepository.ensureLoaded()
+                P2pSettingsRepository.ensureLoaded()
+                WatchedRepository.ensureLoaded()
+                DownloadsRepository.ensureLoaded()
+                ServerRepository.ensureLoaded()
+                ContinueWatchingPreferencesRepository.ensureLoaded()
             }
         }
         LaunchedEffect(ownsAppRuntime) {
             if (!ownsAppRuntime) return@LaunchedEffect
-            AddonRepository.initialize()
-            PluginRepository.initialize()
-            CloudStreamRepository.initialize()
+            withContext(Dispatchers.IO) {
+                EpisodeReleaseNotificationsRepository.ensureLoaded()
+                AddonRepository.initialize()
+                PluginRepository.initialize()
+                CloudStreamRepository.initialize()
+                ProfileSettingsSync.startObserving()
+                CollectionSyncService.startObserving()
+            }
+            // CloudStream repository refreshes schedule their network jobs internally.
             CloudStreamRepository.refreshAll()
         }
         val hapticFeedback = LocalHapticFeedback.current
@@ -303,10 +312,7 @@ internal fun MainAppContent(
         var pendingTrackingRemoval by remember { mutableStateOf<PendingTrackingMembershipRemoval?>(null) }
         val trackingListsUpdateFailedMessage = stringResource(Res.string.tracking_lists_update_failed)
         val addonsUiState by AddonRepository.uiState.collectAsStateWithLifecycle()
-        val libraryUiState by remember {
-            LibraryRepository.ensureLoaded()
-            LibraryRepository.uiState
-        }.collectAsStateWithLifecycle()
+        val libraryUiState by LibraryRepository.uiState.collectAsStateWithLifecycle()
         val authState by AuthRepository.state.collectAsStateWithLifecycle()
         val openPosterActions: (PosterActionTarget) -> Unit = { target ->
             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -319,29 +325,17 @@ internal fun MainAppContent(
         }
         val profileState by ProfileRepository.state.collectAsStateWithLifecycle()
         val launchOverlayProfile = profileState.activeProfile ?: profileState.profiles.firstOrNull()
-    val playerSettingsUiState by remember {
-        PlayerSettingsRepository.ensureLoaded()
-        PlayerSettingsRepository.uiState
-    }.collectAsStateWithLifecycle()
+    val playerSettingsUiState by PlayerSettingsRepository.uiState.collectAsStateWithLifecycle()
     var visiblePlayerEntries by remember { mutableIntStateOf(0) }
     var streamLandscapeLoadingVisible by remember(currentRoute) { mutableStateOf(false) }
     if (currentRoute is PlayerRoute || visiblePlayerEntries > 0 || streamLandscapeLoadingVisible) {
         LockPlayerToLandscape()
         HidePlayerSystemBars()
     }
-    val p2pSettingsUiState by remember {
-        P2pSettingsRepository.ensureLoaded()
-        P2pSettingsRepository.uiState
-    }.collectAsStateWithLifecycle()
-    val watchedUiState by remember {
-        WatchedRepository.ensureLoaded()
-        WatchedRepository.uiState
-    }.collectAsStateWithLifecycle()
+    val p2pSettingsUiState by P2pSettingsRepository.uiState.collectAsStateWithLifecycle()
+    val watchedUiState by WatchedRepository.uiState.collectAsStateWithLifecycle()
     val fullyWatchedSeriesKeys by WatchedRepository.fullyWatchedSeriesKeys.collectAsStateWithLifecycle()
-    val downloadsUiState by remember {
-        DownloadsRepository.ensureLoaded()
-        DownloadsRepository.uiState
-    }.collectAsStateWithLifecycle()
+    val downloadsUiState by DownloadsRepository.uiState.collectAsStateWithLifecycle()
     val networkStatusUiState by remember {
         NetworkStatusRepository.uiState
     }.collectAsStateWithLifecycle()
@@ -396,10 +390,7 @@ internal fun MainAppContent(
     }
     val addonsWaitingForFirstManifest = addonsUiState.addons.isWaitingForFirstEnabledManifest()
 
-    val serversUiState by remember {
-        ServerRepository.ensureLoaded()
-        ServerRepository.uiState
-    }.collectAsStateWithLifecycle()
+    val serversUiState by ServerRepository.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(appContentGeneration, homeCatalogRefreshKey, serversUiState.revision, addonsWaitingForFirstManifest) {
         if (!ownsAppRuntime) return@LaunchedEffect
@@ -698,10 +689,7 @@ internal fun MainAppContent(
             }
         }
     }
-    val continueWatchingPreferencesUiState by remember {
-        ContinueWatchingPreferencesRepository.ensureLoaded()
-        ContinueWatchingPreferencesRepository.uiState
-    }.collectAsStateWithLifecycle()
+    val continueWatchingPreferencesUiState by ContinueWatchingPreferencesRepository.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(
         initialHomeReady,
