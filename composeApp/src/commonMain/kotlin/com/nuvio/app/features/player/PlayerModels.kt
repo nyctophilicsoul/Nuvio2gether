@@ -151,8 +151,6 @@ enum class PlayerResizeMode(val label: String) {
     Zoom("Zoom"),
     Ratio16x9("16:9");
 
-    fun next(): PlayerResizeMode = entries[(ordinal + 1) % entries.size]
-
     companion object {
         fun fromStoredName(value: String?): PlayerResizeMode = when (value) {
             "Fill" -> Full
