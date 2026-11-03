@@ -143,7 +143,7 @@ internal actual object SimklAuthStorage {
     @OptIn(ExperimentalForeignApi::class)
     private inline fun <T> withKeychainQuery(
         key: String,
-        profileId: Int? = null,
+        profileId: Int,
         block: (CFMutableDictionaryRef) -> T,
     ): T {
         val service = CFStringCreateWithCString(null, KEYCHAIN_SERVICE, kCFStringEncodingUTF8)
