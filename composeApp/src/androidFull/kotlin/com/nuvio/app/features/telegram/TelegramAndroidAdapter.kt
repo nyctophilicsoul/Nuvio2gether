@@ -108,7 +108,8 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
             is TelegramTdAuthState.Failed -> current.copy(authState = "Error", authenticated = false, qrLink = null, error = state.message, isBusy = false)
         }
         _snapshot.value = next.copy(
-            configured = preferences.getInt(API_ID, 0) > 0,
+            configured = preferences.getInt(API_ID, 0) > 0 &&
+                preferences.getString(API_HASH, "").orEmpty().matches(Regex("[a-fA-F0-9]{32}")),
             selectedChatIds = readSelectedChatIds(),
             cacheSizeBytes = calculateCacheSize(),
         )
@@ -402,6 +403,10 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
 
     private suspend fun searchChat(chatId: Long, queries: List<String>): ChatSearchResult {
         val found = linkedMapOf<String, VideoCandidate>()
+        // SearchChatMessages is deliberately bounded to one page per phrase. If Telegram reports
+        // more matches than it returned, preserve the streams found but do not cache the lookup as
+        // complete; otherwise a truncated page could be mistaken for an exhaustive empty result.
+        var complete = true
         for (query in queries) {
             for (filter in listOf(TdApi.SearchMessagesFilterVideo(), TdApi.SearchMessagesFilterDocument())) {
                 val response = try {
@@ -425,6 +430,15 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
 
                 val result = response as? TdApi.FoundChatMessages
                     ?: return ChatSearchResult(found.values.toList(), complete = false)
+                if (result.totalCount > result.messages.size) {
+                    complete = false
+                    Log.w(
+                        TAG,
+                        "Telegram search page is truncated for chat " + chatId + " and query '" + query +
+                            "' (" + result.messages.size + "/" + result.totalCount +
+                            "); results will not be cached as complete",
+                    )
+                }
                 result.messages.forEach { message ->
                     extractCandidate(message)?.let { candidate ->
                         found["${candidate.chatId}:${candidate.messageId}:${candidate.fileId}"] = candidate
@@ -432,7 +446,7 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
                 }
             }
         }
-        return ChatSearchResult(found.values.toList(), complete = true)
+        return ChatSearchResult(found.values.toList(), complete = complete)
     }
 
     private fun extractCandidate(message: TdApi.Message): VideoCandidate? {
