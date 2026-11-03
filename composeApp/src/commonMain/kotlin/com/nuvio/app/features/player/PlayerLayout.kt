@@ -142,7 +142,7 @@ internal val PlayerResizeMode.labelRes: StringResource
     get() = when (this) {
         PlayerResizeMode.BestFit -> Res.string.compose_player_resize_best_fit
         PlayerResizeMode.Fit -> Res.string.compose_player_resize_fit
-        PlayerResizeMode.Full -> Res.string.compose_player_resize_fill
+        PlayerResizeMode.Fill -> Res.string.compose_player_resize_fill
         PlayerResizeMode.Zoom -> Res.string.compose_player_resize_zoom
         PlayerResizeMode.Ratio16x9 -> Res.string.compose_player_resize_16_9
     }
