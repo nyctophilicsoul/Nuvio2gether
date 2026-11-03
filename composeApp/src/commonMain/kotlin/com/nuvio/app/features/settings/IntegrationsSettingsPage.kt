@@ -16,6 +16,7 @@ internal fun LazyListScope.integrationsContent(
     onTmdbClick: () -> Unit,
     onMdbListClick: () -> Unit,
     onDebridClick: () -> Unit,
+    onTelegramClick: (() -> Unit)? = null,
 ) {
     item {
         SettingsSection(
@@ -45,6 +46,15 @@ internal fun LazyListScope.integrationsContent(
                     isTablet = isTablet,
                     onClick = onDebridClick,
                 )
+                if (onTelegramClick != null) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_telegram_title),
+                        description = stringResource(Res.string.settings_telegram_description),
+                        isTablet = isTablet,
+                        onClick = onTelegramClick,
+                    )
+                }
             }
         }
     }
