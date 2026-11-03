@@ -148,6 +148,8 @@ private fun HomeCatalogRowSectionContent(
                 item = item,
                 hideWithoutPoster = hideMergedTitlesWithoutPosters,
                 useLandscapeBackdropMode = posterCardStyle.catalogLandscapeModeEnabled,
+                hideLabels = posterCardStyle.hideLabelsEnabled,
+                alwaysShowLandscapeClearlogo = posterCardStyle.alwaysShowLandscapeClearlogo,
                 isWatched = WatchingState.isPosterWatched(
                     watchedKeys = watchedKeys,
                     item = item,
