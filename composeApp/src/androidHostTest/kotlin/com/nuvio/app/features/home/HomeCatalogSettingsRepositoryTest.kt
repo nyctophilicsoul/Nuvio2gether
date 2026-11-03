@@ -125,7 +125,7 @@ class HomeCatalogSettingsRepositoryTest {
         val refreshed = listOf(addon(listOf("popular", "latest", "new")))
         HomeCatalogSettingsRepository.syncCatalogs(refreshed)
         assertEquals(
-            HomeCatalogRowPlacement.PINNED_POSITION,
+            HomeCatalogRowPlacement.NORMAL,
             HomeCatalogSettingsRepository.uiState.value.items.single { it.key == positionKey }.rowPlacement,
         )
         assertEquals(
@@ -136,7 +136,7 @@ class HomeCatalogSettingsRepositoryTest {
         HomeCatalogSettingsRepository.clearLocalState()
         HomeCatalogSettingsRepository.syncCatalogs(refreshed)
         assertEquals(
-            HomeCatalogRowPlacement.PINNED_POSITION,
+            HomeCatalogRowPlacement.NORMAL,
             HomeCatalogSettingsRepository.uiState.value.items.single { it.key == positionKey }.rowPlacement,
         )
         assertEquals(
