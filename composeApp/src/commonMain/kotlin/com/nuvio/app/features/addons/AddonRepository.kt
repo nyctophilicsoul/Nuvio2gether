@@ -338,18 +338,26 @@ object AddonRepository {
     }
 
     fun refreshAll() {
-        val manifestUrls = _uiState.value.addons
-            .filter { it.enabled }
-            .distinctBy { it.manifestUrl }
-            .map { it.manifestUrl }
-        val jobsToCancel = synchronized(activeRefreshJobsLock) {
-            manifestUrls.mapNotNull { activeRefreshJobs.remove(it) }
+        val refreshPlan = synchronized(activeRefreshJobsLock) {
+            val profileId = currentProfileId
+            val generation = profileGeneration
+            if (!isProfileGenerationCurrentLocked(profileId, generation)) return
+
+            val manifestUrls = _uiState.value.addons
+                .filter { it.enabled }
+                .distinctBy { it.manifestUrl }
+                .map { it.manifestUrl }
+            val jobsToCancel = manifestUrls.mapNotNull { activeRefreshJobs.remove(it) }
+            Triple(profileId to generation, manifestUrls, jobsToCancel)
         }
-        jobsToCancel.forEach(Job::cancel)
-        manifestUrls.forEach { manifestUrl ->
-            refreshAddon(
+        refreshPlan.third.forEach(Job::cancel)
+        refreshPlan.second.forEach { manifestUrl ->
+            refreshAddonForProfile(
                 manifestUrl = manifestUrl,
                 forceRefresh = true,
+                notifyOnSuccess = false,
+                expectedProfileId = refreshPlan.first.first,
+                expectedGeneration = refreshPlan.first.second,
             )
         }
     }
@@ -359,10 +367,28 @@ object AddonRepository {
         forceRefresh: Boolean = false,
         notifyOnSuccess: Boolean = false,
     ) {
-        val expectedProfile = synchronized(activeRefreshJobsLock) { currentProfileId to profileGeneration }
+        val expectedProfile = synchronized(activeRefreshJobsLock) {
+            currentProfileId to profileGeneration
+        }
+        refreshAddonForProfile(
+            manifestUrl = manifestUrl,
+            forceRefresh = forceRefresh,
+            notifyOnSuccess = notifyOnSuccess,
+            expectedProfileId = expectedProfile.first,
+            expectedGeneration = expectedProfile.second,
+        )
+    }
+
+    private fun refreshAddonForProfile(
+        manifestUrl: String,
+        forceRefresh: Boolean,
+        notifyOnSuccess: Boolean,
+        expectedProfileId: Int,
+        expectedGeneration: Long,
+    ) {
         var jobToStart: Job? = null
         synchronized(activeRefreshJobsLock) {
-            if (!isProfileGenerationCurrentLocked(expectedProfile.first, expectedProfile.second)) return
+            if (!isProfileGenerationCurrentLocked(expectedProfileId, expectedGeneration)) return
             val existingJob = activeRefreshJobs[manifestUrl]
             if (existingJob != null && !existingJob.isCompleted) return
             markRefreshing(manifestUrl)
@@ -387,7 +413,7 @@ object AddonRepository {
                     }
                     val applied = synchronized(activeRefreshJobsLock) {
                         if (
-                            !isProfileGenerationCurrentLocked(expectedProfile.first, expectedProfile.second) ||
+                            !isProfileGenerationCurrentLocked(expectedProfileId, expectedGeneration) ||
                             activeRefreshJobs[manifestUrl] !== refreshJob
                         ) {
                             false

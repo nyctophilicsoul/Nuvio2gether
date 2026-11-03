@@ -172,7 +172,13 @@ actual object CloudStreamRepository {
 
     actual fun refreshRepository(manifestUrl: String) {
         initialize()
-        val expectedProfileGeneration = profileGenerationSnapshot()
+        refreshRepositoryForGeneration(manifestUrl, profileGenerationSnapshot())
+    }
+
+    private fun refreshRepositoryForGeneration(
+        manifestUrl: String,
+        expectedProfileGeneration: Long,
+    ) {
         val normalizedUrl = runCatching { normalizeCloudStreamRepositoryUrl(manifestUrl) }.getOrNull() ?: return
         var jobToStart: Job? = null
 
@@ -258,16 +264,21 @@ actual object CloudStreamRepository {
 
     actual fun refreshAll(force: Boolean) {
         initialize()
-        val nowEpochMs = currentEpochMillis()
-        val repositoriesToRefresh = _uiState.value.repositories.filter { item ->
-            force || shouldRefreshCloudStreamRepository(item.lastRefreshedAtEpochMs, nowEpochMs)
+        val expectedProfileGeneration = profileGenerationSnapshot()
+        val refreshPlan = synchronized(profileLock) {
+            if (profileGeneration != expectedProfileGeneration) return
+            val nowEpochMs = currentEpochMillis()
+            val repositoriesToRefresh = _uiState.value.repositories.filter { item ->
+                force || shouldRefreshCloudStreamRepository(item.lastRefreshedAtEpochMs, nowEpochMs)
+            }
+            val manifestUrls = repositoriesToRefresh.map { it.manifest.sourceUrl }.distinct()
+            val jobsToCancel = manifestUrls.mapNotNull { manifestUrl -> refreshJobs.remove(manifestUrl) }
+            Triple(expectedProfileGeneration, manifestUrls, jobsToCancel)
         }
-        val manifestUrls = repositoriesToRefresh.map { it.manifest.sourceUrl }.toSet()
-        val jobsToCancel = synchronized(profileLock) {
-            manifestUrls.mapNotNull { manifestUrl -> refreshJobs.remove(manifestUrl) }
+        refreshPlan.third.forEach(Job::cancel)
+        refreshPlan.second.forEach { manifestUrl ->
+            refreshRepositoryForGeneration(manifestUrl, refreshPlan.first)
         }
-        jobsToCancel.forEach(Job::cancel)
-        repositoriesToRefresh.forEach { refreshRepository(it.manifest.sourceUrl) }
     }
 
     actual fun removeRepository(manifestUrl: String) {
