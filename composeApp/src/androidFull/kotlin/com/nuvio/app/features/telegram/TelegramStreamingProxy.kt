@@ -29,6 +29,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.drinkless.tdlib.TdApi
+import java.io.File
 import java.net.ServerSocket
 import java.util.UUID
 
@@ -72,7 +73,7 @@ internal class TelegramStreamingProxy(
     }
     private val mimeTypes = mutableMapOf<Int, String>()
 
-    @Volatile private var server: ApplicationEngine? = null
+    @Volatile private var server: io.ktor.server.engine.EmbeddedServer<*, *>? = null
     @Volatile private var port: Int = 0
     @Volatile private var accessToken: String = UUID.randomUUID().toString().replace("-", "")
 
@@ -109,7 +110,7 @@ internal class TelegramStreamingProxy(
                         if (byteRange == null) {
                             call.response.header(HttpHeaders.AcceptRanges, "bytes")
                             call.response.header(HttpHeaders.ContentRange, "bytes */$totalSize")
-                            call.respond(HttpStatusCode.RangeNotSatisfiable)
+                            call.respond(HttpStatusCode(416, "Range Not Satisfiable"))
                             return@get
                         }
 
