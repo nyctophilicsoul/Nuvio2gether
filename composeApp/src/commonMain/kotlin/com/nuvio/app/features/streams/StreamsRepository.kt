@@ -733,7 +733,8 @@ object StreamsRepository {
                         val searchTitle = details?.name?.takeIf { it.isNotBlank() }
                         val year = details?.releaseInfo
                             ?.let { Regex("\\b(19\\d{2}|20\\d{2})\\b").find(it)?.value?.toIntOrNull() }
-                        val streams = if (searchTitle.isNullOrBlank()) {
+                        val selectedChats = TelegramIntegrationBridge.snapshot.value.selectedChatIds
+                        val streams = if (searchTitle.isNullOrBlank() || selectedChats.isEmpty()) {
                             emptyList()
                         } else {
                             TelegramIntegrationBridge.resolveStreams(
@@ -746,13 +747,18 @@ object StreamsRepository {
                                 imdbId = details?.imdbId,
                             )
                         }
+                        val noResultReason = when {
+                            searchTitle.isNullOrBlank() -> "Media title is not available for Telegram search."
+                            selectedChats.isEmpty() -> "No Telegram channels or groups are selected. Configure sources in Settings > Integrations > Telegram."
+                            else -> null
+                        }
                         StreamLoadCompletion.Addon(
                             AddonStreamGroup(
                                 addonName = "Telegram",
                                 addonId = "telegram_native",
                                 streams = streams,
                                 isLoading = false,
-                                error = if (searchTitle.isNullOrBlank()) "Media title is not available for Telegram search." else null,
+                                error = noResultReason,
                             ),
                         )
                     } catch (cancelled: CancellationException) {
