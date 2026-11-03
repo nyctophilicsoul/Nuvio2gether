@@ -49,6 +49,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -244,6 +245,7 @@ internal fun PlayerControlsShell(
                     onLockToggle = onLockToggle,
                     onVideoSettingsClick = onVideoSettingsClick,
                     onOpenInExternalPlayer = onOpenInExternalPlayer,
+                    onSwitchEngineClick = onSwitchEngineClick,
                     onPartyClick = onPartyClick,
                     partyActive = partyActive,
                     onBack = onBack,
@@ -407,6 +409,7 @@ private fun PlayerHeader(
     onLockToggle: () -> Unit,
     onVideoSettingsClick: (() -> Unit)?,
     onOpenInExternalPlayer: (() -> Unit)?,
+    onSwitchEngineClick: (() -> Unit)?,
     onPartyClick: (() -> Unit)?,
     partyActive: Boolean,
     onBack: () -> Unit,
@@ -518,9 +521,18 @@ private fun PlayerHeader(
                             onClick = onSubmitIntroClick,
                         )
                     }
-                    if (onOpenInExternalPlayer != null) {
+                    if (onSwitchEngineClick != null) {
                         PlayerHeaderIconButton(
                             icon = Icons.Filled.SwapHoriz,
+                            contentDescription = stringResource(Res.string.cd_switch_player_engine),
+                            buttonSize = metrics.headerIconSize + 16.dp,
+                            iconSize = metrics.headerIconSize,
+                            onClick = onSwitchEngineClick,
+                        )
+                    }
+                    if (onOpenInExternalPlayer != null) {
+                        PlayerHeaderIconButton(
+                            icon = Icons.AutoMirrored.Rounded.OpenInNew,
                             contentDescription = stringResource(Res.string.streams_open_external_player),
                             buttonSize = metrics.headerIconSize + 16.dp,
                             iconSize = metrics.headerIconSize,
@@ -808,7 +820,11 @@ internal fun PlayerSeekBar(
     val seekDurationMs = durationMs.coerceAtLeast(1L)
     val seekDescription = stringResource(Res.string.player_seek_position)
     val seekState = remember(seekDurationMs) { SliderState(trackRange = 0f..seekDurationMs.toFloat()) }
-    seekState.value = displayedPositionMs.coerceIn(0L, seekDurationMs).toFloat()
+    // Keep the imperative SliderState in sync after composition, rather than mutating
+    // snapshot state while the legacy controls tree is being composed.
+    SideEffect {
+        seekState.value = displayedPositionMs.coerceIn(0L, seekDurationMs).toFloat()
+    }
     Column(modifier = modifier) {
         Slider(
             modifier = Modifier
@@ -818,7 +834,9 @@ internal fun PlayerSeekBar(
                 .semantics { contentDescription = seekDescription },
             state = seekState,
             onValueChange = { value -> onScrubChange(value.toLong()) },
-            onValueChangeFinished = { onScrubFinished(displayedPositionMs.coerceIn(0L, seekDurationMs)) },
+            onValueChangeFinished = {
+                onScrubFinished(seekState.value.toLong().coerceIn(0L, seekDurationMs))
+            },
             enabled = durationMs > 0L,
             track = { sliderState -> PlayerProgressTrack(sliderState, chapters, durationMs) },
         )
