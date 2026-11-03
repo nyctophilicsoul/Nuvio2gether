@@ -60,6 +60,7 @@ import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.nuvioKeyboardFocusIndicator
 import com.nuvio.app.features.settings.NuvioEnhancedBackupFileBridge
+import com.nuvio.app.features.livetv.LiveTvIncomingSourceRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
@@ -75,7 +76,6 @@ import nuvio.composeapp.generated.resources.live_tv_favorites
 import nuvio.composeapp.generated.resources.live_tv_guide_title
 import nuvio.composeapp.generated.resources.live_tv_load
 import nuvio.composeapp.generated.resources.live_tv_load_file
-import nuvio.composeapp.generated.resources.live_tv_magnet_unsupported
 import nuvio.composeapp.generated.resources.live_tv_recent_channel_cta
 import nuvio.composeapp.generated.resources.live_tv_recent_channel_title
 import nuvio.composeapp.generated.resources.live_tv_refresh
@@ -196,7 +196,8 @@ fun LiveTvScreen(
         scope.launch {
             fileImportError = null
             if (sourceUrl.trim().startsWith("magnet:", ignoreCase = true)) {
-                fileImportError = stringResource(Res.string.live_tv_magnet_unsupported)
+                LiveTvIncomingSourceRepository.submitText(sourceUrl)
+                editingSource = false
             } else {
                 val isUnchangedSavedLocalPlaylist =
                     uiState.sourceType == LiveTvSourceType.M3u &&
