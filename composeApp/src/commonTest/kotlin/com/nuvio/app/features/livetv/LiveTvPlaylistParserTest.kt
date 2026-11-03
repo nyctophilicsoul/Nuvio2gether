@@ -348,4 +348,21 @@ class LiveTvPlaylistParserTest {
 
         assertEquals(listOf(first, second), merged["one"])
     }
+
+    @Test
+    fun stripsStackedStalkerPlaybackPrefixes() {
+        assertEquals(
+            "http://provider.test/live/123",
+            "auto ffmpeg http://provider.test/live/123".toStalkerPlayableUrl(),
+        )
+        assertEquals(
+            "https://provider.test/live/456",
+            "FFMPEG AUTO https://provider.test/live/456".toStalkerPlayableUrl(),
+        )
+        assertEquals(
+            "https://provider.test/live/789",
+            "https://provider.test/live/789".toStalkerPlayableUrl(),
+        )
+    }
+
 }
