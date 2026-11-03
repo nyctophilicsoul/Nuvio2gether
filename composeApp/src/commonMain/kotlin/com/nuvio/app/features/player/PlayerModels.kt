@@ -144,10 +144,22 @@ object PlayerLaunchStore {
     }
 }
 
-enum class PlayerResizeMode {
-    Fit,
-    Fill,
-    Zoom,
+enum class PlayerResizeMode(val label: String) {
+    BestFit("Best Fit"),
+    Fit("Fit"),
+    Full("Full"),
+    Zoom("Zoom"),
+    Ratio16x9("16:9");
+
+    fun next(): PlayerResizeMode = entries[(ordinal + 1) % entries.size]
+
+    companion object {
+        fun fromStoredName(value: String?): PlayerResizeMode = when (value) {
+            "Fill" -> Full
+            "Fit" -> BestFit
+            else -> entries.firstOrNull { it.name == value } ?: BestFit
+        }
+    }
 }
 
 enum class AndroidPlaybackEngine(
