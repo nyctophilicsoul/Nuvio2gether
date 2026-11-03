@@ -258,6 +258,10 @@ actual object CloudStreamRepository {
 
     actual fun refreshAll() {
         initialize()
+        val jobsToCancel = synchronized(profileLock) {
+            refreshJobs.values.toList().also { refreshJobs.clear() }
+        }
+        jobsToCancel.forEach(Job::cancel)
         _uiState.value.repositories.forEach { refreshRepository(it.manifest.sourceUrl) }
     }
 

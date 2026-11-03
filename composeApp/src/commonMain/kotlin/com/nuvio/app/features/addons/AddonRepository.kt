@@ -288,9 +288,17 @@ object AddonRepository {
     }
 
     fun refreshAll() {
-        _uiState.value.addons.filter { it.enabled }.distinctBy { it.manifestUrl }.forEach { addon ->
+        val manifestUrls = _uiState.value.addons
+            .filter { it.enabled }
+            .distinctBy { it.manifestUrl }
+            .map { it.manifestUrl }
+        val jobsToCancel = synchronized(activeRefreshJobsLock) {
+            manifestUrls.mapNotNull { activeRefreshJobs.remove(it) }
+        }
+        jobsToCancel.forEach(Job::cancel)
+        manifestUrls.forEach { manifestUrl ->
             refreshAddon(
-                manifestUrl = addon.manifestUrl,
+                manifestUrl = manifestUrl,
                 forceRefresh = true,
             )
         }
