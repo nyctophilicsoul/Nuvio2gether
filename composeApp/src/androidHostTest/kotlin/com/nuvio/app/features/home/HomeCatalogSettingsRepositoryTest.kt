@@ -105,7 +105,7 @@ class HomeCatalogSettingsRepositoryTest {
     }
 
     @Test
-    fun rowPlacementSurvivesCatalogRefreshAndLocalReload() {
+    fun legacyPositionPinIsNormalizedWhileTopAndBottomPinsPersist() {
         val initial = listOf(addon(listOf("popular", "latest")))
         HomeCatalogSettingsRepository.syncCatalogs(initial)
         val positionKey = "test:movie:popular"
@@ -114,7 +114,7 @@ class HomeCatalogSettingsRepositoryTest {
         HomeCatalogSettingsRepository.setRowPlacement(positionKey, HomeCatalogRowPlacement.PINNED_POSITION)
         HomeCatalogSettingsRepository.setRowPlacement(bottomKey, HomeCatalogRowPlacement.PINNED_BOTTOM)
         assertEquals(
-            HomeCatalogRowPlacement.PINNED_POSITION,
+            HomeCatalogRowPlacement.NORMAL,
             HomeCatalogSettingsRepository.uiState.value.items.single { it.key == positionKey }.rowPlacement,
         )
         assertEquals(
@@ -146,7 +146,7 @@ class HomeCatalogSettingsRepositoryTest {
     }
 
     @Test
-    fun movingAnotherRowAcrossPositionPinnedRowDoesNotDisplaceTheAnchor() {
+    fun legacyPositionPinNoLongerBlocksManualReordering() {
         HomeCatalogSettingsRepository.syncCatalogs(listOf(addon(listOf("popular", "middle", "latest"))))
         val pinnedKey = "test:movie:middle"
         HomeCatalogSettingsRepository.setRowPlacement(
@@ -160,10 +160,35 @@ class HomeCatalogSettingsRepositoryTest {
 
         HomeCatalogSettingsRepository.moveByIndex(fromIndex = 0, toIndex = pinnedIndex)
 
-        assertEquals(before, HomeCatalogSettingsRepository.uiState.value.items.map { it.key })
+        assertFalse(before == HomeCatalogSettingsRepository.uiState.value.items.map { it.key })
         assertEquals(
-            HomeCatalogRowPlacement.PINNED_POSITION,
+            HomeCatalogRowPlacement.NORMAL,
             HomeCatalogSettingsRepository.uiState.value.items.single { it.key == pinnedKey }.rowPlacement,
+        )
+    }
+
+
+    @Test
+    fun normalRowsCannotBeDraggedAcrossPinnedBottomBoundary() {
+        HomeCatalogSettingsRepository.syncCatalogs(
+            listOf(addon(listOf("popular", "middle", "latest"))),
+        )
+        HomeCatalogSettingsRepository.setRowPlacement(
+            "test:movie:latest",
+            HomeCatalogRowPlacement.PINNED_BOTTOM,
+        )
+
+        assertFalse(
+            HomeCatalogSettingsRepository.canMoveByKeys(
+                "test:movie:popular",
+                "test:movie:latest",
+            ),
+        )
+        assertTrue(
+            HomeCatalogSettingsRepository.canMoveByKeys(
+                "test:movie:popular",
+                "test:movie:middle",
+            ),
         )
     }
 
