@@ -553,3 +553,76 @@ private fun androidx.compose.ui.unit.Density.posterCornerRadiusPx(
 }
 
 private val PosterZoomFinalCornerRadius = NuvioTokens.Space.s18
+
+
+/**
+ * Shared full-screen artwork-backed action surface used by contextual media details.
+ * The scrim is dismissible while the foreground content remains independently interactive.
+ */
+@Composable
+fun NuvioMediaActionOverlay(
+    artworkUrl: String?,
+    contentDescription: String,
+    onDismissRequest: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismissRequest,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.82f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (!artworkUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = artworkUrl,
+                    contentDescription = contentDescription,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { alpha = 0.18f },
+                    contentScale = ContentScale.Crop,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable(onClick = onDismissRequest),
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 24.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                content()
+            }
+        }
+    }
+}
+
+/**
+ * Draws a consistent keyboard-focus ring around clickable Compose surfaces.
+ * Focus observation is attached here so callers do not need to duplicate state.
+ */
+fun Modifier.nuvioKeyboardFocusIndicator(
+    shape: androidx.compose.ui.graphics.Shape,
+    enabled: Boolean = true,
+): Modifier = androidx.compose.ui.composed {
+    var isFocused by remember { mutableStateOf(false) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val layoutDirection = androidx.compose.ui.platform.LocalLayoutDirection.current
+    val focusModifier = this.onFocusChanged { isFocused = it.isFocused }
+    focusModifier.drawWithContent {
+        drawContent()
+        if (enabled && isFocused) {
+            drawOutline(
+                outline = shape.createOutline(size, layoutDirection, density),
+                color = MaterialTheme.nuvio.colors.accent,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = with(density) { 2.dp.toPx() }),
+            )
+        }
+    }
+}
