@@ -221,7 +221,7 @@ object PlayerSettingsRepository {
         showPlayerLoadingStatus = true
         pauseOverlayEnabled = true
         showParentalGuide = true
-        resizeMode = PlayerResizeMode.Fit
+        resizeMode = PlayerResizeMode.BestFit
         holdToSpeedEnabled = true
         holdToSpeedValue = 2f
         touchGesturesEnabled = true
