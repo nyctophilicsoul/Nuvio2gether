@@ -293,6 +293,7 @@ private fun ExoPlayerSurface(
     val latestOnError = rememberUpdatedState(onError)
     val latestOnInitialPositionHandled = rememberUpdatedState(onInitialPositionHandled)
     val latestPlayWhenReady = rememberUpdatedState(playWhenReady)
+    val latestResizeMode = rememberUpdatedState(resizeMode)
     val coroutineScope = rememberCoroutineScope()
 
     val playerSettings = remember {
@@ -486,7 +487,10 @@ private fun ExoPlayerSurface(
                 else subtitlePresenter.present(cues, format?.sampleMimeType != MimeTypes.TEXT_SSA && format?.codecs != MimeTypes.TEXT_SSA)
             },
             videoBoundsFractionProvider = {
-                playerViewRef?.videoBoundsFraction(latestVideoAspectRatio.value)
+                playerViewRef?.videoBoundsFraction(
+                    mode = latestResizeMode.value,
+                    aspectRatio = latestVideoAspectRatio.value,
+                )
             },
         )
             .setExtensionRendererMode(effectiveDecoderPriority)
@@ -874,11 +878,12 @@ private fun ExoPlayerSurface(
             override fun onVideoSizeChanged(videoSize: VideoSize) {
                 if (!isCurrentExoPlayerSource()) return
                 latestOnSnapshot.value(exoPlayer.snapshot())
-                if (videoSize.width > 0 && videoSize.height > 0) {
-                    videoAspectRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
-                }
+                videoAspectRatio = videoSize.subtitleBoundsAspectRatio(resizeMode)
                 playerViewRef?.post {
-                    playerViewRef?.syncLibassOverlayGeometry()
+                    playerViewRef?.let { view ->
+                        view.applyNuvioAspectRatio(resizeMode, videoSize)
+                        view.syncLibassOverlayGeometry()
+                    }
                 }
             }
 
@@ -1404,8 +1409,15 @@ private fun ExoPlayerSurface(
                     player = exoPlayer
                     keepScreenOn = exoPlayer.shouldKeepPlayerScreenOn()
                     this.resizeMode = resizeMode.toExoResizeMode()
+                    applyNuvioAspectRatio(resizeMode, exoPlayer.videoSize)
                     setShutterBackgroundColor(android.graphics.Color.BLACK)
                     playerViewRef = this
+                    addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+                        post {
+                            applyNuvioAspectRatio(latestResizeMode.value, exoPlayer.videoSize)
+                            syncLibassOverlayGeometry()
+                        }
+                    }
                     sidecarController.bindSubtitleView(this.subtitleView)
                     subtitleView?.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
                         val inPip = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N &&
@@ -1431,6 +1443,7 @@ private fun ExoPlayerSurface(
                 playerView.player = exoPlayer
                 playerView.useController = useNativeController
                 playerView.resizeMode = resizeMode.toExoResizeMode()
+                playerView.applyNuvioAspectRatio(resizeMode, exoPlayer.videoSize)
                 playerViewRef = playerView
                 sidecarController.bindSubtitleView(playerView.subtitleView)
                 syncPlayerViewKeepScreenOn()
@@ -1445,6 +1458,12 @@ private fun ExoPlayerSurface(
                 }
             },
         )
+        LaunchedEffect(playerViewRef, resizeMode) {
+            val currentVideoSize = exoPlayer.videoSize
+            videoAspectRatio = currentVideoSize.subtitleBoundsAspectRatio(resizeMode)
+            playerViewRef?.applyNuvioAspectRatio(resizeMode, currentVideoSize)
+            playerViewRef?.post { playerViewRef?.syncLibassOverlayGeometry() }
+        }
         StyledSubtitleOverlay(subtitlePresenter.text, currentSubtitleStyle)
     }
 }
@@ -2045,6 +2064,15 @@ private class NuvioLibmpvView(
     fun applyResizeMode(resizeMode: PlayerResizeMode) {
         executeMpv {
             when (resizeMode) {
+                PlayerResizeMode.BestFit -> {
+                    mpv.setPropertyString("keepaspect", "yes")
+                    mpv.setPropertyString("video-aspect-method", "container")
+                    mpv.setPropertyString("video-aspect-override", "no")
+                    mpv.setPropertyString("video-unscaled", "no")
+                    mpv.setPropertyDouble("video-zoom", 0.0)
+                    mpv.setPropertyDouble("panscan", 0.0)
+                }
+                // Fit, Fill, and Zoom retain the original official Nuvio mpv behaviour.
                 PlayerResizeMode.Fit -> {
                     mpv.setPropertyDouble("panscan", 0.0)
                     mpv.setPropertyString("video-aspect-override", "no")
@@ -2056,6 +2084,13 @@ private class NuvioLibmpvView(
                 PlayerResizeMode.Zoom -> {
                     mpv.setPropertyDouble("panscan", 0.5)
                     mpv.setPropertyString("video-aspect-override", "no")
+                }
+                PlayerResizeMode.Ratio16x9 -> {
+                    mpv.setPropertyString("keepaspect", "yes")
+                    mpv.setPropertyString("video-unscaled", "no")
+                    mpv.setPropertyString("video-aspect-override", "16:9")
+                    mpv.setPropertyDouble("video-zoom", 0.0)
+                    mpv.setPropertyDouble("panscan", 0.0)
                 }
             }
         }
@@ -2539,9 +2574,43 @@ private fun PlaybackException.isDecoderFailure(): Boolean =
         PlaybackException.ERROR_CODE_DECODING_RESOURCES_RECLAIMED,
     )
 
+private fun VideoSize.subtitleBoundsAspectRatio(mode: PlayerResizeMode): Float = when (mode) {
+    PlayerResizeMode.Fit, PlayerResizeMode.Fill -> 0f
+    PlayerResizeMode.Ratio16x9 -> 16f / 9f
+    PlayerResizeMode.BestFit, PlayerResizeMode.Zoom -> {
+        if (width <= 0 || height <= 0) {
+            0f
+        } else {
+            val sampleAspectRatio = pixelWidthHeightRatio.takeIf { it.isFinite() && it > 0f } ?: 1f
+            width.toFloat() * sampleAspectRatio / height.toFloat()
+        }
+    }
+}
+
+private fun PlayerView.applyNuvioAspectRatio(mode: PlayerResizeMode, videoSize: VideoSize) {
+    val contentFrame = findViewById<AspectRatioFrameLayout>(androidx.media3.ui.R.id.exo_content_frame)
+        ?: return
+    val codedRatio = if (videoSize.width > 0 && videoSize.height > 0) {
+        videoSize.width.toFloat() / videoSize.height
+    } else 0f
+    val sampleAspectRatio = videoSize.pixelWidthHeightRatio
+        .takeIf { it.isFinite() && it > 0f } ?: 1f
+    val correctedRatio = if (codedRatio > 0f) codedRatio * sampleAspectRatio else 0f
+
+    when (mode) {
+        PlayerResizeMode.BestFit, PlayerResizeMode.Fit, PlayerResizeMode.Zoom ->
+            contentFrame.setAspectRatio(correctedRatio)
+        PlayerResizeMode.Fill ->
+            contentFrame.setAspectRatio(0f)
+        PlayerResizeMode.Ratio16x9 ->
+            contentFrame.setAspectRatio(16f / 9f)
+    }
+}
+
 private fun PlayerResizeMode.toExoResizeMode(): Int =
     when (this) {
-        PlayerResizeMode.Fit -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+        PlayerResizeMode.BestFit, PlayerResizeMode.Fit, PlayerResizeMode.Ratio16x9 ->
+            AspectRatioFrameLayout.RESIZE_MODE_FIT
         PlayerResizeMode.Fill -> AspectRatioFrameLayout.RESIZE_MODE_FILL
         PlayerResizeMode.Zoom -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
     }
@@ -2959,13 +3028,17 @@ private fun ExoPlayer.logCurrentTracks(context: String) {
 }
 
 @androidx.annotation.OptIn(UnstableApi::class)
-private fun PlayerView.videoBoundsFraction(aspectRatio: Float): RectF? {
+private fun PlayerView.videoBoundsFraction(
+    mode: PlayerResizeMode,
+    aspectRatio: Float,
+): RectF? {
     val subtitleView = this.subtitleView ?: return null
     val viewWidth = subtitleView.width.toFloat()
     val viewHeight = subtitleView.height.toFloat()
     if (viewWidth <= 0f || viewHeight <= 0f) return null
 
-    if (aspectRatio > 0f) {
+    // Zoom crops beyond the viewport; use its actual transformed child bounds below.
+    if (aspectRatio > 0f && mode != PlayerResizeMode.Zoom) {
         val parentRatio = viewWidth / viewHeight
         return if (parentRatio > aspectRatio) {
             val fitW = viewHeight * aspectRatio
@@ -2982,17 +3055,18 @@ private fun PlayerView.videoBoundsFraction(aspectRatio: Float): RectF? {
         ?: findViewById<AspectRatioFrameLayout>(androidx.media3.ui.R.id.exo_content_frame)
             ?.also { setTag(androidx.media3.ui.R.id.exo_content_frame, it) }
         ?: return null
-    val frameWidth = contentFrame.width.toFloat()
-    val frameHeight = contentFrame.height.toFloat()
-    if (frameWidth <= 0f || frameHeight <= 0f) return null
-    if (frameWidth > viewWidth || frameHeight > viewHeight) return null
-    val left = contentFrame.x / viewWidth
-    val top = contentFrame.y / viewHeight
+    val transformedBounds = transformedChildBoundsInParent(contentFrame) ?: return null
+    if (
+        mode != PlayerResizeMode.Zoom && (
+            transformedBounds.left < 0f || transformedBounds.top < 0f ||
+                transformedBounds.right > viewWidth || transformedBounds.bottom > viewHeight
+        )
+    ) return null
     return RectF(
-        left,
-        top,
-        left + frameWidth / viewWidth,
-        top + frameHeight / viewHeight,
+        transformedBounds.left / viewWidth,
+        transformedBounds.top / viewHeight,
+        transformedBounds.right / viewWidth,
+        transformedBounds.bottom / viewHeight,
     )
 }
 
