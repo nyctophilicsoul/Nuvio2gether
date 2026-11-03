@@ -19,7 +19,7 @@ internal suspend fun httpGetBytesWithHeaders(
     check(response.status in 200..299) {
         "HTTP ${response.status} ${response.statusText}".trim()
     }
-    check(!response.body.endsWith("\\n...[truncated]")) {
+    check(!response.body.endsWith("\n...[truncated]")) {
         "HTTP response exceeds the safe size limit."
     }
     return response.bodyBytes
