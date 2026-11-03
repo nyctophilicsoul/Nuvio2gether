@@ -518,7 +518,7 @@ internal fun cleanMergedSourceTabTitle(rawTitle: String): String {
         else -> cleaned
     }.replace(
         Regex("""\bfor you\b""", RegexOption.IGNORE_CASE),
-        "Picks",
+        " ",
     )
 
     val words = canonical.split(' ')
