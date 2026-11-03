@@ -2027,13 +2027,16 @@ private class NuvioLibmpvView(
                     mpv.setPropertyString("keepaspect", "yes")
                     mpv.setPropertyString("video-aspect-method", "ignore")
                     mpv.setPropertyString("video-aspect-override", "no")
-                    mpv.setPropertyString("video-unscaled", "downscale-big")
+                    mpv.setPropertyString("video-unscaled", "no")
                     mpv.setPropertyDouble("video-zoom", 0.0)
                     mpv.setPropertyDouble("panscan", 0.0)
                 }
                 PlayerResizeMode.Full -> {
                     mpv.setPropertyString("video-unscaled", "no")
+                    mpv.setPropertyDouble("video-zoom", 0.0)
                     mpv.setPropertyDouble("panscan", 0.0)
+                    mpv.setPropertyString("video-aspect-override", "no")
+                    mpv.setPropertyString("video-aspect-method", "container")
                     mpv.setPropertyString("keepaspect", "no")
                 }
                 PlayerResizeMode.Zoom -> {
