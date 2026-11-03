@@ -84,7 +84,11 @@ object AuthRepository {
         if (userId.isBlank() || validatedRemoteUserId == userId) return true
 
         return runCatching {
-            SupabaseProvider.client.auth.retrieveUserForCurrentSession(false)
+            // Refresh the Supabase access token before validating the remote user. Passing
+            // updateSession = false can turn an ordinary expired JWT into a 401, which this
+            // repository correctly treats as terminal and would otherwise wipe local
+            // account-scoped integrations such as Trakt and Simkl.
+            SupabaseProvider.client.auth.retrieveUserForCurrentSession(updateSession = true)
             validatedRemoteUserId = userId
             true
         }.getOrElse { e ->
