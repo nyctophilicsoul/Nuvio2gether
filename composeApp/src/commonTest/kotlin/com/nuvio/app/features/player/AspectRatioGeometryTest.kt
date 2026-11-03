@@ -25,6 +25,34 @@ class AspectRatioGeometryTest {
     }
 
     @Test
+    fun fitDoesNotUpscaleLowResolutionSources() {
+        val result = AspectRatioGeometry.calculate(720, 576, 1920f, 1080f, 1f, PlayerResizeMode.Fit)
+        requireNotNull(result)
+        assertEquals(720f, result.width, 0.1f)
+        assertEquals(576f, result.height, 0.1f)
+        assertEquals(600f, result.offsetX, 0.1f)
+        assertEquals(252f, result.offsetY, 0.1f)
+    }
+
+    @Test
+    fun fitStillDownscalesSourcesLargerThanViewport() {
+        val result = AspectRatioGeometry.calculate(3840, 2160, 1920f, 1080f, 1f, PlayerResizeMode.Fit)
+        requireNotNull(result)
+        assertEquals(1920f, result.width, 0.1f)
+        assertEquals(1080f, result.height, 0.1f)
+    }
+
+    @Test
+    fun fitModeNameRestoresAsFitInsteadOfBestFit() {
+        assertEquals(PlayerResizeMode.Fit, PlayerResizeMode.fromStoredName("Fit"))
+    }
+
+    @Test
+    fun legacyFillNameStillRestoresAsFull() {
+        assertEquals(PlayerResizeMode.Full, PlayerResizeMode.fromStoredName("Fill"))
+    }
+
+    @Test
     fun fullStretchesBothAxesWithoutBars() {
         val result = AspectRatioGeometry.calculate(720, 576, 1920f, 1080f, 1f, PlayerResizeMode.Full)
         requireNotNull(result)
