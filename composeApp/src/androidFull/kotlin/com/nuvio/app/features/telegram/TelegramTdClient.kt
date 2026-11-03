@@ -151,8 +151,6 @@ internal class TelegramTdClient(
         when (state) {
             is TdApi.AuthorizationStateWaitTdlibParameters ->
                 client?.let { sendTdlibParameters(it, apiIdProvider(), apiHashProvider()) }
-            is TdApi.AuthorizationStateWaitEncryptionKey ->
-                client?.send(TdApi.CheckDatabaseEncryptionKey(""), null)
             is TdApi.AuthorizationStateWaitPhoneNumber -> _authState.value = TelegramTdAuthState.WaitPhone
             is TdApi.AuthorizationStateWaitCode -> {
                 val length = when (val type = state.codeInfo.type) {
@@ -255,8 +253,8 @@ internal class TelegramTdClient(
                 // TDLib invalidates the authorization state and removes the server-side session.
                 runCatching { sendRequest(TdApi.LogOut(), timeoutMs = 15_000L) }
             }
-            withTimeoutOrNull(15_000L) {
-                suspendCancellableCoroutine { continuation ->
+            withTimeoutOrNull<Unit>(15_000L) {
+                suspendCancellableCoroutine<Unit> { continuation ->
                     current.send(TdApi.Close()) { result ->
                         if (continuation.isActive) {
                             if (result is TdApi.Error) {
