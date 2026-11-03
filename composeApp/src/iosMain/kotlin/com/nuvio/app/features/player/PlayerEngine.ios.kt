@@ -324,9 +324,11 @@ actual fun PlatformPlayerSurface(
     LaunchedEffect(bridge, resizeMode) {
         bridge.setResizeMode(
             when (resizeMode) {
-                PlayerResizeMode.Fit -> 0
-                PlayerResizeMode.Fill -> 1
-                PlayerResizeMode.Zoom -> 2
+                PlayerResizeMode.BestFit -> 0
+                PlayerResizeMode.Fit -> 1
+                PlayerResizeMode.Full -> 2
+                PlayerResizeMode.Zoom -> 3
+                PlayerResizeMode.Ratio16x9 -> 4
             }
         )
     }
