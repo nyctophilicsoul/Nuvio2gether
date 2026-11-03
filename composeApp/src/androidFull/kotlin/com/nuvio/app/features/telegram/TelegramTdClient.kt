@@ -88,8 +88,9 @@ internal class TelegramTdClient(
                     { error -> Log.e(TAG, "TDLib update exception", error) },
                     { error -> Log.e(TAG, "TDLib default exception", error) },
                 )
+                // TDLib first emits AuthorizationStateWaitTdlibParameters; the state handler
+                // sends configuration exactly once instead of racing the startup sequence.
                 client = created
-                sendTdlibParameters(created, apiId, apiHash)
             } catch (error: Throwable) {
                 Log.e(TAG, "TDLib initialization failed", error)
                 client = null
@@ -113,7 +114,14 @@ internal class TelegramTdClient(
             value.systemVersion = "Android ${Build.VERSION.RELEASE ?: Build.VERSION.SDK_INT}"
             value.applicationVersion = "Nuvio"
         }
-        target.send(parameters, null)
+        target.send(parameters) { result ->
+            if (result is TdApi.Error && client === target) {
+                Log.e(TAG, "TDLib rejected initialization parameters: ${result.message}")
+                _authState.value = TelegramTdAuthState.Failed(
+                    result.message ?: "Telegram rejected the TDLib configuration.",
+                )
+            }
+        }
     }
 
     private fun handleUpdate(update: TdApi.Object) {
@@ -135,7 +143,10 @@ internal class TelegramTdClient(
 
     private fun handleAuthorizationState(state: TdApi.AuthorizationState) {
         when (state) {
-            is TdApi.AuthorizationStateWaitTdlibParameters -> client?.let { sendTdlibParameters(it, apiIdProvider(), apiHashProvider()) }
+            is TdApi.AuthorizationStateWaitTdlibParameters ->
+                client?.let { sendTdlibParameters(it, apiIdProvider(), apiHashProvider()) }
+            is TdApi.AuthorizationStateWaitEncryptionKey ->
+                client?.send(TdApi.CheckDatabaseEncryptionKey(""), null)
             is TdApi.AuthorizationStateWaitPhoneNumber -> _authState.value = TelegramTdAuthState.WaitPhone
             is TdApi.AuthorizationStateWaitCode -> {
                 val length = when (val type = state.codeInfo.type) {
