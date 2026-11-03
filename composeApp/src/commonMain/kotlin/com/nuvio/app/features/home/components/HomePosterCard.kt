@@ -6,7 +6,6 @@ import androidx.compose.ui.Modifier
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.ui.NuvioPosterCard
 import com.nuvio.app.core.ui.NuvioPosterShape
-import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
 
@@ -16,15 +15,16 @@ fun HomePosterCard(
     modifier: Modifier = Modifier,
     hideWithoutPoster: Boolean = false,
     useLandscapeBackdropMode: Boolean = false,
+    hideLabels: Boolean = false,
+    alwaysShowLandscapeClearlogo: Boolean = false,
     isWatched: Boolean = false,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
     showLandscapeOverlay: Boolean = true,
 ) {
-    val posterCardStyle = rememberPosterCardStyleUiState()
     if (hideWithoutPoster && item.poster.isNullOrBlank()) return
-    val isLandscapeMode = useLandscapeBackdropMode || posterCardStyle.catalogLandscapeModeEnabled
-    val effectiveLandscapePoster = if (posterCardStyle.alwaysShowLandscapeClearlogo) null else item.landscapePoster
+    val isLandscapeMode = useLandscapeBackdropMode || useLandscapeBackdropMode
+    val effectiveLandscapePoster = if (alwaysShowLandscapeClearlogo) null else item.landscapePoster
     val imageUrl = if (isLandscapeMode) {
         effectiveLandscapePoster ?: item.banner ?: item.poster
     } else item.poster
@@ -41,7 +41,7 @@ fun HomePosterCard(
         modifier = modifier,
         fallbackImageUrl = fallbackImageUrl,
         shape = if (isLandscapeMode) NuvioPosterShape.Landscape else item.posterShape.toNuvioPosterShape(),
-        detailLine = if (isLandscapeMode || posterCardStyle.hideLabelsEnabled) null else item.releaseInfo?.let { formatReleaseDateForDisplay(it) },
+        detailLine = if (isLandscapeMode || hideLabels) null else item.releaseInfo?.let { formatReleaseDateForDisplay(it) },
         showTitleBelow = !posterCardStyle.hideLabelsEnabled,
         bottomLeftLogoUrl = if (isLandscapeMode && showLandscapeOverlay && effectiveLandscapePoster.isNullOrBlank()) item.logo else null,
         bottomLeftText = if (isLandscapeMode && showLandscapeOverlay && effectiveLandscapePoster.isNullOrBlank() && item.logo.isNullOrBlank() && !posterCardStyle.hideLabelsEnabled) item.name else null,
