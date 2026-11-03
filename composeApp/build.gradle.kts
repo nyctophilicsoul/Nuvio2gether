@@ -551,6 +551,7 @@ kotlin {
                 // libass - atlas-based subtitle rendering (from NuvioMedia/nuvio-libass)
                 implementation(files("libs/nuvio-libass-release.aar"))
                 implementation(libs.ktor.client.okhttp)
+                implementation("org.tukaani:xz:1.10")
                 implementation(libs.sentry.android)
                 // Use the complete Maven Media3 player stack at one pinned version.
                 // Legacy precompiled core/UI/data-source AARs are intentionally excluded
@@ -588,6 +589,10 @@ kotlin {
                     ),
                 )
                 if (androidDistribution == "full") {
+                    // TDLib-backed Telegram streaming; native JNI and generated Java API are shipped in this pinned AAR.
+                    implementation("com.github.capullo-tech:lib-tdlib-android:11850efeb5791d4fd386c0eeec1ebce4c5080435")
+                    implementation("io.ktor:ktor-server-core:${libs.versions.ktor.get()}")
+                    implementation("io.ktor:ktor-server-cio:${libs.versions.ktor.get()}")
                     implementation(files("libs/quickjs-kt-android-1.0.5-nuvio.aar"))
                     implementation(files(cloudStreamRuntimeAar).builtBy(downloadCloudStreamRuntime))
                     implementation(libs.ksoup)

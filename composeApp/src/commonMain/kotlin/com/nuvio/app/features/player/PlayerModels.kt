@@ -144,10 +144,22 @@ object PlayerLaunchStore {
     }
 }
 
-enum class PlayerResizeMode {
-    Fit,
-    Fill,
-    Zoom,
+enum class PlayerResizeMode(val label: String) {
+    BestFit("Best Fit"),
+    Fit("Fit"),
+    Full("Full"),
+    Zoom("Zoom"),
+    Ratio16x9("16:9");
+
+    companion object {
+        fun fromStoredName(value: String?): PlayerResizeMode = when (value) {
+            // "Fit" is also the current enum name. Do not remap it to BestFit:
+            // doing so makes a user's Fit selection disappear after app restart.
+            // The only legacy alias retained here is the old "Fill" value.
+            "Fill" -> Full
+            else -> entries.firstOrNull { it.name == value } ?: BestFit
+        }
+    }
 }
 
 enum class AndroidPlaybackEngine(
