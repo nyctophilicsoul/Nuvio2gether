@@ -19,6 +19,7 @@ internal object ChapterSkipIntervals {
 
     private const val MIN_DURATION_SEC = 5.0
     private const val MAX_DURATION_SEC = 240.0 // 4 minutes max for OP/ED/recap
+    private const val MAX_CREDITS_DURATION_SEC = 600.0 // Movie end credits can legitimately exceed 4 minutes
 
     private val OPENING_PATTERN = Regex("^\\s*(op(ening)?)(\\s*(credits|theme))?\\s*\\d*\\s*$", RegexOption.IGNORE_CASE)
     private val ENDING_PATTERN = Regex("^\\s*(ed|ending)(\\s*(credits|theme))?\\s*\\d*\\s*$", RegexOption.IGNORE_CASE)
@@ -66,7 +67,12 @@ internal object ChapterSkipIntervals {
             val endSec = c.endMs / 1000.0
             val duration = endSec - startSec
             if (duration < MIN_DURATION_SEC) return@mapNotNull null
-            if (c.type != ChapterType.POST_CREDITS && duration > MAX_DURATION_SEC) return@mapNotNull null
+            val maxDuration = when (c.type) {
+                ChapterType.POST_CREDITS -> Double.POSITIVE_INFINITY
+                ChapterType.CREDITS -> MAX_CREDITS_DURATION_SEC
+                else -> MAX_DURATION_SEC
+            }
+            if (duration > maxDuration) return@mapNotNull null
             SkipInterval(
                 startTime = startSec,
                 endTime = endSec,
@@ -83,7 +89,7 @@ internal object ChapterSkipIntervals {
         if (POST_CREDITS_PATTERN.containsMatchIn(title)) return ChapterType.POST_CREDITS
         if (OPENING_PATTERN.matches(title)) return ChapterType.OPENING
         if (ENDING_PATTERN.matches(title)) return ChapterType.ENDING
-        if (CREDITS_PATTERN.matches(title)) return ChapterType.ENDING
+        if (CREDITS_PATTERN.matches(title)) return ChapterType.CREDITS
         if (RECAP_PATTERN.matches(title)) return ChapterType.RECAP
         if (INTRO_PATTERN.matches(title)) return ChapterType.INTRO
         return null
@@ -95,6 +101,7 @@ internal object ChapterSkipIntervals {
         RECAP("recap"),
         INTRO("intro"),
         POST_CREDITS("post-credits"),
+        CREDITS("outro"),
     }
 
     private data class ClassifiedChapter(
