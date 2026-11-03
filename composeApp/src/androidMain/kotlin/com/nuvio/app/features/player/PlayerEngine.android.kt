@@ -287,6 +287,7 @@ private fun ExoPlayerSurface(
     val latestOnError = rememberUpdatedState(onError)
     val latestOnInitialPositionHandled = rememberUpdatedState(onInitialPositionHandled)
     val latestPlayWhenReady = rememberUpdatedState(playWhenReady)
+    val latestResizeMode = rememberUpdatedState(resizeMode)
     val coroutineScope = rememberCoroutineScope()
 
     val playerSettings = remember {
@@ -839,9 +840,7 @@ private fun ExoPlayerSurface(
             override fun onVideoSizeChanged(videoSize: VideoSize) {
                 if (!isCurrentExoPlayerSource()) return
                 latestOnSnapshot.value(exoPlayer.snapshot())
-                if (videoSize.width > 0 && videoSize.height > 0) {
-                    videoAspectRatio = (videoSize.width.toFloat() * videoSize.pixelWidthHeightRatio) / videoSize.height.toFloat()
-                }
+                videoAspectRatio = videoSize.subtitleBoundsAspectRatio(resizeMode)
                 playerViewRef?.post {
                     playerViewRef?.let { view ->
                         view.applyNuvioAspectRatio(resizeMode, videoSize)
@@ -1375,6 +1374,12 @@ private fun ExoPlayerSurface(
                     applyNuvioAspectRatio(resizeMode, exoPlayer.videoSize)
                     setShutterBackgroundColor(android.graphics.Color.BLACK)
                     playerViewRef = this
+                    addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+                        post {
+                            applyNuvioAspectRatio(latestResizeMode.value, exoPlayer.videoSize)
+                            syncLibassOverlayGeometry()
+                        }
+                    }
                     sidecarController.bindSubtitleView(this.subtitleView)
                     subtitleView?.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
                         val inPip = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N &&
@@ -1415,6 +1420,12 @@ private fun ExoPlayerSurface(
                 }
             },
         )
+        LaunchedEffect(playerViewRef, resizeMode) {
+            val currentVideoSize = exoPlayer.videoSize
+            videoAspectRatio = currentVideoSize.subtitleBoundsAspectRatio(resizeMode)
+            playerViewRef?.applyNuvioAspectRatio(resizeMode, currentVideoSize)
+            playerViewRef?.post { playerViewRef?.syncLibassOverlayGeometry() }
+        }
         StyledSubtitleOverlay(subtitlePresenter.text, currentSubtitleStyle)
     }
 }
@@ -2027,7 +2038,7 @@ private class NuvioLibmpvView(
                     mpv.setPropertyString("keepaspect", "yes")
                     mpv.setPropertyString("video-aspect-method", "ignore")
                     mpv.setPropertyString("video-aspect-override", "no")
-                    mpv.setPropertyString("video-unscaled", "no")
+                    mpv.setPropertyString("video-unscaled", "downscale-big")
                     mpv.setPropertyDouble("video-zoom", 0.0)
                     mpv.setPropertyDouble("panscan", 0.0)
                 }
