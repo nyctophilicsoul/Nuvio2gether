@@ -480,6 +480,7 @@ object TraktAuthRepository : TrackingAuthProvider {
         if (!persisted) {
             log.e { "Failed to durably persist the rotated Trakt token pair for profile $profileId" }
         }
+        if (!isCurrentProfile(profileId, expectedProfileGeneration)) return@withLock false
         publish()
         true
     }
