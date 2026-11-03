@@ -430,6 +430,13 @@ mutableUiState.value = mutableUiState.value.copy(
     suspend fun hasStoredLocalPlaylist(): Boolean =
         withContext(Dispatchers.IO) { LiveTvStorage.loadLocalPlaylistData().orEmpty().isNotBlank() }
 
+    fun reportPlaybackError(error: Throwable) {
+        if (!featureEnabled) return
+        val message = error.message?.takeIf(String::isNotBlank)
+            ?: "Could not prepare this channel for playback."
+        mutableUiState.value = mutableUiState.value.copy(errorMessage = message)
+    }
+
     fun recordRecentChannel(channel: LiveTvChannel) {
         if (!featureEnabled) return
         val state = mutableUiState.value
