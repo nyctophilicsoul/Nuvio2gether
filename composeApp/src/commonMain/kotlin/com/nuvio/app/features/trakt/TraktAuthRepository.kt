@@ -200,8 +200,10 @@ object TraktAuthRepository : TrackingAuthProvider {
 
     suspend fun refreshUserSettings(profileId: Int = currentProfileId): String? {
         if (ProfileRepository.activeProfileId != profileId) return null
-        val expectedProfileGeneration = profileGeneration
         ensureLoaded(profileId)
+        // Capture after ensureLoaded(), which may itself advance the generation
+        // when the repository is first opened for the active profile.
+        val expectedProfileGeneration = profileGeneration
         val headers = authorizedHeaders(profileId) ?: return null
         val response = runCatching {
             httpGetTextWithHeaders(
@@ -229,8 +231,9 @@ object TraktAuthRepository : TrackingAuthProvider {
 
     fun onDisconnectRequested(profileId: Int = currentProfileId) {
         ensureLoaded(profileId)
+        val expectedProfileGeneration = profileGeneration
         scope.launch {
-            disconnect(profileId)
+            disconnect(profileId, expectedProfileGeneration)
         }
     }
 
@@ -373,7 +376,11 @@ object TraktAuthRepository : TrackingAuthProvider {
         )
     }
 
-    private suspend fun disconnect(profileId: Int = currentProfileId) {
+    private suspend fun disconnect(
+        profileId: Int,
+        expectedProfileGeneration: Long,
+    ) {
+        if (!isCurrentProfile(profileId, expectedProfileGeneration)) return
         publish(isLoading = true, errorMessage = null)
 
         val token = authState.accessToken?.takeIf { it.isNotBlank() }
@@ -397,6 +404,9 @@ object TraktAuthRepository : TrackingAuthProvider {
             }
         }
 
+        // The revoke request may outlive the profile that started it. Do not clear
+        // or publish credentials belonging to a profile selected in the meantime.
+        if (!isCurrentProfile(profileId, expectedProfileGeneration)) return
         authState = TraktAuthState()
         persist(profileId)
         publish(
