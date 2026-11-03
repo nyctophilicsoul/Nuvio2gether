@@ -30,6 +30,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -51,6 +52,7 @@ object HomeRepository {
     private var refreshRequestGeneration = 0L
     private var activeFetchGeneration = 0L
     private var lifecycleGeneration = 0L
+    private var applySettingsGeneration = 0L
     private var activeRequestKey: String? = null
     private var currentRequestKey: String? = null
     private var currentDefinitions: List<HomeCatalogDefinition> = emptyList()
@@ -291,8 +293,13 @@ object HomeRepository {
 
     fun applyCurrentSettings() {
         val lifecycle = lifecycleGeneration
+        val generation = ++applySettingsGeneration
         scope.launch {
-            if (lifecycle != lifecycleGeneration) return@launch
+            // CloudStream repository refreshes can complete close together. Debounce
+            // their home-catalog invalidations so we do not cancel/re-fetch provider
+            // catalogs repeatedly while a batch of repositories is being applied.
+            delay(250)
+            if (lifecycle != lifecycleGeneration || generation != applySettingsGeneration) return@launch
             refreshCloudStreamHomeSections()
             publishCurrentState(isLoading = _uiState.value.isLoading, requestKey = currentRequestKey)
             ensureCollectionHeroFallback(
@@ -306,6 +313,7 @@ object HomeRepository {
 
     fun clear() {
         lifecycleGeneration++
+        applySettingsGeneration++
         refreshRequestGeneration++
         activeFetchGeneration++
         refreshPreparationJob?.cancel()
