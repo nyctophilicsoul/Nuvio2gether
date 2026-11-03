@@ -489,13 +489,6 @@ object AddonRepository {
         }
     }
 
-    private fun persist() {
-        val snapshot = synchronized(activeRefreshJobsLock) {
-            currentProfileId to _uiState.value.addons
-        }
-        persistSnapshot(snapshot.first, snapshot.second)
-    }
-
     private fun persistSnapshot(profileId: Int, addons: List<ManagedAddon>) {
         AddonStorage.saveInstalledAddonUrls(
             profileId,
