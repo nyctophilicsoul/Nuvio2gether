@@ -256,13 +256,18 @@ actual object CloudStreamRepository {
         jobToStart?.start()
     }
 
-    actual fun refreshAll() {
+    actual fun refreshAll(force: Boolean) {
         initialize()
+        val nowEpochMs = currentEpochMillis()
+        val repositoriesToRefresh = _uiState.value.repositories.filter { item ->
+            force || shouldRefreshCloudStreamRepository(item.lastRefreshedAtEpochMs, nowEpochMs)
+        }
+        val manifestUrls = repositoriesToRefresh.map { it.manifest.sourceUrl }.toSet()
         val jobsToCancel = synchronized(profileLock) {
-            refreshJobs.values.toList().also { refreshJobs.clear() }
+            manifestUrls.mapNotNull { manifestUrl -> refreshJobs.remove(manifestUrl) }
         }
         jobsToCancel.forEach(Job::cancel)
-        _uiState.value.repositories.forEach { refreshRepository(it.manifest.sourceUrl) }
+        repositoriesToRefresh.forEach { refreshRepository(it.manifest.sourceUrl) }
     }
 
     actual fun removeRepository(manifestUrl: String) {
@@ -771,7 +776,10 @@ actual object CloudStreamRepository {
             current.copy(
                 repositories = current.repositories.map { item ->
                     if (item.manifest.sourceUrl == repository.sourceUrl) {
-                        CloudStreamRepositoryItem(repository)
+                        CloudStreamRepositoryItem(
+                            manifest = repository,
+                            lastRefreshedAtEpochMs = currentEpochMillis(),
+                        )
                     } else item
                 },
                 plugins = (current.plugins.filterNot { it.metadata.repositoryManifestUrl == repository.sourceUrl } + refreshed)
@@ -835,6 +843,7 @@ actual object CloudStreamRepository {
                     iconUrl = repository.iconUrl,
                     manifestVersion = repository.manifestVersion,
                     pluginListUrls = repository.pluginListUrls,
+                    lastRefreshedAtEpochMs = repository.lastRefreshedAtEpochMs,
                 ),
             )
         }
@@ -884,6 +893,7 @@ actual object CloudStreamRepository {
                     iconUrl = item.manifest.iconUrl,
                     manifestVersion = item.manifest.manifestVersion,
                     pluginListUrls = item.manifest.pluginListUrls,
+                    lastRefreshedAtEpochMs = item.lastRefreshedAtEpochMs,
                 )
             },
             plugins = current.plugins.map { item -> item.toStored() },

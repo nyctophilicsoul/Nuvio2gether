@@ -6,6 +6,7 @@ data class CloudStreamRepositoryItem(
     val manifest: CloudStreamRepositoryManifest,
     val isRefreshing: Boolean = false,
     val errorMessage: String? = null,
+    val lastRefreshedAtEpochMs: Long = 0L,
 )
 
 data class CloudStreamPluginItem(
@@ -85,7 +86,7 @@ expect object CloudStreamRepository {
 
     suspend fun addRepository(rawUrl: String): AddCloudStreamRepositoryResult
     fun refreshRepository(manifestUrl: String)
-    fun refreshAll()
+    fun refreshAll(force: Boolean = true)
     fun removeRepository(manifestUrl: String)
 
     suspend fun installPlugin(pluginId: String): CloudStreamInstallResult

@@ -271,7 +271,7 @@ internal fun MainAppContent(
                 CollectionSyncService.startObserving()
             }
             // CloudStream repository refreshes schedule their network jobs internally.
-            CloudStreamRepository.refreshAll()
+            CloudStreamRepository.refreshAll(force = false)
             runtimeRepositoriesInitialized = true
         }
         val hapticFeedback = LocalHapticFeedback.current
