@@ -29,11 +29,18 @@ class AuthSessionFailurePolicyTest {
     fun `remote user deletion is detectable without status code`() {
         assertTrue(isInvalidRemoteSessionFailure(null, "User does not exist"))
     }
+
     @Test
     fun `401 user lookup retries after refreshing the Supabase session`() {
         assertTrue(shouldRetryRemoteSessionValidationAfterRefresh(401))
         assertFalse(shouldRetryRemoteSessionValidationAfterRefresh(403))
         assertFalse(shouldRetryRemoteSessionValidationAfterRefresh(500))
+    }
+
+    @Test
+    fun `expired jwt message retries refresh except for forbidden responses`() {
+        assertTrue(shouldRetryRemoteSessionValidationAfterRefresh(null, "JWT expired"))
+        assertFalse(shouldRetryRemoteSessionValidationAfterRefresh(403, "JWT expired"))
     }
 
     @Test
