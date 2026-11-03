@@ -446,9 +446,9 @@ object AddonRepository {
                     sortOrder = index,
                 )
             }
-        pushJobsByProfile[profileId]?.cancel()
-        var pushJob: Job? = null
-        pushJob = scope.launch {
+
+        lateinit var pushJob: Job
+        pushJob = scope.launch(start = CoroutineStart.LAZY) {
             try {
                 delay(ADDON_PUSH_DEBOUNCE_MS)
                 log.d { "pushToServer() — profileId=$profileId, pushing ${addons.size} addons" }
@@ -464,12 +464,29 @@ object AddonRepository {
             } catch (error: Throwable) {
                 log.e(error) { "pushToServer() — FAILED" }
             } finally {
-                if (pushJobsByProfile[profileId] === pushJob) {
-                    pushJobsByProfile.remove(profileId)
+                synchronized(activeRefreshJobsLock) {
+                    if (pushJobsByProfile[profileId] === pushJob) {
+                        pushJobsByProfile.remove(profileId)
+                    }
                 }
             }
         }
-        pushJobsByProfile[profileId] = pushJob
+
+        var previousJob: Job? = null
+        val scheduled = synchronized(activeRefreshJobsLock) {
+            if (!isProfileGenerationCurrentLocked(profileId, generation)) {
+                false
+            } else {
+                previousJob = pushJobsByProfile.put(profileId, pushJob)
+                true
+            }
+        }
+        if (!scheduled) {
+            pushJob.cancel()
+            return
+        }
+        previousJob?.cancel()
+        pushJob.start()
     }
 
     private fun markRefreshing(manifestUrl: String) {
