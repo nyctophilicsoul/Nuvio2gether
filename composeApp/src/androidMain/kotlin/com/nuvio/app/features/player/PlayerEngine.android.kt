@@ -1369,6 +1369,7 @@ private fun ExoPlayerSurface(
                     player = exoPlayer
                     keepScreenOn = exoPlayer.shouldKeepPlayerScreenOn()
                     this.resizeMode = resizeMode.toExoResizeMode()
+                    applyNuvioAspectRatio(resizeMode, exoPlayer.videoSize)
                     setShutterBackgroundColor(android.graphics.Color.BLACK)
                     playerViewRef = this
                     sidecarController.bindSubtitleView(this.subtitleView)
@@ -1396,6 +1397,7 @@ private fun ExoPlayerSurface(
                 playerView.player = exoPlayer
                 playerView.useController = useNativeController
                 playerView.resizeMode = resizeMode.toExoResizeMode()
+                playerView.applyNuvioAspectRatio(resizeMode, exoPlayer.videoSize)
                 playerViewRef = playerView
                 sidecarController.bindSubtitleView(playerView.subtitleView)
                 syncPlayerViewKeepScreenOn()
@@ -2527,6 +2529,27 @@ private fun PlaybackException.isDecoderFailure(): Boolean =
         PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
         PlaybackException.ERROR_CODE_DECODING_RESOURCES_RECLAIMED,
     )
+
+private fun PlayerView.applyNuvioAspectRatio(mode: PlayerResizeMode, videoSize: VideoSize) {
+    val contentFrame = findViewById<AspectRatioFrameLayout>(androidx.media3.ui.R.id.exo_content_frame)
+        ?: return
+    val codedRatio = if (videoSize.width > 0 && videoSize.height > 0) {
+        videoSize.width.toFloat() / videoSize.height.toFloat()
+    } else {
+        0f
+    }
+    when (mode) {
+        PlayerResizeMode.BestFit -> {
+            // Media3's VideoSize pixelWidthHeightRatio remains authoritative for SAR correction.
+        }
+        PlayerResizeMode.Fit -> if (codedRatio > 0f) contentFrame.setAspectRatio(codedRatio)
+        PlayerResizeMode.Full -> contentFrame.setAspectRatio(0f)
+        PlayerResizeMode.Zoom -> {
+            // Keep Media3's source DAR; RESIZE_MODE_ZOOM expands the measured frame.
+        }
+        PlayerResizeMode.Ratio16x9 -> contentFrame.setAspectRatio(16f / 9f)
+    }
+}
 
 private fun PlayerResizeMode.toExoResizeMode(): Int =
     when (this) {
