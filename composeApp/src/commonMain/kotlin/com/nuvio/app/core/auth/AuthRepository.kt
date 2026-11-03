@@ -221,6 +221,24 @@ object AuthRepository {
     suspend fun signOutIfSessionInvalid(error: Throwable, source: String): Boolean {
         if (!isInvalidRemoteSessionError(error)) return false
 
+        if (shouldRetryRemoteSessionValidationAfterRefresh(error.findCause<RestException>()?.statusCode)) {
+            try {
+                SupabaseProvider.client.auth.refreshCurrentSession()
+                log.w(error) { "$source returned 401; Supabase refresh succeeded, preserving local account data" }
+                return false
+            } catch (refreshError: CancellationException) {
+                throw refreshError
+            } catch (refreshError: Throwable) {
+                if (!isInvalidRemoteSessionError(refreshError)) {
+                    log.w(refreshError) { "$source returned 401, but session refresh failed transiently; preserving local account data" }
+                    return false
+                }
+                log.w(refreshError) { "$source returned 401 and Supabase rejected the refresh grant; clearing local auth" }
+                clearLocalSessionAfterRemoteInvalidation()
+                return true
+            }
+        }
+
         log.w(error) { "$source failed because the current Supabase account/session is no longer valid; clearing local auth" }
         clearLocalSessionAfterRemoteInvalidation()
         return true
