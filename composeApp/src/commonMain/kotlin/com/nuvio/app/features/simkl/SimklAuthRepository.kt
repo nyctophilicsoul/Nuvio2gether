@@ -611,8 +611,7 @@ internal fun simklTokenRefreshResponseAction(
     oauthErrorCode: String? = null,
 ): SimklTokenRefreshResponseAction = when {
     status in 200..299 -> SimklTokenRefreshResponseAction.ACCEPT
-    oauthErrorCode.equals("invalid_grant", ignoreCase = true) ||
-        oauthErrorCode.equals("invalid_token", ignoreCase = true) ->
+    oauthErrorCode.equals("invalid_grant", ignoreCase = true) ->
         SimklTokenRefreshResponseAction.INVALIDATE
     else -> SimklTokenRefreshResponseAction.TRANSIENT_FAILURE
 }
