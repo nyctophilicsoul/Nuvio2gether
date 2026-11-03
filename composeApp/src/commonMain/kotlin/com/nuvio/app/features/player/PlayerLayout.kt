@@ -17,6 +17,8 @@ import com.nuvio.app.isIos
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_player_resize_fill
 import nuvio.composeapp.generated.resources.compose_player_resize_fit
+import nuvio.composeapp.generated.resources.compose_player_resize_best_fit
+import nuvio.composeapp.generated.resources.compose_player_resize_16_9
 import nuvio.composeapp.generated.resources.compose_player_resize_zoom
 import org.jetbrains.compose.resources.StringResource
 import kotlin.math.max
