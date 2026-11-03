@@ -1012,9 +1012,8 @@ object HomeCatalogSettingsRepository {
 
     fun ensureLoaded() {
         if (hasLoaded) return
-        hasLoaded = true
-
         val payload = HomeCatalogSettingsStorage.loadPayload().orEmpty().trim()
+        hasLoaded = true
         if (payload.isEmpty()) return
 
         val parsedPayload = runCatching {

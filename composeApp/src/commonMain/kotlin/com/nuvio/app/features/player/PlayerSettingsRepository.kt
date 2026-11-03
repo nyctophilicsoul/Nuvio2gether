@@ -303,7 +303,6 @@ object PlayerSettingsRepository {
     }
 
     private fun loadFromDisk() {
-        hasLoaded = true
         useLegacyPlayerLayout = PlayerSettingsStorage.loadUseLegacyPlayerLayout() ?: false
         showLoadingOverlay = PlayerSettingsStorage.loadShowLoadingOverlay() ?: true
         showPlayerLoadingStatus = PlayerSettingsStorage.loadShowPlayerLoadingStatus() ?: true
@@ -475,6 +474,7 @@ object PlayerSettingsRepository {
         iosContrast = PlayerSettingsStorage.loadIosContrast() ?: 0
         iosSaturation = PlayerSettingsStorage.loadIosSaturation() ?: 0
         iosGamma = PlayerSettingsStorage.loadIosGamma() ?: 0
+        hasLoaded = true
         publish()
     }
 
