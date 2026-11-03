@@ -140,29 +140,44 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
 
     override suspend fun signInWithPhone(phone: String) {
         val value = phone.trim()
-        if (value.isBlank()) return fail("Enter your phone number with country code.")
+        if (value.isBlank()) {
+            fail("Enter your phone number with country code.")
+            return
+        }
         tdClient.submitPhone(value)
     }
 
     override suspend fun signInWithCode(code: String) {
         val value = code.trim()
-        if (value.isBlank()) return fail("Enter the Telegram login code.")
+        if (value.isBlank()) {
+            fail("Enter the Telegram login code.")
+            return
+        }
         tdClient.submitCode(value)
     }
 
     override suspend fun signInWithPassword(password: String) {
-        if (password.isBlank()) return fail("Enter your Telegram two-step verification password.")
+        if (password.isBlank()) {
+            fail("Enter your Telegram two-step verification password.")
+            return
+        }
         tdClient.submitPassword(password)
     }
 
     override suspend fun signInWithBotToken(token: String) {
         val value = token.trim()
-        if (value.isBlank()) return fail("Enter a bot token.")
+        if (value.isBlank()) {
+            fail("Enter a bot token.")
+            return
+        }
         tdClient.submitBotToken(value)
     }
 
     override suspend fun requestQrLogin() {
-        if (!snapshot.value.configured) return fail("Configure your Telegram API ID and hash first.")
+        if (!snapshot.value.configured) {
+            fail("Configure your Telegram API ID and hash first.")
+            return
+        }
         tdClient.requestQrCode()
     }
 
@@ -207,18 +222,37 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
         val raw = identifier.trim()
         if (raw.isBlank()) return fail("Enter a Telegram channel username or chat ID.")
         val chat = try {
-            val normalized = raw
-                .removePrefix("https://t.me/")
-                .removePrefix("http://t.me/")
-                .removePrefix("t.me/")
-                .removePrefix("@")
-                .substringBefore('/')
-                .trim()
-            val numericId = normalized.toLongOrNull()
-            if (numericId != null) {
-                tdClient.sendRequest(TdApi.GetChat(numericId)) as? TdApi.Chat
+            val cleanLink = when {
+                raw.startsWith("https://t.me/", ignoreCase = true) -> raw
+                raw.startsWith("http://t.me/", ignoreCase = true) -> raw.replaceFirst("http://", "https://")
+                raw.startsWith("t.me/", ignoreCase = true) -> "https://$raw"
+                raw.startsWith("+") -> "https://t.me/$raw"
+                else -> null
+            }
+            val inviteLink = cleanLink?.takeIf {
+                it.contains("/+") || it.contains("/joinchat/")
+            }
+            if (inviteLink != null) {
+                // Invite links are joined only after the user explicitly adds them in this screen.
+                tdClient.sendRequest(TdApi.JoinChatByInviteLink(inviteLink)) as? TdApi.Chat
             } else {
-                tdClient.sendRequest(TdApi.SearchPublicChat(normalized)) as? TdApi.Chat
+                val cleanPath = cleanLink?.removePrefix("https://t.me/") ?: raw
+                val isPrivateLink = cleanPath.startsWith("c/")
+                val normalized = cleanPath
+                    .removePrefix("c/")
+                    .removePrefix("@")
+                    .substringBefore('/')
+                    .trim()
+                val numericId = if (isPrivateLink) {
+                    normalized.toLongOrNull()?.let { "-100$it".toLongOrNull() }
+                } else {
+                    normalized.toLongOrNull()
+                }
+                if (numericId != null) {
+                    tdClient.sendRequest(TdApi.GetChat(numericId)) as? TdApi.Chat
+                } else {
+                    tdClient.sendRequest(TdApi.SearchPublicChat(normalized)) as? TdApi.Chat
+                }
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -409,7 +443,9 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
         }
 
         if (fileId <= 0 || fileSize <= 0L || fileName.isBlank()) return null
-        if (!mimeType.startsWith("video/") && mimeType != "application/x-matroska") return null
+        val videoExtension = fileName.substringAfterLast('.', "").lowercase(Locale.ROOT) in
+            setOf("mkv", "mp4", "m4v", "avi", "mov", "webm", "ts", "m2ts", "wmv", "mpg", "mpeg", "3gp")
+        if (!mimeType.startsWith("video/") && mimeType != "application/x-matroska" && !videoExtension) return null
         return VideoCandidate(
             chatId = message.chatId,
             messageId = message.id,
