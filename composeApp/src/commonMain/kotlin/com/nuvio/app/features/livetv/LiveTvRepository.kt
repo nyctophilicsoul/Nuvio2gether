@@ -113,7 +113,7 @@ object LiveTvRepository {
         if (!featureEnabled) return liveTvDisabledResult()
         val normalizedUrl = sourceUrl.trim()
         if (!normalizedUrl.startsWith("http://", ignoreCase = true) && !normalizedUrl.startsWith("https://", ignoreCase = true)) {
-            val error = IllegalArgumentException("Geçerli bir HTTP veya HTTPS M3U bağlantısı girin.")
+            val error = IllegalArgumentException("Enter a valid HTTP or HTTPS M3U URL.")
             mutableUiState.value = mutableUiState.value.copy(errorMessage = error.message)
             return Result.failure(error)
         }
@@ -161,7 +161,7 @@ object LiveTvRepository {
                 }
             }
             val channels = playlist.channels
-            require(channels.isNotEmpty()) { "Bu M3U listesinde oynatılabilir kanal bulunamadı." }
+            require(channels.isNotEmpty()) { "No playable channels were found in this M3U playlist." }
             LiveTvStorage.saveSourceUrl(normalizedUrl)
             withContext(Dispatchers.IO) { LiveTvStorage.saveLocalPlaylistData("") }
             LiveTvStorage.saveSourceType(LiveTvSourceType.M3u)
@@ -187,7 +187,7 @@ object LiveTvRepository {
 mutableUiState.value = mutableUiState.value.copy(
                 isLoading = false,
                 isLoaded = mutableUiState.value.channels.isNotEmpty(),
-                errorMessage = error.message ?: "M3U listesi yüklenemedi.",
+                errorMessage = error.message ?: "The M3U playlist could not be loaded.",
             )
         }
     }
@@ -197,7 +197,7 @@ mutableUiState.value = mutableUiState.value.copy(
         val trimmedData = playlistData.trim()
         val displayName = fileName.trim().ifBlank { "Local M3U playlist" }
         if (trimmedData.isBlank()) {
-            val error = IllegalArgumentException("Seçilen M3U dosyası boş.")
+            val error = IllegalArgumentException("The selected M3U file is empty.")
             mutableUiState.value = mutableUiState.value.copy(errorMessage = error.message)
             return Result.failure(error)
         }
@@ -214,7 +214,7 @@ mutableUiState.value = mutableUiState.value.copy(
                 parseM3uPlaylistData(trimmedData)
             }
             val channels = playlist.channels
-            require(channels.isNotEmpty()) { "Bu M3U dosyasında oynatılabilir kanal bulunamadı." }
+            require(channels.isNotEmpty()) { "No playable channels were found in this M3U file." }
             LiveTvStorage.saveSourceUrl(displayName)
             withContext(Dispatchers.IO) { LiveTvStorage.saveLocalPlaylistData(trimmedData) }
             LiveTvStorage.saveSourceType(LiveTvSourceType.M3u)
@@ -240,7 +240,7 @@ mutableUiState.value = mutableUiState.value.copy(
 mutableUiState.value = mutableUiState.value.copy(
                 isLoading = false,
                 isLoaded = mutableUiState.value.channels.isNotEmpty(),
-                errorMessage = error.message ?: "M3U dosyası yüklenemedi.",
+                errorMessage = error.message ?: "The M3U file could not be loaded.",
             )
         }
     }
@@ -251,7 +251,7 @@ mutableUiState.value = mutableUiState.value.copy(
             LiveTvStorage.loadSourceUrl().orEmpty() to LiveTvStorage.loadLocalPlaylistData().orEmpty()
         }
         if (saved.second.isBlank()) {
-            return Result.failure(IllegalStateException("Kayıtlı M3U dosyası bulunamadı."))
+            return Result.failure(IllegalStateException("No saved M3U playlist was found."))
         }
         return loadLocalPlaylist(
             fileName = saved.first.ifBlank { "Local M3U playlist" },
@@ -263,12 +263,12 @@ mutableUiState.value = mutableUiState.value.copy(
         if (!featureEnabled) return liveTvDisabledResult()
         val normalizedSettings = settings.normalized()
         if (!normalizedSettings.isConfigured) {
-            val error = IllegalArgumentException("Portal URL ve MAC adresi zorunludur.")
+            val error = IllegalArgumentException("A portal URL and MAC address are required.")
             mutableUiState.value = mutableUiState.value.copy(errorMessage = error.message)
             return Result.failure(error)
         }
         if (!normalizedSettings.portalUrl.startsWith("http://", ignoreCase = true) && !normalizedSettings.portalUrl.startsWith("https://", ignoreCase = true)) {
-            val error = IllegalArgumentException("Geçerli bir HTTP veya HTTPS portal bağlantısı girin.")
+            val error = IllegalArgumentException("Enter a valid HTTP or HTTPS Stalker portal URL.")
             mutableUiState.value = mutableUiState.value.copy(errorMessage = error.message)
             return Result.failure(error)
         }
@@ -285,7 +285,7 @@ mutableUiState.value = mutableUiState.value.copy(
             val channels = withContext(Dispatchers.IO) {
                 fetchStalkerChannels(normalizedSettings)
             }
-            require(channels.isNotEmpty()) { "Bu Stalker Portal içinde oynatılabilir kanal bulunamadı." }
+            require(channels.isNotEmpty()) { "No playable channels were found in this Stalker portal." }
             withContext(Dispatchers.IO) { LiveTvStorage.saveLocalPlaylistData("") }
             LiveTvStorage.saveSourceType(LiveTvSourceType.Stalker)
             LiveTvStorage.saveStalkerSettings(normalizedSettings)
@@ -310,7 +310,7 @@ mutableUiState.value = mutableUiState.value.copy(
 mutableUiState.value = mutableUiState.value.copy(
                 isLoading = false,
                 isLoaded = mutableUiState.value.channels.isNotEmpty(),
-                errorMessage = error.message ?: "Stalker Portal yüklenemedi.",
+                errorMessage = error.message ?: "The Stalker portal could not be loaded.",
             )
         }
     }
@@ -763,7 +763,7 @@ private object LiveTvRepositoryStalker {
             .stringValue("token")
             .orEmpty()
             .trim()
-        require(token.isNotBlank()) { "Stalker Portal token alınamadı." }
+        require(token.isNotBlank()) { "Could not retrieve a Stalker portal token." }
         return StalkerSession(settings = settings, token = token).also {
             cachedSession = it
         }
