@@ -144,7 +144,7 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
             fail("Enter your phone number with country code.")
             return
         }
-        tdClient.submitPhone(value)
+        runAuthAction { tdClient.submitPhone(value) }
     }
 
     override suspend fun signInWithCode(code: String) {
@@ -153,7 +153,7 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
             fail("Enter the Telegram login code.")
             return
         }
-        tdClient.submitCode(value)
+        runAuthAction { tdClient.submitCode(value) }
     }
 
     override suspend fun signInWithPassword(password: String) {
@@ -161,7 +161,7 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
             fail("Enter your Telegram two-step verification password.")
             return
         }
-        tdClient.submitPassword(password)
+        runAuthAction { tdClient.submitPassword(password) }
     }
 
     override suspend fun signInWithBotToken(token: String) {
@@ -170,7 +170,7 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
             fail("Enter a bot token.")
             return
         }
-        tdClient.submitBotToken(value)
+        runAuthAction { tdClient.submitBotToken(value) }
     }
 
     override suspend fun requestQrLogin() {
@@ -178,7 +178,22 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
             fail("Configure your Telegram API ID and hash first.")
             return
         }
-        tdClient.requestQrCode()
+        runAuthAction { tdClient.requestQrCode() }
+    }
+
+    private suspend fun runAuthAction(action: suspend () -> Unit) {
+        try {
+            action()
+            _snapshot.value = _snapshot.value.copy(error = null)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            Log.w(TAG, "Telegram authentication action failed", error)
+            _snapshot.value = _snapshot.value.copy(
+                error = error.message ?: "Telegram authentication failed. Try again.",
+                isBusy = false,
+            )
+        }
     }
 
     override suspend fun refreshChats() {
