@@ -18,11 +18,8 @@ import io.ktor.utils.io.writeFully
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -47,14 +44,12 @@ internal class TelegramStreamingProxy(
         private const val TAG = "NuvioTelegramProxy"
         private const val CHUNK_BYTES = 1024 * 1024
         private const val DOWNLOAD_TIMEOUT_MS = 45_000L
-        private const val CLEANUP_GRACE_MS = 90_000L
         private const val REQUEST_TIMEOUT_MS = 10_000L
         private const val DOWNLOAD_PRIORITY = 32
     }
 
     private data class ActiveRequests(
         var count: Int = 0,
-        var cleanup: Job? = null,
     )
 
     private val appContext = context.applicationContext
@@ -195,7 +190,6 @@ internal class TelegramStreamingProxy(
         scope.launch {
             val ids = mutex.withLock {
                 val keys = requestStates.keys.toList()
-                requestStates.values.forEach { it.cleanup?.cancel() }
                 requestStates.clear()
                 keys
             }
@@ -214,8 +208,6 @@ internal class TelegramStreamingProxy(
     private suspend fun beginRequest(fileId: Int) {
         mutex.withLock {
             val state = requestStates.getOrPut(fileId) { ActiveRequests() }
-            state.cleanup?.cancel()
-            state.cleanup = null
             state.count += 1
         }
     }
@@ -224,24 +216,10 @@ internal class TelegramStreamingProxy(
         mutex.withLock {
             val state = requestStates[fileId] ?: return@withLock
             state.count = (state.count - 1).coerceAtLeast(0)
-            if (state.count != 0) return@withLock
-            state.cleanup = scope.launch {
-                delay(CLEANUP_GRACE_MS)
-                val thisJob = currentCoroutineContext()[Job]
-                mutex.withLock {
-                    val current = requestStates[fileId]
-                    if (current != null && current.count == 0 && current.cleanup === thisJob) {
-                        // Drop state before the TDLib calls so a fresh request can establish a new lease.
-                        requestStates.remove(fileId)
-                        deleteFile(fileId)
-                        synchronized(registeredFileIds) {
-                            registeredFileIds.remove(fileId)
-                            persistFileRegistryLocked()
-                        }
-                        synchronized(mimeTypes) { mimeTypes.remove(fileId) }
-                    }
-                }
-            }
+            // Keep the TDLib file alive after the last range request: players may pause for
+            // several minutes before issuing the next seek/range request. Cache eviction is
+            // explicit in Settings or performed on logout, never based on request inactivity.
+            if (state.count == 0) requestStates.remove(fileId)
         }
     }
 
