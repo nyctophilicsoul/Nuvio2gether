@@ -134,7 +134,7 @@ internal fun playerTimelineBottomInsets(metrics: PlayerLayoutMetrics): WindowIns
     return if (isIos) safeInsets.union(contentInsets) else safeInsets.add(contentInsets)
 }
 
-internal fun PlayerResizeMode.next(): PlayerResizeMode = next()
+internal fun PlayerResizeMode.next(): PlayerResizeMode = PlayerResizeMode.entries[(ordinal + 1) % PlayerResizeMode.entries.size]
 
 internal val PlayerResizeMode.labelRes: StringResource
     get() = when (this) {
