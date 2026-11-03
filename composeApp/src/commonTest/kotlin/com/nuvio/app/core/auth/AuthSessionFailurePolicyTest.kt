@@ -29,4 +29,23 @@ class AuthSessionFailurePolicyTest {
     fun `remote user deletion is detectable without status code`() {
         assertTrue(isInvalidRemoteSessionFailure(null, "User does not exist"))
     }
+    @Test
+    fun `401 user lookup retries after refreshing the Supabase session`() {
+        assertTrue(shouldRetryRemoteSessionValidationAfterRefresh(401))
+        assertFalse(shouldRetryRemoteSessionValidationAfterRefresh(403))
+        assertFalse(shouldRetryRemoteSessionValidationAfterRefresh(500))
+    }
+
+    @Test
+    fun `invalid refresh token is terminal and clears account scoped data`() {
+        assertTrue(isInvalidRemoteSessionFailure(400, "Invalid Refresh Token", "RefreshTokenNotFound"))
+        assertTrue(isInvalidRemoteSessionFailure(400, "Refresh token already used", "refresh_token_already_used"))
+    }
+
+    @Test
+    fun `transient auth service errors do not clear account scoped data`() {
+        assertFalse(isInvalidRemoteSessionFailure(429, "Too many requests", "TooManyRequests"))
+        assertFalse(isInvalidRemoteSessionFailure(503, "Service unavailable", null))
+    }
+
 }
