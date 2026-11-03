@@ -126,7 +126,7 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
         }
         preferences.edit().putInt(API_ID, parsedId).putString(API_HASH, cleanHash).apply()
         lookupCache.clear()
-        tdClient.reset()
+        tdClient.resetAndWait()
         _snapshot.value = _snapshot.value.copy(
             configured = true,
             authState = "Connecting",
@@ -294,7 +294,7 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
     }
 
     override suspend fun disconnect() {
-        tdClient.reset()
+        tdClient.resetAndWait(logOut = true)
         lookupCache.clear()
         _snapshot.value = _snapshot.value.copy(
             authenticated = false,
