@@ -2547,15 +2547,31 @@ private fun PlaybackException.isDecoderFailure(): Boolean =
         PlaybackException.ERROR_CODE_DECODING_RESOURCES_RECLAIMED,
     )
 
+private fun VideoSize.subtitleBoundsAspectRatio(mode: PlayerResizeMode): Float = when (mode) {
+    // Fit uses the actual transformed content-frame bounds because it deliberately
+    // preserves native pixel size for sources smaller than the viewport.
+    PlayerResizeMode.Fit, PlayerResizeMode.Full -> 0f
+    PlayerResizeMode.Ratio16x9 -> 16f / 9f
+    PlayerResizeMode.BestFit, PlayerResizeMode.Zoom -> {
+        if (width <= 0 || height <= 0) {
+            0f
+        } else {
+            val sampleAspectRatio = pixelWidthHeightRatio.takeIf { it.isFinite() && it > 0f } ?: 1f
+            width.toFloat() * sampleAspectRatio / height.toFloat()
+        }
+    }
+}
+
 private fun PlayerView.applyNuvioAspectRatio(mode: PlayerResizeMode, videoSize: VideoSize) {
     val contentFrame = findViewById<AspectRatioFrameLayout>(androidx.media3.ui.R.id.exo_content_frame)
         ?: return
     val codedRatio = if (videoSize.width > 0 && videoSize.height > 0) {
         videoSize.width.toFloat() / videoSize.height.toFloat()
     } else 0f
-    val correctedRatio = if (codedRatio > 0f && videoSize.pixelWidthHeightRatio > 0f) {
-        codedRatio * videoSize.pixelWidthHeightRatio
-    } else codedRatio
+    val sampleAspectRatio = videoSize.pixelWidthHeightRatio
+        .takeIf { it.isFinite() && it > 0f } ?: 1f
+    val correctedRatio = if (codedRatio > 0f) codedRatio * sampleAspectRatio else 0f
+
     when (mode) {
         PlayerResizeMode.BestFit, PlayerResizeMode.Zoom ->
             contentFrame.setAspectRatio(correctedRatio)
@@ -2565,6 +2581,31 @@ private fun PlayerView.applyNuvioAspectRatio(mode: PlayerResizeMode, videoSize: 
             contentFrame.setAspectRatio(0f)
         PlayerResizeMode.Ratio16x9 ->
             contentFrame.setAspectRatio(16f / 9f)
+    }
+
+    if (mode != PlayerResizeMode.Fit || videoSize.width <= 0 || videoSize.height <= 0) {
+        contentFrame.scaleX = 1f
+        contentFrame.scaleY = 1f
+        return
+    }
+
+    // Keep the coded-size image at native pixel size when it is smaller than the
+    // available video rectangle. Large sources are still downscaled to fit.
+    contentFrame.post {
+        val frameWidth = contentFrame.width.toFloat()
+        val frameHeight = contentFrame.height.toFloat()
+        if (frameWidth <= 0f || frameHeight <= 0f) return@post
+
+        val nativeScale = minOf(
+            1f,
+            videoSize.width.toFloat() / frameWidth,
+            videoSize.height.toFloat() / frameHeight,
+        ).coerceIn(0f, 1f)
+        contentFrame.pivotX = frameWidth / 2f
+        contentFrame.pivotY = frameHeight / 2f
+        contentFrame.scaleX = nativeScale
+        contentFrame.scaleY = nativeScale
+        syncLibassOverlayGeometry()
     }
 }
 
@@ -3011,17 +3052,16 @@ private fun PlayerView.videoBoundsFraction(aspectRatio: Float): RectF? {
         ?: findViewById<AspectRatioFrameLayout>(androidx.media3.ui.R.id.exo_content_frame)
             ?.also { setTag(androidx.media3.ui.R.id.exo_content_frame, it) }
         ?: return null
-    val frameWidth = contentFrame.width.toFloat()
-    val frameHeight = contentFrame.height.toFloat()
-    if (frameWidth <= 0f || frameHeight <= 0f) return null
-    if (frameWidth > viewWidth || frameHeight > viewHeight) return null
-    val left = contentFrame.x / viewWidth
-    val top = contentFrame.y / viewHeight
+    val transformedBounds = transformedChildBoundsInParent(contentFrame) ?: return null
+    if (
+        transformedBounds.left < 0f || transformedBounds.top < 0f ||
+        transformedBounds.right > viewWidth || transformedBounds.bottom > viewHeight
+    ) return null
     return RectF(
-        left,
-        top,
-        left + frameWidth / viewWidth,
-        top + frameHeight / viewHeight,
+        transformedBounds.left / viewWidth,
+        transformedBounds.top / viewHeight,
+        transformedBounds.right / viewWidth,
+        transformedBounds.bottom / viewHeight,
     )
 }
 
