@@ -187,20 +187,13 @@ internal class TelegramStreamingProxy(
         server = null
         accessToken = UUID.randomUUID().toString().replace("-", "")
         current.stop(250, 1_000)
-        scope.launch {
-            val ids = mutex.withLock {
-                val keys = requestStates.keys.toList()
-                requestStates.clear()
-                keys
-            }
-            ids.forEach {
-                deleteFile(it)
-                synchronized(registeredFileIds) {
-                    registeredFileIds.remove(it)
-                    persistFileRegistryLocked()
-                }
-                synchronized(mimeTypes) { mimeTypes.remove(it) }
-            }
+    }
+
+    suspend fun forgetRegisteredFiles() {
+        mutex.withLock { requestStates.clear() }
+        synchronized(registeredFileIds) {
+            registeredFileIds.clear()
+            persistFileRegistryLocked()
         }
         synchronized(mimeTypes) { mimeTypes.clear() }
     }
