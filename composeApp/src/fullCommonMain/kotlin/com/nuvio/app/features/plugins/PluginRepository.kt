@@ -403,6 +403,13 @@ actual object PluginRepository {
                                 Result.failure(error)
                             }
 
+                            // Resource lookup is suspending; resolve it before entering
+                            // the profile lock so no suspension occurs in the critical section.
+                            val refreshFailureMessage = if (result.isFailure) {
+                                getString(Res.string.plugins_repository_refresh_failed)
+                            } else {
+                                null
+                            }
                             var persistenceSnapshot: PluginPersistenceSnapshot? = null
                             var serverPushSnapshot: Pair<Int, List<PluginPushItem>>? = null
                             val applied = synchronized(profileLock) {
@@ -413,11 +420,6 @@ actual object PluginRepository {
                                 ) {
                                     false
                                 } else {
-                                    val refreshFailureMessage = if (result.isFailure) {
-                                        getString(Res.string.plugins_repository_refresh_failed)
-                                    } else {
-                                        null
-                                    }
                                     _uiState.update { state ->
                                         result.fold(
                                             onSuccess = { (repo, scrapers) ->
