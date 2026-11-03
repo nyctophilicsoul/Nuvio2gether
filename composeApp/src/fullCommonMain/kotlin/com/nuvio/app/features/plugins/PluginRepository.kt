@@ -28,7 +28,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -414,6 +413,11 @@ actual object PluginRepository {
                                 ) {
                                     false
                                 } else {
+                                    val refreshFailureMessage = if (result.isFailure) {
+                                        getString(Res.string.plugins_repository_refresh_failed)
+                                    } else {
+                                        null
+                                    }
                                     _uiState.update { state ->
                                         result.fold(
                                             onSuccess = { (repo, scrapers) ->
@@ -435,8 +439,7 @@ actual object PluginRepository {
                                                         if (existing.manifestUrl == manifestUrl) {
                                                             existing.copy(
                                                                 isRefreshing = false,
-                                                                errorMessage = error.message
-                                                                    ?: runBlocking { getString(Res.string.plugins_repository_refresh_failed) },
+                                                                errorMessage = error.message ?: refreshFailureMessage,
                                                             )
                                                         } else {
                                                             existing
@@ -917,9 +920,9 @@ actual object PluginRepository {
         return if (query.isEmpty()) withSuffix else "$withSuffix?$query"
     }
 
-    private fun normalizeManifestUrl(rawUrl: String): String {
+    private suspend fun normalizeManifestUrl(rawUrl: String): String {
         val trimmed = rawUrl.trim()
-        require(trimmed.isNotEmpty()) { runBlocking { getString(Res.string.plugins_error_enter_repo_url) } }
+        require(trimmed.isNotEmpty()) { getString(Res.string.plugins_error_enter_repo_url) }
 
         val normalizedScheme = when {
             trimmed.startsWith("http://") || trimmed.startsWith("https://") -> trimmed
