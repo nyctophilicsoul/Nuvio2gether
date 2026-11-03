@@ -197,7 +197,7 @@ object HomeRepository {
             plugins.sortedBy { it.metadata.id.value }.forEach { plugin ->
                 append(plugin.metadata.id.value).append(':')
                 append(plugin.metadata.version).append(':')
-                append(plugin.installedVersion.orEmpty()).append(':')
+                append(plugin.installedVersion).append(':')
                 append(plugin.enabled).append(':')
                 append(plugin.verified).append('|')
             }
