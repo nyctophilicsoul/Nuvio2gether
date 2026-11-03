@@ -1010,7 +1010,7 @@ object HomeCatalogSettingsRepository {
         addonLayouts = updatedLayouts
     }
 
-    private fun ensureLoaded() {
+    internal fun ensureLoaded() {
         if (hasLoaded) return
         hasLoaded = true
 
