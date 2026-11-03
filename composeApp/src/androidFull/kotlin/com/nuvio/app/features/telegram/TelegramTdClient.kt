@@ -177,24 +177,31 @@ internal class TelegramTdClient(
         }
     }
 
-    fun requestQrCode() {
-        client?.send(TdApi.RequestQrCodeAuthentication(LongArray(0)), null)
+    suspend fun requestQrCode() {
+        sendAuthenticationRequest(TdApi.RequestQrCodeAuthentication(LongArray(0)))
     }
 
-    fun submitPhone(phone: String) {
-        client?.send(TdApi.SetAuthenticationPhoneNumber(phone, null), null)
+    suspend fun submitPhone(phone: String) {
+        sendAuthenticationRequest(TdApi.SetAuthenticationPhoneNumber(phone, null))
     }
 
-    fun submitCode(code: String) {
-        client?.send(TdApi.CheckAuthenticationCode(code), null)
+    suspend fun submitCode(code: String) {
+        sendAuthenticationRequest(TdApi.CheckAuthenticationCode(code))
     }
 
-    fun submitPassword(password: String) {
-        client?.send(TdApi.CheckAuthenticationPassword(password), null)
+    suspend fun submitPassword(password: String) {
+        sendAuthenticationRequest(TdApi.CheckAuthenticationPassword(password))
     }
 
-    fun submitBotToken(token: String) {
-        client?.send(TdApi.CheckAuthenticationBotToken(token), null)
+    suspend fun submitBotToken(token: String) {
+        sendAuthenticationRequest(TdApi.CheckAuthenticationBotToken(token))
+    }
+
+    private suspend fun sendAuthenticationRequest(function: TdApi.Function<out TdApi.Object>) {
+        val response = sendRequest(function, timeoutMs = 15_000L)
+        if (response == null) {
+            throw TelegramTdApiException(0, "Telegram did not respond to the authentication request. Try again.")
+        }
     }
 
     suspend fun sendRequest(
