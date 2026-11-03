@@ -94,7 +94,7 @@ object AuthRepository {
                 throw error
             } catch (error: Throwable) {
                 val statusCode = error.findCause<RestException>()?.statusCode
-                if (!shouldRetryRemoteSessionValidationAfterRefresh(statusCode)) throw error
+                if (!shouldRetryRemoteSessionValidationAfterRefresh(statusCode, error.message.orEmpty())) throw error
 
                 // A user lookup can return 401 when the stored access JWT has expired.
                 // Refresh the Supabase session once before treating that response as
@@ -221,7 +221,7 @@ object AuthRepository {
     suspend fun signOutIfSessionInvalid(error: Throwable, source: String): Boolean {
         if (!isInvalidRemoteSessionError(error)) return false
 
-        if (shouldRetryRemoteSessionValidationAfterRefresh(error.findCause<RestException>()?.statusCode)) {
+        if (shouldRetryRemoteSessionValidationAfterRefresh(error.findCause<RestException>()?.statusCode, error.message.orEmpty())) {
             try {
                 SupabaseProvider.client.auth.refreshCurrentSession()
                 log.w(error) { "$source returned 401; Supabase refresh succeeded, preserving local account data" }
@@ -321,8 +321,12 @@ object AuthRepository {
  * expired account session. Treating every 403 as a bad session caused the account
  * cleaner to wipe unrelated local integrations (including Trakt and Simkl).
  */
-internal fun shouldRetryRemoteSessionValidationAfterRefresh(statusCode: Int?): Boolean =
-    statusCode == 401
+internal fun shouldRetryRemoteSessionValidationAfterRefresh(statusCode: Int?, message: String = ""): Boolean {
+    if (statusCode == 403) return false
+    if (statusCode == 401) return true
+    val normalized = message.lowercase()
+    return "jwt" in normalized && "expired" in normalized
+}
 
 internal fun isInvalidRemoteSessionFailure(
     statusCode: Int?,
