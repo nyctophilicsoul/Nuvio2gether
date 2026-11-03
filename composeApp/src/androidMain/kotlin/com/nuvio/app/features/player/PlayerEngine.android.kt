@@ -2072,29 +2072,18 @@ private class NuvioLibmpvView(
                     mpv.setPropertyDouble("video-zoom", 0.0)
                     mpv.setPropertyDouble("panscan", 0.0)
                 }
+                // Fit, Fill, and Zoom retain the original official Nuvio mpv behaviour.
                 PlayerResizeMode.Fit -> {
-                    mpv.setPropertyString("keepaspect", "yes")
-                    mpv.setPropertyString("video-aspect-method", "ignore")
-                    mpv.setPropertyString("video-aspect-override", "no")
-                    mpv.setPropertyString("video-unscaled", "downscale-big")
-                    mpv.setPropertyDouble("video-zoom", 0.0)
                     mpv.setPropertyDouble("panscan", 0.0)
+                    mpv.setPropertyString("video-aspect-override", "no")
                 }
-                PlayerResizeMode.Full -> {
-                    mpv.setPropertyString("video-unscaled", "no")
-                    mpv.setPropertyDouble("video-zoom", 0.0)
-                    mpv.setPropertyDouble("panscan", 0.0)
+                PlayerResizeMode.Fill -> {
+                    mpv.setPropertyDouble("panscan", 1.0)
                     mpv.setPropertyString("video-aspect-override", "no")
-                    mpv.setPropertyString("video-aspect-method", "container")
-                    mpv.setPropertyString("keepaspect", "no")
                 }
                 PlayerResizeMode.Zoom -> {
-                    mpv.setPropertyString("keepaspect", "yes")
-                    mpv.setPropertyString("video-aspect-method", "container")
+                    mpv.setPropertyDouble("panscan", 0.5)
                     mpv.setPropertyString("video-aspect-override", "no")
-                    mpv.setPropertyString("video-unscaled", "no")
-                    mpv.setPropertyDouble("video-zoom", 0.0)
-                    mpv.setPropertyDouble("panscan", 1.0)
                 }
                 PlayerResizeMode.Ratio16x9 -> {
                     mpv.setPropertyString("keepaspect", "yes")
@@ -2586,9 +2575,7 @@ private fun PlaybackException.isDecoderFailure(): Boolean =
     )
 
 private fun VideoSize.subtitleBoundsAspectRatio(mode: PlayerResizeMode): Float = when (mode) {
-    // Fit uses the actual transformed content-frame bounds because it deliberately
-    // preserves native pixel size for sources smaller than the viewport.
-    PlayerResizeMode.Fit, PlayerResizeMode.Full -> 0f
+    PlayerResizeMode.Fit, PlayerResizeMode.Fill -> 0f
     PlayerResizeMode.Ratio16x9 -> 16f / 9f
     PlayerResizeMode.BestFit, PlayerResizeMode.Zoom -> {
         if (width <= 0 || height <= 0) {
@@ -2604,57 +2591,27 @@ private fun PlayerView.applyNuvioAspectRatio(mode: PlayerResizeMode, videoSize: 
     val contentFrame = findViewById<AspectRatioFrameLayout>(androidx.media3.ui.R.id.exo_content_frame)
         ?: return
     val codedRatio = if (videoSize.width > 0 && videoSize.height > 0) {
-        videoSize.width.toFloat() / videoSize.height.toFloat()
+        videoSize.width.toFloat() / videoSize.height
     } else 0f
     val sampleAspectRatio = videoSize.pixelWidthHeightRatio
         .takeIf { it.isFinite() && it > 0f } ?: 1f
     val correctedRatio = if (codedRatio > 0f) codedRatio * sampleAspectRatio else 0f
 
     when (mode) {
-        PlayerResizeMode.BestFit, PlayerResizeMode.Zoom ->
+        PlayerResizeMode.BestFit, PlayerResizeMode.Fit, PlayerResizeMode.Zoom ->
             contentFrame.setAspectRatio(correctedRatio)
-        PlayerResizeMode.Fit ->
-            contentFrame.setAspectRatio(codedRatio)
-        PlayerResizeMode.Full ->
+        PlayerResizeMode.Fill ->
             contentFrame.setAspectRatio(0f)
         PlayerResizeMode.Ratio16x9 ->
             contentFrame.setAspectRatio(16f / 9f)
-    }
-
-    if (mode != PlayerResizeMode.Fit || videoSize.width <= 0 || videoSize.height <= 0) {
-        contentFrame.scaleX = 1f
-        contentFrame.scaleY = 1f
-        return
-    }
-
-    // Clear the previous stream/viewport's native-size transform before the next layout.
-    contentFrame.scaleX = 1f
-    contentFrame.scaleY = 1f
-
-    // Keep the coded-size image at native pixel size when it is smaller than the
-    // available video rectangle. Large sources are still downscaled to fit.
-    contentFrame.post {
-        val frameWidth = contentFrame.width.toFloat()
-        val frameHeight = contentFrame.height.toFloat()
-        if (frameWidth <= 0f || frameHeight <= 0f) return@post
-
-        val nativeScale = minOf(
-            1f,
-            videoSize.width.toFloat() / frameWidth,
-            videoSize.height.toFloat() / frameHeight,
-        ).coerceIn(0f, 1f)
-        contentFrame.pivotX = frameWidth / 2f
-        contentFrame.pivotY = frameHeight / 2f
-        contentFrame.scaleX = nativeScale
-        contentFrame.scaleY = nativeScale
-        syncLibassOverlayGeometry()
     }
 }
 
 private fun PlayerResizeMode.toExoResizeMode(): Int =
     when (this) {
-        PlayerResizeMode.BestFit, PlayerResizeMode.Fit, PlayerResizeMode.Ratio16x9 -> AspectRatioFrameLayout.RESIZE_MODE_FIT
-        PlayerResizeMode.Full -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+        PlayerResizeMode.BestFit, PlayerResizeMode.Fit, PlayerResizeMode.Ratio16x9 ->
+            AspectRatioFrameLayout.RESIZE_MODE_FIT
+        PlayerResizeMode.Fill -> AspectRatioFrameLayout.RESIZE_MODE_FILL
         PlayerResizeMode.Zoom -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
     }
 
