@@ -316,6 +316,8 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
 
     override suspend fun disconnect() {
         tdClient.resetAndWait(logOut = true)
+        proxy.stop()
+        proxy.forgetRegisteredFiles()
         lookupCache.clear()
         _snapshot.value = _snapshot.value.copy(
             authenticated = false,
