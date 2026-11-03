@@ -835,7 +835,7 @@ final class MPVPlayerViewController: UIViewController {
             setStringProperty("keepaspect", "yes")
             setStringProperty("video-aspect-method", "ignore")
             setStringProperty("video-aspect-override", "no")
-            setStringProperty("video-unscaled", "no")
+            setStringProperty("video-unscaled", "downscale-big")
             setStringProperty("video-zoom", "0")
             setStringProperty("panscan", "0")
         case 2: // Full: non-uniform stretch to the viewport.
