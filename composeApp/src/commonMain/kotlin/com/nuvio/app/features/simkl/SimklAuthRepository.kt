@@ -303,6 +303,7 @@ object SimklAuthRepository : TrackingAuthProvider {
         } catch (error: CancellationException) {
             throw error
         } catch (error: Throwable) {
+            if (!isCurrentProfile(profileId, expectedProfileGeneration)) return@withLock
             log.w { "Simkl token exchange failed: ${error.message}" }
             clearPendingAuthorization(profileId)
             persistMetadata(profileId)

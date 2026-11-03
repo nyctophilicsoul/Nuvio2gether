@@ -184,6 +184,7 @@ object TraktAuthRepository : TrackingAuthProvider {
         url == TraktConfig.REDIRECT_URI || url.startsWith("${TraktConfig.REDIRECT_URI}?")
 
     suspend fun authorizedHeaders(profileId: Int = currentProfileId): Map<String, String>? {
+        if (ProfileRepository.activeProfileId != profileId) return null
         ensureLoaded(profileId)
         if (!authState.isAuthenticated) return null
 
@@ -197,6 +198,8 @@ object TraktAuthRepository : TrackingAuthProvider {
     }
 
     suspend fun refreshUserSettings(profileId: Int = currentProfileId): String? {
+        if (ProfileRepository.activeProfileId != profileId) return null
+        val expectedProfileGeneration = profileGeneration
         ensureLoaded(profileId)
         val headers = authorizedHeaders(profileId) ?: return null
         val response = runCatching {
@@ -209,6 +212,7 @@ object TraktAuthRepository : TrackingAuthProvider {
             log.w { "Failed to fetch Trakt user settings: ${error.message}" }
         }.getOrNull() ?: return null
 
+        if (!isCurrentProfile(profileId, expectedProfileGeneration)) return null
         val parsed = runCatching {
             json.decodeFromString<TraktUserSettingsResponse>(response)
         }.getOrNull() ?: return null
