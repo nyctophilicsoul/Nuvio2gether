@@ -840,7 +840,7 @@ private fun ExoPlayerSurface(
                 if (!isCurrentExoPlayerSource()) return
                 latestOnSnapshot.value(exoPlayer.snapshot())
                 if (videoSize.width > 0 && videoSize.height > 0) {
-                    videoAspectRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
+                    videoAspectRatio = (videoSize.width.toFloat() * videoSize.pixelWidthHeightRatio) / videoSize.height.toFloat()
                 }
                 playerViewRef?.post {
                     playerViewRef?.let { view ->
