@@ -192,6 +192,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
@@ -413,8 +414,13 @@ internal fun MainAppContent(
         if (!ownsAppRuntime || !localRepositoriesLoaded || !runtimeRepositoriesInitialized) {
             return@LaunchedEffect
         }
-        val enabledAddons = addonsUiState.addons.enabledAddons()
-        if (addonsWaitingForFirstManifest) return@LaunchedEffect
+        // Add-on manifests can finish in a short burst during startup. Coalesce
+        // those state updates so the home catalog pipeline is not cancelled and
+        // restarted once per manifest.
+        delay(350)
+        val latestAddons = AddonRepository.uiState.value.addons
+        if (latestAddons.isWaitingForFirstEnabledManifest()) return@LaunchedEffect
+        val enabledAddons = latestAddons.enabledAddons()
         HomeCatalogSettingsRepository.syncCatalogs(enabledAddons)
         HomeRepository.refresh(enabledAddons)
     }
