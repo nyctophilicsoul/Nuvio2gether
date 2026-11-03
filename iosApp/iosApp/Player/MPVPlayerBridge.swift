@@ -824,47 +824,35 @@ final class MPVPlayerViewController: UIViewController {
     func setResize(_ mode: Int) {
         guard mpv != nil else { return }
         switch mode {
-        case 0: // Best Fit: preserve container/bitstream DAR and fit inside viewport.
+        case 0: // Best Fit: preserve the source display aspect ratio.
             setStringProperty("keepaspect", "yes")
             setStringProperty("video-aspect-method", "container")
             setStringProperty("video-aspect-override", "no")
             setStringProperty("video-unscaled", "no")
             setStringProperty("video-zoom", "0")
             setStringProperty("panscan", "0")
-        case 1: // Fit: square-pixel/native coded geometry, downscale only when necessary.
-            setStringProperty("keepaspect", "yes")
-            setStringProperty("video-aspect-method", "ignore")
-            setStringProperty("video-aspect-override", "no")
-            setStringProperty("video-unscaled", "downscale-big")
-            setStringProperty("video-zoom", "0")
-            setStringProperty("panscan", "0")
-        case 2: // Full: non-uniform stretch to the viewport.
-            setStringProperty("video-unscaled", "no")
-            setStringProperty("video-zoom", "0")
-            setStringProperty("panscan", "0")
-            setStringProperty("video-aspect-override", "no")
-            setStringProperty("video-aspect-method", "container")
-            setStringProperty("keepaspect", "no")
-        case 3: // Zoom: preserve DAR and crop to fill.
-            setStringProperty("keepaspect", "yes")
-            setStringProperty("video-aspect-method", "container")
+        case 1: // Official Fit.
+            setStringProperty("panscan", "0.0")
             setStringProperty("video-aspect-override", "no")
             setStringProperty("video-unscaled", "no")
-            setStringProperty("video-zoom", "0")
-            setStringProperty("panscan", "1")
-        case 4: // Forced 16:9 canvas.
-            setStringProperty("keepaspect", "yes")
+        case 2: // Official Fill.
+            setStringProperty("panscan", "1.0")
+            setStringProperty("video-aspect-override", "no")
             setStringProperty("video-unscaled", "no")
+        case 3: // Official Zoom.
+            setStringProperty("panscan", "0.5")
+            setStringProperty("video-aspect-override", "no")
+            setStringProperty("video-unscaled", "no")
+        case 4: // Fixed 16:9.
+            setStringProperty("keepaspect", "yes")
             setStringProperty("video-aspect-override", "16:9")
+            setStringProperty("video-unscaled", "no")
             setStringProperty("video-zoom", "0")
             setStringProperty("panscan", "0")
         default:
-            setStringProperty("keepaspect", "yes")
-            setStringProperty("video-aspect-method", "container")
+            setStringProperty("panscan", "0.0")
             setStringProperty("video-aspect-override", "no")
             setStringProperty("video-unscaled", "no")
-            setStringProperty("video-zoom", "0")
-            setStringProperty("panscan", "0")
         }
     }
 
