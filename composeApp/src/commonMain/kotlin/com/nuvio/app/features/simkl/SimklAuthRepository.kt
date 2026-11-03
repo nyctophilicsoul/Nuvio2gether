@@ -252,20 +252,42 @@ object SimklAuthRepository : TrackingAuthProvider {
     }
 
     suspend fun refreshUserSettings(): String? {
+        ensureLoaded()
+        val expectedProfileId = currentProfileId
+        val expectedProfileGeneration = profileGeneration
         authorizedAccessToken() ?: return null
-        return if (fetchAndStoreUserSettings()) storedState.username else null
+        if (!isCurrentProfile(expectedProfileId, expectedProfileGeneration)) return null
+        return if (
+            fetchAndStoreUserSettings(
+                expectedProfileId = expectedProfileId,
+                expectedProfileGeneration = expectedProfileGeneration,
+            )
+        ) {
+            storedState.username
+        } else {
+            null
+        }
     }
 
     internal suspend fun synchronizeUserSettings(activityWatermark: String?) {
+        ensureLoaded()
+        val expectedProfileId = currentProfileId
+        val expectedProfileGeneration = profileGeneration
         authorizedAccessToken() ?: return
+        if (!isCurrentProfile(expectedProfileId, expectedProfileGeneration)) return
         when (simklSettingsRefreshAction(storedState, activityWatermark)) {
             SimklSettingsRefreshAction.NONE -> Unit
             SimklSettingsRefreshAction.RECORD_WATERMARK -> {
+                if (!isCurrentProfile(expectedProfileId, expectedProfileGeneration)) return
                 storedState = storedState.copy(settingsActivityWatermark = activityWatermark)
-                persistMetadata(currentProfileId)
+                persistMetadata(expectedProfileId)
             }
             SimklSettingsRefreshAction.FETCH -> {
-                fetchAndStoreUserSettings(activityWatermark)
+                fetchAndStoreUserSettings(
+                    activityWatermark = activityWatermark,
+                    expectedProfileId = expectedProfileId,
+                    expectedProfileGeneration = expectedProfileGeneration,
+                )
             }
         }
     }
