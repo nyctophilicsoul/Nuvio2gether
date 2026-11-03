@@ -257,16 +257,12 @@ object SimklAuthRepository : TrackingAuthProvider {
         val expectedProfileGeneration = profileGeneration
         authorizedAccessToken() ?: return null
         if (!isCurrentProfile(expectedProfileId, expectedProfileGeneration)) return null
-        return if (
-            fetchAndStoreUserSettings(
-                expectedProfileId = expectedProfileId,
-                expectedProfileGeneration = expectedProfileGeneration,
-            )
-        ) {
-            storedState.username
-        } else {
-            null
-        }
+        val fetched = fetchAndStoreUserSettings(
+            expectedProfileId = expectedProfileId,
+            expectedProfileGeneration = expectedProfileGeneration,
+        )
+        if (!fetched || !isCurrentProfile(expectedProfileId, expectedProfileGeneration)) return null
+        return storedState.username
     }
 
     internal suspend fun synchronizeUserSettings(activityWatermark: String?) {
