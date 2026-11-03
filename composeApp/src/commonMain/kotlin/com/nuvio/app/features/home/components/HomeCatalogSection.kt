@@ -105,7 +105,17 @@ private fun HomeCatalogRowSectionContent(
     }
     val selectedTab = sourceTabs.firstOrNull { it.key == selectedTabKey }
         ?: sourceTabs.firstOrNull()
-    val visibleEntries = selectedTab?.items?.take(HOME_MERGED_ROW_TAB_PREVIEW_LIMIT) ?: entries
+    val selectedItems = selectedTab?.items ?: entries
+    val posterEligibleItems = if (hideMergedTitlesWithoutPosters) {
+        selectedItems.filterNot { it.poster.isNullOrBlank() }
+    } else {
+        selectedItems
+    }
+    val visibleEntries = if (selectedTab != null) {
+        posterEligibleItems.take(HOME_MERGED_ROW_TAB_PREVIEW_LIMIT)
+    } else {
+        posterEligibleItems
+    }
     val sourceTabsHeader: (@Composable () -> Unit)? = if (sourceTabs.isNotEmpty()) {
         {
             Row(
