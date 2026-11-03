@@ -47,11 +47,11 @@ private fun TelegramSettingsContent(isTablet: Boolean) {
     val horizontalPadding = if (isTablet) 2.dp else 0.dp
 
     var apiId by rememberSaveable { mutableStateOf("") }
-    var apiHash by rememberSaveable { mutableStateOf("") }
+    var apiHash by remember { mutableStateOf("") }
     var phone by rememberSaveable { mutableStateOf("") }
     var loginCode by rememberSaveable { mutableStateOf("") }
-    var password by rememberSaveable { mutableStateOf("") }
-    var botToken by rememberSaveable { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var botToken by remember { mutableStateOf("") }
     var channelInput by rememberSaveable { mutableStateOf("") }
 
     Column(
