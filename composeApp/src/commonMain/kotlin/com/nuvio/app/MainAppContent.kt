@@ -140,6 +140,9 @@ import com.nuvio.app.features.player.recordExternalPlaybackProgress
 import com.nuvio.app.features.player.ExternalPlayerPlatform
 import com.nuvio.app.features.player.PlayerLaunch
 import com.nuvio.app.features.player.PlayerLaunchStore
+import com.nuvio.app.features.livetv.LiveTvChannel
+import com.nuvio.app.features.livetv.LiveTvIncomingSource
+import com.nuvio.app.features.livetv.LiveTvIncomingSourceRepository
 import com.nuvio.app.features.livetv.LiveTvRepository
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.player.SubtitleLanguageOption
@@ -848,6 +851,122 @@ internal fun MainAppContent(
             }
         }
 
+        suspend fun launchPlayer(launch: PlayerLaunch) {
+            if (playerSettingsUiState.externalPlayerEnabled) {
+                openExternalPlayback(launch)
+            } else {
+                val launchId = PlayerLaunchStore.put(launch)
+                navController.navigate(PlayerRoute(launchId = launchId, title = launch.title))
+            }
+        }
+
+        suspend fun openLiveTvChannel(
+            channel: LiveTvChannel,
+            providerName: String = "Live TV",
+            recordRecent: Boolean = true,
+        ) {
+            if (recordRecent) {
+                LiveTvRepository.recordRecentChannel(channel)
+            }
+            val stableChannelId = channel.id.ifBlank { channel.streamUrl }
+            launchPlayer(
+                PlayerLaunch(
+                    profileId = activePlaybackProfileId,
+                    title = channel.name,
+                    sourceUrl = channel.streamUrl,
+                    sourceHeaders = channel.headers,
+                    streamType = channel.streamType,
+                    logo = channel.logoUrl,
+                    streamTitle = channel.name,
+                    streamSubtitle = channel.group.takeIf(String::isNotBlank),
+                    providerName = providerName,
+                    providerAddonId = "live-tv",
+                    contentType = "live-tv",
+                    videoId = channel.id.ifBlank { stableChannelId },
+                    parentMetaId = stableChannelId,
+                    parentMetaType = "live-tv",
+                ),
+            )
+        }
+
+        LaunchedEffect(
+            activePlaybackProfileId,
+            p2pSettingsUiState.p2pEnabled,
+            playerSettingsUiState.externalPlayerEnabled,
+        ) {
+            if (!ownsAppRuntime) return@LaunchedEffect
+            LiveTvIncomingSourceRepository.requests.collectLatest { request ->
+                when (request) {
+                    is LiveTvIncomingSource.DirectStream -> {
+                        openLiveTvChannel(
+                            channel = LiveTvChannel(
+                                id = "shared:${request.url}",
+                                name = request.title.ifBlank { "Shared stream" },
+                                streamUrl = request.url,
+                                group = "Shared",
+                                headers = request.headers,
+                            ),
+                            providerName = "Shared",
+                            recordRecent = false,
+                        )
+                    }
+
+                    is LiveTvIncomingSource.SourceUrl -> {
+                        LiveTvRepository.load(request.url)
+                            .onSuccess { channels ->
+                                if (channels.size == 1) {
+                                    openLiveTvChannel(channels.first(), providerName = "Shared")
+                                } else {
+                                    activateTab(AppScreenTab.LiveTv)
+                                }
+                            }
+                            .onFailure { error ->
+                                NuvioToastController.show(error.message ?: "Unable to open shared playlist.")
+                            }
+                    }
+
+                    is LiveTvIncomingSource.PlaylistData -> {
+                        LiveTvRepository.loadLocalPlaylist(request.fileName, request.data)
+                            .onSuccess { channels ->
+                                if (channels.size == 1) {
+                                    openLiveTvChannel(channels.first(), providerName = "Shared")
+                                } else {
+                                    activateTab(AppScreenTab.LiveTv)
+                                }
+                            }
+                            .onFailure { error ->
+                                NuvioToastController.show(error.message ?: "Unable to open shared playlist.")
+                            }
+                    }
+
+                    is LiveTvIncomingSource.Magnet -> {
+                        if (!p2pSettingsUiState.p2pEnabled) {
+                            NuvioToastController.show("Enable P2P playback to open magnet links.")
+                            return@collectLatest
+                        }
+                        val title = "Magnet stream"
+                        launchPlayer(
+                            PlayerLaunch(
+                                profileId = activePlaybackProfileId,
+                                title = title,
+                                sourceUrl = "torrent://${request.infoHash}",
+                                streamTitle = title,
+                                streamSubtitle = request.infoHash,
+                                providerName = "Magnet",
+                                providerAddonId = "shared-magnet",
+                                contentType = "shared-stream",
+                                videoId = request.infoHash,
+                                parentMetaId = request.infoHash,
+                                parentMetaType = "shared-stream",
+                                torrentInfoHash = request.infoHash,
+                                torrentTrackers = request.trackers,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+
         fun openDownloadedItem(item: DownloadItem) {
             val sourceUrl = DownloadsRepository.playableLocalFileUri(item) ?: return
             val resumeEntry = item.videoId
@@ -1407,22 +1526,7 @@ internal fun MainAppContent(
                                 },
                                 onLibrarySectionViewAllClick = onLibrarySectionViewAllClick,
                                 onLiveTvChannelClick = { channel ->
-                                    val launch = PlayerLaunch(
-                                        profileId = activePlaybackProfileId,
-                                        title = channel.name,
-                                        sourceUrl = channel.streamUrl,
-                                        sourceHeaders = channel.headers,
-                                        sourceResponseHeaders = emptyMap(),
-                                        streamType = channel.streamType,
-                                        logo = channel.logoUrl,
-                                        streamTitle = channel.name,
-                                        providerName = "Live TV",
-                                        providerAddonId = "live-tv",
-                                        parentMetaId = channel.id,
-                                        parentMetaType = "live-tv",
-                                    )
-                                    val launchId = PlayerLaunchStore.put(launch)
-                                    navController.navigate(PlayerRoute(launchId = launchId, title = launch.title))
+                                    coroutineScope.launch { openLiveTvChannel(channel) }
                                 },
                                 onCloudFilePlay = { item, file ->
                                     coroutineScope.launch {
