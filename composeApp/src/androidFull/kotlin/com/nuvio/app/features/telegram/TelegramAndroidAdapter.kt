@@ -72,12 +72,8 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
 
     init {
         // The loopback server starts lazily when a Telegram stream URL is registered.
+        // TDLib is initialized once by the bootstrap after the adapter is registered.
         tdClient.authState.collectInBackground()
-        if (preferences.getInt(API_ID, 0) > 0 &&
-            preferences.getString(API_HASH, "").orEmpty().matches(Regex("[a-fA-F0-9]{32}"))
-        ) {
-            tdClient.initialize()
-        }
     }
 
     private fun buildInitialSnapshot(): TelegramIntegrationSnapshot = TelegramIntegrationSnapshot(
@@ -121,11 +117,16 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
     }
 
     override fun initialize() {
+        val configured = preferences.getInt(API_ID, 0) > 0 &&
+            preferences.getString(API_HASH, "").orEmpty().matches(Regex("[a-fA-F0-9]{32}"))
         _snapshot.value = _snapshot.value.copy(
-            configured = preferences.getInt(API_ID, 0) > 0 &&
-                preferences.getString(API_HASH, "").orEmpty().matches(Regex("[a-fA-F0-9]{32}")),
+            configured = configured,
+            authState = if (configured) _snapshot.value.authState else "Idle",
+            authenticated = if (configured) _snapshot.value.authenticated else false,
+            error = if (configured) _snapshot.value.error else null,
+            isBusy = if (configured) _snapshot.value.isBusy else false,
         )
-        tdClient.initialize()
+        if (configured) tdClient.initialize()
     }
 
     override suspend fun configureAndConnect(apiId: String, apiHash: String): Boolean {
