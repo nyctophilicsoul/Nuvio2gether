@@ -43,13 +43,25 @@ object CloudStreamRepositoryParser {
         val normalizedRepositoryUrl = normalizeCloudStreamRepositoryUrl(repositoryManifestUrl)
         val normalizedPluginListUrl = resolveCloudStreamUrl(normalizedRepositoryUrl, pluginListUrl)
         val elements = json.parseToJsonElement(payload).jsonArray
-        val plugins = elements.mapNotNull { element ->
-            runCatching { json.decodeFromJsonElement<CloudStreamPluginMetadataDto>(element) }
-                .getOrNull()
-                ?.toDomainOrNull(normalizedRepositoryUrl, normalizedPluginListUrl)
+        val decoded = elements.map { element ->
+            runCatching { json.decodeFromJsonElement<CloudStreamPluginMetadataDto>(element) }.getOrNull()
         }
-        require(plugins.size == elements.size) {
-            "CloudStream plugin list contains invalid entries; refusing a partial refresh"
+        require(decoded.all { it != null }) {
+            "CloudStream plugin list contains malformed entries; refusing a partial refresh"
+        }
+
+        // Invalid declared hashes make an individual package unsafe to install, but
+        // should not invalidate an otherwise well-formed repository response. Missing
+        // hashes remain supported for legacy repositories.
+        val hashValidated = decoded.filterNotNull().filter { plugin ->
+            val declaredHash = plugin.fileHash?.trim().orEmpty()
+            declaredHash.isBlank() || CloudStreamFileHash.parse(declaredHash) != null
+        }
+        val plugins = hashValidated.mapNotNull { dto ->
+            dto.toDomainOrNull(normalizedRepositoryUrl, normalizedPluginListUrl)
+        }
+        require(plugins.size == hashValidated.size) {
+            "CloudStream plugin list contains invalid plugin metadata; refusing a partial refresh"
         }
         return plugins
     }
