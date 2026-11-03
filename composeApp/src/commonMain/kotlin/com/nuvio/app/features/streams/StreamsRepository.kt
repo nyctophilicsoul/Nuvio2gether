@@ -743,7 +743,7 @@ object StreamsRepository {
                                 year = year,
                                 season = season,
                                 episode = episode,
-                                imdbId = details.imdbId,
+                                imdbId = details?.imdbId,
                             )
                         }
                         StreamLoadCompletion.Addon(
