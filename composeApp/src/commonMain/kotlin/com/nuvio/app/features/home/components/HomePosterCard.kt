@@ -2,8 +2,6 @@ package com.nuvio.app.features.home.components
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import androidx.compose.ui.Modifier
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.ui.NuvioPosterCard
@@ -16,6 +14,7 @@ import com.nuvio.app.features.home.PosterShape
 fun HomePosterCard(
     item: MetaPreview,
     modifier: Modifier = Modifier,
+    hideWithoutPoster: Boolean = false,
     useLandscapeBackdropMode: Boolean = false,
     isWatched: Boolean = false,
     onClick: (() -> Unit)? = null,
@@ -23,8 +22,7 @@ fun HomePosterCard(
     showLandscapeOverlay: Boolean = true,
 ) {
     val posterCardStyle = rememberPosterCardStyleUiState()
-    val catalogSettings by HomeCatalogSettingsRepository.uiState.collectAsStateWithLifecycle()
-    if (catalogSettings.hideMergedTitlesWithoutPosters && item.poster.isNullOrBlank()) return
+    if (hideWithoutPoster && item.poster.isNullOrBlank()) return
     val isLandscapeMode = useLandscapeBackdropMode || posterCardStyle.catalogLandscapeModeEnabled
     val effectiveLandscapePoster = if (posterCardStyle.alwaysShowLandscapeClearlogo) null else item.landscapePoster
     val imageUrl = if (isLandscapeMode) {
