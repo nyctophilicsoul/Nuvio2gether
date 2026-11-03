@@ -195,11 +195,23 @@ object SimklAuthRepository : TrackingAuthProvider {
      */
     internal suspend fun authorizedAccessToken(): String? {
         ensureLoaded()
-        val currentToken = accessToken?.takeIf(String::isNotBlank) ?: return null
-        val expiresAt = storedState.tokenExpiresAtEpochMs ?: return currentToken
-        val now = SimklPlatformClock.nowEpochMs()
+        val currentToken = accessToken?.takeIf(String::isNotBlank)
         val refresh = refreshToken?.takeIf(String::isNotBlank)
+        val now = SimklPlatformClock.nowEpochMs()
 
+        // A missing/corrupt access-token entry must not strand a still-valid refresh
+        // grant. Recover the short-lived token before declaring the account disconnected.
+        if (currentToken == null) {
+            if (refresh == null) return null
+            return refreshAccessToken(
+                force = true,
+                profileId = currentProfileId,
+                expectedProfileGeneration = profileGeneration,
+                observedAccessToken = null,
+            )
+        }
+
+        val expiresAt = storedState.tokenExpiresAtEpochMs ?: return currentToken
         if (refresh == null) {
             if (now >= expiresAt) {
                 invalidateCredentials(SimklAuthError.AUTHORIZATION_EXPIRED)

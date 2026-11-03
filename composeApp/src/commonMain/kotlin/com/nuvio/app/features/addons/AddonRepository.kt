@@ -96,7 +96,9 @@ object AddonRepository {
             val existing = existingByUrl[manifestUrl]
             val addon = _uiState.value.addons.firstOrNull { it.manifestUrl == manifestUrl }
             if (addon?.enabled == true && (existing == null || (addon.manifest == null && !addon.isRefreshing))) {
-                refreshAddon(manifestUrl, forceRefresh = true)
+                // Respect the HTTP cache on startup; explicit user refreshes still
+                // bypass it through refreshAll()/forceRefresh.
+                refreshAddon(manifestUrl)
             }
         }
     }
