@@ -87,6 +87,10 @@ internal object DohClient {
     private const val TYPE_A = 1
     private const val TYPE_AAAA = 28
 
+    private val queryExecutor = java.util.concurrent.Executors.newFixedThreadPool(4) { runnable ->
+        Thread(runnable, "NuvioDns-query").apply { isDaemon = true }
+    }
+
     private val client: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .dns { host ->
@@ -103,8 +107,8 @@ internal object DohClient {
         // Run A and AAAA concurrently so a slow IPv6 response cannot hold up IPv4 playback.
         val aTask = java.util.concurrent.FutureTask { query(endpoint, hostname, TYPE_A) }
         val aaaaTask = java.util.concurrent.FutureTask { query(endpoint, hostname, TYPE_AAAA) }
-        Thread(aTask, "NuvioDns-A").apply { isDaemon = true; start() }
-        Thread(aaaaTask, "NuvioDns-AAAA").apply { isDaemon = true; start() }
+        queryExecutor.execute(aTask)
+        queryExecutor.execute(aaaaTask)
 
         val v4 = try {
             aTask.get(8, TimeUnit.SECONDS)
