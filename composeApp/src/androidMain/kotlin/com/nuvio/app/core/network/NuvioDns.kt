@@ -54,7 +54,7 @@ internal object NuvioDns : Dns {
         return answer.addresses
     }
 
-    private val ipv4Literal = Regex("""^\\d{1,3}(\\.\\d{1,3}){3}$""")
+    private val ipv4Literal = Regex("""^\d{1,3}(\.\d{1,3}){3}$""")
 
     private fun String.isIpLiteral(): Boolean = contains(':') || ipv4Literal.matches(this)
 }
