@@ -547,6 +547,7 @@ kotlin {
                 implementation(libs.coil.gif)
                 implementation("androidx.recyclerview:recyclerview:1.4.0")
                 implementation("com.squareup.okhttp3:okhttp:4.12.0")
+                implementation("com.squareup.okhttp3:okhttp-urlconnection:4.12.0")
                 implementation("com.google.code.gson:gson:2.11.0")
                 // libass - atlas-based subtitle rendering (from NuvioMedia/nuvio-libass)
                 implementation(files("libs/nuvio-libass-release.aar"))
