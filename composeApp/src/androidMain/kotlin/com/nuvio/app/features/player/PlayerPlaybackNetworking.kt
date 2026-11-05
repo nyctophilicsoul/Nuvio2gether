@@ -7,6 +7,7 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import com.nuvio.app.core.diagnostics.SentryNetworkBreadcrumbInterceptor
 import com.nuvio.app.core.network.IPv4FirstDns
 import okhttp3.OkHttpClient
+import okhttp3.OkUrlFactory
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.SecureRandom
@@ -123,7 +124,7 @@ internal object PlayerPlaybackNetworking {
         range: String? = null,
     ): HttpURLConnection {
         val mergedHeaders = withDefaultUserAgent(headers)
-        return (URL(url).openConnection() as HttpURLConnection).apply {
+        return (OkUrlFactory(playbackHttpClient).open(URL(url)) as HttpURLConnection).apply {
             if (this is HttpsURLConnection) {
                 sslSocketFactory = sslContext.socketFactory
                 hostnameVerifier = playbackHostnameVerifier
