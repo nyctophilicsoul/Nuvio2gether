@@ -166,8 +166,9 @@ internal object DnsMessage {
         val out = ByteArrayOutputStream()
         out.write(byteArrayOf((id shr 8).toByte(), id.toByte(), 0x01, 0x00, 0, 1, 0, 0, 0, 0, 0, 0))
         normalized.split('.').forEach { label ->
+            require(label.all { it.code in 0x21..0x7E }) { "Invalid host name: $hostname" }
             val bytes = label.toByteArray(Charsets.US_ASCII)
-            require(bytes.size in 1..63 && bytes.all { (it.toInt() and 0xFF) in 0x21..0x7E }) {
+            require(bytes.size in 1..63) {
                 "Invalid host name: $hostname"
             }
             out.write(bytes.size)
