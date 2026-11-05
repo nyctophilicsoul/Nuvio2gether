@@ -4,6 +4,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import com.nuvio.app.core.network.NuvioDns
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -14,6 +15,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 
 internal val downloadHttpClient = OkHttpClient.Builder()
+    .dns(NuvioDns)
     .connectTimeout(60, TimeUnit.SECONDS)
     .readTimeout(60, TimeUnit.SECONDS)
     .writeTimeout(60, TimeUnit.SECONDS)
