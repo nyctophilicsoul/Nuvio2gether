@@ -107,7 +107,7 @@ private fun HomeCatalogRowSectionContent(
         ?: sourceTabs.firstOrNull()
     val selectedItems = selectedTab?.items ?: entries
     val posterEligibleItems = if (hideMergedTitlesWithoutPosters) {
-        selectedItems.filterNot { it.poster.isNullOrBlank() }
+        selectedItems.filterNot { it.poster.isNullOrBlank() && it.rawPosterUrl.isNullOrBlank() }
     } else {
         selectedItems
     }

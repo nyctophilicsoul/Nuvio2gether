@@ -17,7 +17,6 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -144,84 +143,92 @@ private fun MergedHomeRowsEditor(
     }
 
     Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = if (isTablet) 24.dp else 16.dp, vertical = 12.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(
-            text = stringResource(Res.string.settings_merged_rows_description),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        Button(onClick = ::startCreate, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(Res.string.settings_merged_rows_add))
-        }
-
-        if (orderedRows.isEmpty()) {
-            Surface(
+        SettingsSection(
+            title = stringResource(Res.string.settings_merged_rows_title),
+            isTablet = isTablet,
+        ) {
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = MaterialTheme.shapes.medium,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
-                    text = stringResource(Res.string.settings_merged_rows_empty),
-                    modifier = Modifier.padding(16.dp),
+                    text = stringResource(Res.string.settings_merged_rows_description),
+                    modifier = Modifier.padding(horizontal = if (isTablet) 20.dp else 16.dp),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
-        } else {
-            orderedRows.forEachIndexed { index, row ->
-                val homeItem = rowItems[mergedHomeRowKey(row.id)]
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.surface,
-                    shape = MaterialTheme.shapes.medium,
-                    tonalElevation = 1.dp,
+
+                Button(
+                    onClick = ::startCreate,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = if (isTablet) 20.dp else 16.dp),
                 ) {
-                    Column(
-                        modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(row.title, style = MaterialTheme.typography.titleMedium)
-                                Spacer(Modifier.height(3.dp))
+                    Text(stringResource(Res.string.settings_merged_rows_add))
+                }
+
+                if (orderedRows.isEmpty()) {
+                    SettingsGroup(isTablet = isTablet) {
+                        Text(
+                            text = stringResource(Res.string.settings_merged_rows_empty),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                } else {
+                    orderedRows.forEach { row ->
+                        val homeItem = rowItems[mergedHomeRowKey(row.id)]
+                        SettingsGroup(isTablet = isTablet) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(
+                                    horizontal = if (isTablet) 20.dp else 16.dp,
+                                    vertical = 12.dp,
+                                ),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(row.title, style = MaterialTheme.typography.titleMedium)
+                                        Spacer(Modifier.height(3.dp))
+                                        Text(
+                                            text = "${row.sourceKeys.size} catalogs · ${stringResource(when (row.resolvedDisplayMode()) {
+                                                MergedHomeRowDisplayMode.SOURCE_TABS -> Res.string.settings_merged_rows_mode_tabs
+                                                MergedHomeRowDisplayMode.TYPE_TABS -> Res.string.settings_merged_rows_mode_type_tabs
+                                                MergedHomeRowDisplayMode.UNIFIED_CAROUSEL -> Res.string.settings_merged_rows_mode_unified
+                                            })}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    Switch(
+                                        checked = homeItem?.enabled != false,
+                                        onCheckedChange = { enabled ->
+                                            HomeCatalogSettingsRepository.setEnabled(mergedHomeRowKey(row.id), enabled)
+                                        },
+                                    )
+                                }
                                 Text(
-                                    text = "${row.sourceKeys.size} catalogs · ${stringResource(when (row.resolvedDisplayMode()) {
-                                        MergedHomeRowDisplayMode.SOURCE_TABS -> Res.string.settings_merged_rows_mode_tabs
-                                        MergedHomeRowDisplayMode.TYPE_TABS -> Res.string.settings_merged_rows_mode_type_tabs
-                                        MergedHomeRowDisplayMode.UNIFIED_CAROUSEL -> Res.string.settings_merged_rows_mode_unified
-                                    })}",
+                                    text = row.sourceKeys.joinToString(" · ") { key ->
+                                        availableSources.firstOrNull { it.key == key }?.displayTitle?.let(::cleanMergedSourceTabTitle) ?: key
+                                    },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
-                            }
-                            Switch(
-                                checked = homeItem?.enabled != false,
-                                onCheckedChange = { enabled ->
-                                    HomeCatalogSettingsRepository.setEnabled(mergedHomeRowKey(row.id), enabled)
-                                },
-                            )
-                        }
-                        Text(
-                            text = row.sourceKeys.joinToString(" · ") { key ->
-                                availableSources.firstOrNull { it.key == key }?.displayTitle?.let(::cleanMergedSourceTabTitle) ?: key
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            TextButton(onClick = { startEdit(row) }) {
-                                Text(stringResource(Res.string.settings_merged_rows_edit))
-                            }
-                            TextButton(onClick = {
-                                HomeCatalogSettingsRepository.duplicateMergedRow(row.id)
-                            }) {
-                                Text(stringResource(Res.string.settings_merged_rows_duplicate))
-                            }
-                            TextButton(onClick = { deleteTarget = row }) {
-                                Text(stringResource(Res.string.settings_merged_rows_delete))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    TextButton(onClick = { startEdit(row) }) {
+                                        Text(stringResource(Res.string.settings_merged_rows_edit))
+                                    }
+                                    TextButton(onClick = {
+                                        HomeCatalogSettingsRepository.duplicateMergedRow(row.id)
+                                    }) {
+                                        Text(stringResource(Res.string.settings_merged_rows_duplicate))
+                                    }
+                                    TextButton(onClick = { deleteTarget = row }) {
+                                        Text(stringResource(Res.string.settings_merged_rows_delete))
+                                    }
+                                }
                             }
                         }
                     }

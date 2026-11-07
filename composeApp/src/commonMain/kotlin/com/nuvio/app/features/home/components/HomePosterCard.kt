@@ -21,12 +21,14 @@ fun HomePosterCard(
     hideLabels: Boolean = false,
     alwaysShowLandscapeClearlogo: Boolean = false,
 ) {
-    if (hideWithoutPoster && item.poster.isNullOrBlank()) return
+    if (hideWithoutPoster && item.poster.isNullOrBlank() && item.rawPosterUrl.isNullOrBlank()) return
     val isLandscapeMode = useLandscapeBackdropMode
     val effectiveLandscapePoster = if (alwaysShowLandscapeClearlogo) null else item.landscapePoster
     val imageUrl = if (isLandscapeMode) {
-        effectiveLandscapePoster ?: item.banner ?: item.poster
-    } else item.poster
+        effectiveLandscapePoster ?: item.banner ?: item.poster ?: item.rawPosterUrl
+    } else {
+        item.poster ?: item.rawPosterUrl
+    }
     val fallbackImageUrl = if (isLandscapeMode && !effectiveLandscapePoster.isNullOrBlank()) {
         // Landscape custom poster -> fall back to original backdrop, then portrait
         item.banner ?: item.rawPosterUrl

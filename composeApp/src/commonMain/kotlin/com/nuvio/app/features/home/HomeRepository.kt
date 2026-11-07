@@ -354,7 +354,7 @@ object HomeRepository {
             copy(items = items.reapplyCustomPosterUrls(posterPattern))
         fun HomeCatalogSection.withGlobalPosterFilter(): HomeCatalogSection =
             if (!snapshot.hideMergedTitlesWithoutPosters) this
-            else copy(items = items.filterNot { it.poster.isNullOrBlank() })
+            else copy(items = items.filterNot { it.poster.isNullOrBlank() && it.rawPosterUrl.isNullOrBlank() })
 
         val hiddenIncludedSourceKeys = snapshot.mergedRows
             .asSequence()
@@ -496,7 +496,7 @@ object HomeRepository {
             }
         val cloudStreamSections = cachedCloudStreamSections.mapNotNull { section ->
             val preference = snapshot.preferences[section.key]
-            if (preference?.enabled == false) return@mapNotNull null
+            if (preference?.enabled == false || section.key in hiddenIncludedSourceKeys) return@mapNotNull null
             section.withPosterOverlay().withReleaseFilter().withGlobalPosterFilter().copy(
                 title = preference?.customTitle?.takeIf { it.isNotBlank() } ?: section.title,
             )
@@ -706,7 +706,7 @@ object HomeRepository {
             page.items
         }
         return if (settings.hideMergedTitlesWithoutPosters) {
-            releasedItems.filterNot { it.poster.isNullOrBlank() }
+            releasedItems.filterNot { it.poster.isNullOrBlank() && it.rawPosterUrl.isNullOrBlank() }
         } else {
             releasedItems
         }

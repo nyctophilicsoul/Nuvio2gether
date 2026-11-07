@@ -132,12 +132,12 @@ internal fun selectHomeHeroArtwork(
             Triple(item.banner, HomeHeroArtworkAnchor.Center, true),
             Triple(item.background, HomeHeroArtworkAnchor.Center, true),
             Triple(item.landscapePoster, HomeHeroArtworkAnchor.Center, false),
-            Triple(item.poster, HomeHeroArtworkAnchor.Center, item.posterTextless),
+            Triple(item.poster ?: item.rawPosterUrl, HomeHeroArtworkAnchor.Center, item.posterTextless),
         )
         HomeHeroOrientation.Portrait -> listOf(
             Triple(item.banner, HomeHeroArtworkAnchor.Center, true),
             Triple(item.background, HomeHeroArtworkAnchor.Center, true),
-            Triple(item.poster, HomeHeroArtworkAnchor.Center, item.posterTextless),
+            Triple(item.poster ?: item.rawPosterUrl, HomeHeroArtworkAnchor.Center, item.posterTextless),
         )
     }
     val selected = candidates.firstOrNull { !it.first.isNullOrBlank() } ?: return null
