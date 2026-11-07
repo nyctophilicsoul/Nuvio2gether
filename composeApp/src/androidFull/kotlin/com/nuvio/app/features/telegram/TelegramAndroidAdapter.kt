@@ -5,7 +5,10 @@ import android.util.Log
 import com.nuvio.app.features.streams.StreamBehaviorHints
 import com.nuvio.app.features.streams.StreamItem
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,6 +61,8 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
     )
 
     private val appContext = context.applicationContext
+    private val adapterScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    @Volatile private var chatRefreshJob: Job? = null
     private val preferences = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val cacheDirectory = File(appContext.filesDir, "telegram/files")
     private val tdClient = TelegramTdClient(
@@ -71,9 +76,11 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
     override val snapshot: StateFlow<TelegramIntegrationSnapshot> = _snapshot.asStateFlow()
 
     init {
-        // The loopback server starts lazily when a Telegram stream URL is registered.
-        // TDLib is initialized once by the bootstrap after the adapter is registered.
-        tdClient.authState.collectInBackground()
+        // Keep TDLib auth observation in the adapter's application-lifetime scope.
+        // The loopback server still starts lazily when a stream URL is registered.
+        adapterScope.launch {
+            tdClient.authState.collect(::publishAuthState)
+        }
     }
 
     private fun buildInitialSnapshot(): TelegramIntegrationSnapshot = TelegramIntegrationSnapshot(
@@ -84,12 +91,6 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
         selectedChatIds = readSelectedChatIds(),
         cacheSizeBytes = calculateCacheSize(),
     )
-
-    private fun kotlinx.coroutines.flow.StateFlow<TelegramTdAuthState>.collectInBackground() {
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO).launch {
-            collect { state -> publishAuthState(state) }
-        }
-    }
 
     private fun publishAuthState(state: TelegramTdAuthState) {
         val current = _snapshot.value
@@ -110,9 +111,8 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
             cacheSizeBytes = calculateCacheSize(),
         )
         if (state is TelegramTdAuthState.Ready) {
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO).launch {
-                refreshChats()
-            }
+            chatRefreshJob?.cancel()
+            chatRefreshJob = adapterScope.launch { refreshChats() }
         }
     }
 
@@ -317,8 +317,11 @@ internal class TelegramAndroidAdapter(context: Context) : TelegramPlatformAdapte
     }
 
     override suspend fun disconnect() {
-        tdClient.resetAndWait(logOut = true)
+        chatRefreshJob?.cancel()
+        chatRefreshJob = null
+        // Stop accepting local stream requests before TDLib closes its file handles.
         proxy.stop()
+        tdClient.resetAndWait(logOut = true)
         proxy.forgetRegisteredFiles()
         lookupCache.clear()
         _snapshot.value = _snapshot.value.copy(

@@ -117,6 +117,26 @@ class HomeHeroSectionTest {
     }
 
     @Test
+    fun `hero falls back to the original poster when custom poster is missing`() {
+        val originalPoster = "https://example.com/original-poster.jpg"
+        val item = MetaPreview(
+            id = "original-poster",
+            type = "movie",
+            name = "Original Poster",
+            rawPosterUrl = originalPoster,
+        )
+
+        assertEquals(
+            originalPoster,
+            selectHomeHeroArtwork(item, HomeHeroOrientation.Portrait)?.imageUrl,
+        )
+        assertEquals(
+            originalPoster,
+            selectHomeHeroArtwork(item, HomeHeroOrientation.Landscape)?.imageUrl,
+        )
+    }
+
+    @Test
     fun `logo validation rejects portrait and landscape poster aspect ratios`() {
         assertEquals(true, isValidHomeHeroLogo(widthPx = 1200, heightPx = 400))
         assertEquals(false, isValidHomeHeroLogo(widthPx = 1600, heightPx = 900))

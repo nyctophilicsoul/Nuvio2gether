@@ -170,6 +170,29 @@ class LibraryRepositoryTest {
     }
 
     @Test
+    fun `dropped and on hold statuses survive storage and membership projection`() {
+        listOf(LocalLibraryStatus.DROPPED, LocalLibraryStatus.ON_HOLD).forEachIndexed { index, status ->
+            val state = LibraryLocalState()
+            val token = state.beginProfileLoad(profileId = 1).snapshot.token
+            state.completeProfileLoad(token, activeProfileId = 1, items = emptyList())
+            val snapshot = state.upsert(
+                libraryItem(id = "status-$index", savedAtEpochMs = index.toLong() + 1L)
+                    .copy(localStatus = status.storageKey),
+            )
+
+            val decoded = LibraryStoragePayloadCodec.decode(LibraryStoragePayloadCodec.encode(snapshot))
+            assertEquals(status.storageKey, decoded.items.single().localStatus)
+
+            val membership = libraryMembershipWithLocal(
+                inLocal = true,
+                localStatus = decoded.items.single().localStatus,
+            )
+            assertEquals(status, selectedLocalLibraryStatus(membership))
+            assertTrue(membership[status.sectionKey] == true)
+        }
+    }
+
+    @Test
     fun `legacy rewatching status maps into watching without a separate section`() {
         assertEquals(LocalLibraryStatus.WATCHING, LocalLibraryStatus.fromStorage("rewatching"))
         assertFalse(LocalLibraryStatus.entries.any { it.storageKey == "rewatching" })

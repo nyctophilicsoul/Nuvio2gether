@@ -263,4 +263,60 @@ class PartyStreamTest {
         )
     }
 
+
+    @Test
+    fun hostDepartureClearsStreamSharingForTheReplacementHost() {
+        val party = ActiveParty(
+            id = "party",
+            code = "ABC123",
+            memberId = "guest",
+            hostMemberId = "old-host",
+            members = listOf(
+                PartyMember("old-host", "Old host"),
+                PartyMember("guest", "Guest"),
+                PartyMember("next-host", "Next host"),
+            ),
+            presence = emptyMap(),
+            media = PartyMedia(type = "movie", metaId = "tt1", metaType = "movie"),
+            maxMembers = 3,
+            connected = true,
+            sharing = true,
+        )
+
+        val updated = party.withDepartedMemberRemoved(
+            memberId = "old-host",
+            nextHostMemberId = "next-host",
+        )
+
+        assertEquals("next-host", updated.hostMemberId)
+        assertTrue(updated.isHost)
+        assertFalse(updated.sharing)
+        assertEquals(listOf("guest", "next-host"), updated.members.map { it.id })
+    }
+
+    @Test
+    fun nonHostDepartureDoesNotClearTheCurrentHostSharingSetting() {
+        val party = ActiveParty(
+            id = "party",
+            code = "ABC123",
+            memberId = "host",
+            hostMemberId = "host",
+            members = listOf(PartyMember("host", "Host"), PartyMember("guest", "Guest")),
+            presence = emptyMap(),
+            media = PartyMedia(type = "movie", metaId = "tt1", metaType = "movie"),
+            maxMembers = 3,
+            connected = true,
+            sharing = true,
+        )
+
+        val updated = party.withDepartedMemberRemoved(
+            memberId = "guest",
+            nextHostMemberId = "host",
+        )
+
+        assertTrue(updated.sharing)
+        assertTrue(updated.isHost)
+        assertEquals(listOf("host"), updated.members.map { it.id })
+    }
+
 }

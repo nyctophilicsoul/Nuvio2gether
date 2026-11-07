@@ -157,6 +157,21 @@ data class PartyPlayback(
  * Keep the sequence and originating member unchanged so a stale snapshot cannot
  * overwrite this local pause; the host's next playback update has a newer sequence.
  */
+internal fun ActiveParty.withDepartedMemberRemoved(
+    memberId: String,
+    nextHostMemberId: String?,
+): ActiveParty {
+    val hostDeparted = memberId == hostMemberId
+    return copy(
+        members = members.filterNot { it.id == memberId },
+        presence = presence - memberId,
+        hostMemberId = nextHostMemberId ?: hostMemberId,
+        // Sharing is an opt-in by the current host, not a party-wide sticky setting.
+        // A replacement host must explicitly announce a new stream.
+        sharing = if (hostDeparted) false else sharing,
+    )
+}
+
 internal fun pausePartyPlaybackForHostDeparture(
     playback: PartyPlayback?,
     at: Long,

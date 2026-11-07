@@ -455,10 +455,9 @@ object PartyRepository {
             _playback.value = pausePartyPlaybackForHostDeparture(_playback.value, clock.nowMs())
         }
         updateParty { current ->
-            current.copy(
-                members = current.members.filterNot { it.id == memberId },
-                presence = current.presence - memberId,
-                hostMemberId = hostMemberId ?: current.hostMemberId,
+            current.withDepartedMemberRemoved(
+                memberId = memberId,
+                nextHostMemberId = hostMemberId,
             )
         }
         ignoredWaiting.remove(memberId)
