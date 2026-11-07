@@ -2652,6 +2652,7 @@
     <string name="settings_merged_rows_sort_oldest">Oldest</string>
     <string name="settings_merged_rows_hide_included">Hide included source rows from Home</string>
     <string name="settings_merged_rows_hide_without_posters">Hide titles without usable posters</string>
+    <string name="settings_homescreen_hide_without_posters_description">Apply across Home catalog rows, merged rows and Hero content. Titles without a usable poster are removed before rendering.</string>
 
     <string name="settings_custom_poster_mode">Custom poster source mode</string>
     <string name="settings_custom_poster_mode_off">Off</string>

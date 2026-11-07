@@ -386,7 +386,7 @@ object HomeRepository {
         // Reuse the already-fetched source sections. A catalog hidden as its own home row can
         // still be included in a merged row; the two layout preferences are deliberately separate.
         val visibleCatalogSectionsByKey = catalogSections.associateBy(HomeCatalogSection::key)
-        val sourceSectionsByKey = currentDefinitions.mapNotNull { definition ->
+        val addonSourceSectionsByKey = currentDefinitions.mapNotNull { definition ->
             // Reuse the already-normalized section when its own row is visible. Only transform the
             // cached raw section again for a source whose standalone home row is hidden.
             val section = visibleCatalogSectionsByKey[definition.key]
@@ -401,6 +401,19 @@ object HomeRepository {
                 title = customTitle.ifBlank { definition.titleFor(snapshot.showCatalogType) },
             )
         }.toMap()
+        // CloudStream catalogs are dynamic sections rather than HomeCatalogDefinitions.
+        // Keep them in the source index so merged rows can use them for previews and View All.
+        val cloudStreamSourceSectionsByKey = cachedCloudStreamSections.mapNotNull { section ->
+            if (section.target !is CatalogTarget.CloudStream) return@mapNotNull null
+            val normalized = section
+                .withPosterOverlay()
+                .withReleaseFilter()
+                .withGlobalPosterFilter()
+            if (normalized.items.isEmpty() && !normalized.hasMore) return@mapNotNull null
+            val customTitle = preferences[section.key]?.customTitle.orEmpty()
+            section.key to normalized.copy(title = customTitle.ifBlank { section.title })
+        }.toMap()
+        val sourceSectionsByKey = addonSourceSectionsByKey + cloudStreamSourceSectionsByKey
 
         val mergedSections = snapshot.mergedRows
             .sortedBy { it.order }
@@ -484,7 +497,7 @@ object HomeRepository {
         val cloudStreamSections = cachedCloudStreamSections.mapNotNull { section ->
             val preference = snapshot.preferences[section.key]
             if (preference?.enabled == false) return@mapNotNull null
-            section.withPosterOverlay().withReleaseFilter().copy(
+            section.withPosterOverlay().withReleaseFilter().withGlobalPosterFilter().copy(
                 title = preference?.customTitle?.takeIf { it.isNotBlank() } ?: section.title,
             )
         }
@@ -501,7 +514,9 @@ object HomeRepository {
             orderHomeCatalogDefinitions(currentDefinitions, snapshot)
                 .filter { definition -> preferences[definition.key]?.heroSourceEnabled != false }
                 .mapNotNull { definition -> cachedSections[definition.cacheKey] }
-                .map { section -> section.withPosterOverlay().withReleaseFilter() }
+                .map { section ->
+                    section.withPosterOverlay().withReleaseFilter().withGlobalPosterFilter()
+                }
                 .flatMap { section -> section.items }
                 .distinctBy { item -> "${item.type}:${item.id}" }
                 .shuffled(heroRandom)
@@ -684,11 +699,16 @@ object HomeRepository {
                 )
             }
         }
-        val items = page.items
-        return if (HomeCatalogSettingsRepository.snapshot().hideUnreleasedContent) {
-            items.filterReleasedItems(CurrentDateProvider.todayIsoDate())
+        val settings = HomeCatalogSettingsRepository.snapshot()
+        val releasedItems = if (settings.hideUnreleasedContent) {
+            page.items.filterReleasedItems(CurrentDateProvider.todayIsoDate())
         } else {
-            items
+            page.items
+        }
+        return if (settings.hideMergedTitlesWithoutPosters) {
+            releasedItems.filterNot { it.poster.isNullOrBlank() }
+        } else {
+            releasedItems
         }
     }
 

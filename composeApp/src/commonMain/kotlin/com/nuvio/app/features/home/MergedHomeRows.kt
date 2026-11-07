@@ -1,5 +1,6 @@
 package com.nuvio.app.features.home
 
+import com.nuvio.app.features.catalog.CatalogTarget
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -42,8 +43,11 @@ data class MergedHomeRowDefinition(
 }
 
 data class ResolvedMergedHomeRowSource(
-    val definition: HomeCatalogDefinition,
+    val key: String,
     val title: String,
+    val supportsPagination: Boolean,
+    val definition: HomeCatalogDefinition? = null,
+    val cloudStreamTarget: CatalogTarget.CloudStream? = null,
 )
 
 data class ResolvedMergedHomeRow(

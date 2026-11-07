@@ -93,6 +93,8 @@ import nuvio.composeapp.generated.resources.settings_homescreen_section_hero_sou
 import nuvio.composeapp.generated.resources.settings_homescreen_selected_count
 import nuvio.composeapp.generated.resources.settings_homescreen_show_hero
 import nuvio.composeapp.generated.resources.settings_homescreen_show_hero_description
+import nuvio.composeapp.generated.resources.settings_homescreen_hide_without_posters_description
+import nuvio.composeapp.generated.resources.settings_merged_rows_hide_without_posters
 import nuvio.composeapp.generated.resources.settings_homescreen_summary
 import nuvio.composeapp.generated.resources.settings_homescreen_summary_hint
 import nuvio.composeapp.generated.resources.settings_homescreen_addon_row_order
@@ -122,6 +124,7 @@ internal fun LazyListScope.homescreenSettingsContent(
     heroEnabled: Boolean,
     showCatalogType: Boolean,
     hideUnreleasedContent: Boolean,
+    hideTitlesWithoutPosters: Boolean,
     items: List<HomeCatalogSettingsItem>,
     addonGroups: List<HomeAddonLayoutItem>,
     addonRowOrderPolicy: HomeAddonRowOrderPolicy,
@@ -177,6 +180,14 @@ internal fun LazyListScope.homescreenSettingsContent(
                     checked = hideUnreleasedContent,
                     isTablet = isTablet,
                     onCheckedChange = HomeCatalogSettingsRepository::setHideUnreleasedContent,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_merged_rows_hide_without_posters),
+                    description = stringResource(Res.string.settings_homescreen_hide_without_posters_description),
+                    checked = hideTitlesWithoutPosters,
+                    isTablet = isTablet,
+                    onCheckedChange = HomeCatalogSettingsRepository::setHideMergedTitlesWithoutPosters,
                 )
             }
         }

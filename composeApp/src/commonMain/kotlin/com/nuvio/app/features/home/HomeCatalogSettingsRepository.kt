@@ -206,6 +206,7 @@ object HomeCatalogSettingsRepository {
     private var hasLoaded = false
     private var definitions: List<HomeCatalogDefinition> = emptyList()
     private var cloudStreamCatalogItems: List<HomeCatalogSettingsItem> = emptyList()
+    private var cloudStreamCatalogSections: List<HomeCatalogSection> = emptyList()
     private var collectionDefinitions: List<CollectionCatalogDefinition> = emptyList()
     private var lastCatalogSync: CatalogSyncInput? = null
     private var lastCollectionSync: Pair<List<Collection>, String>? = null
@@ -235,6 +236,7 @@ object HomeCatalogSettingsRepository {
         hasLoaded = false
         definitions = emptyList()
         cloudStreamCatalogItems = emptyList()
+        cloudStreamCatalogSections = emptyList()
         collectionDefinitions = emptyList()
         lastCatalogSync = null
         lastCollectionSync = null
@@ -288,6 +290,9 @@ object HomeCatalogSettingsRepository {
 
     fun syncCloudStreamCatalogs(sections: List<HomeCatalogSection>) {
         ensureLoaded()
+        cloudStreamCatalogSections = sections.filter {
+            it.target is com.nuvio.app.features.catalog.CatalogTarget.CloudStream
+        }
         var nextOrder = (preferences.values.maxOfOrNull(StoredHomeCatalogPreference::order) ?: -1) + 1
         val updatedPreferences = preferences.toMutableMap()
         val nextItems = sections.mapNotNull { section ->
@@ -342,32 +347,50 @@ object HomeCatalogSettingsRepository {
         ensureLoaded()
         val row = mergedRows.firstOrNull { it.id == id } ?: return null
         val currentSettings = snapshot()
-        val availableDefinitions = row.sourceKeys.mapNotNull { sourceKey ->
-            definitions.firstOrNull { definition ->
-                definition.key == sourceKey &&
-                    definition.serverConnectionId == null &&
-                    !ServerCatalog.isServerKey(definition.key)
+        val availableSources = row.sourceKeys.distinct().mapNotNull { sourceKey ->
+            val definition = definitions.firstOrNull { candidate ->
+                candidate.key == sourceKey &&
+                    candidate.serverConnectionId == null &&
+                    !ServerCatalog.isServerKey(candidate.key)
+            }
+            if (definition != null) {
+                val title = currentSettings.preferences[definition.key]?.customTitle
+                    ?.takeIf(String::isNotBlank)
+                    ?: definition.titleFor(currentSettings.showCatalogType)
+                ResolvedMergedHomeRowSource(
+                    key = definition.key,
+                    title = title,
+                    supportsPagination = definition.supportsPagination,
+                    definition = definition,
+                )
+            } else {
+                val section = cloudStreamCatalogSections.firstOrNull { it.key == sourceKey }
+                    ?: return@mapNotNull null
+                val target = section.target as? com.nuvio.app.features.catalog.CatalogTarget.CloudStream
+                    ?: return@mapNotNull null
+                val title = currentSettings.preferences[sourceKey]?.customTitle
+                    ?.takeIf(String::isNotBlank)
+                    ?: section.title
+                ResolvedMergedHomeRowSource(
+                    key = sourceKey,
+                    title = title,
+                    supportsPagination = true,
+                    cloudStreamTarget = target,
+                )
             }
         }
-        val baseTitles = availableDefinitions.map { definition ->
-            currentSettings.preferences[definition.key]?.customTitle
-                ?.takeIf(String::isNotBlank)
-                ?: definition.titleFor(currentSettings.showCatalogType)
-        }
+        val baseTitles = availableSources.map(ResolvedMergedHomeRowSource::title)
         val duplicateTitleCounts = baseTitles.groupingBy { it }.eachCount()
-        val sources = availableDefinitions.mapIndexed { index, definition ->
+        val sources = availableSources.mapIndexed { index, source ->
             val baseTitle = baseTitles[index]
             val title = cleanMergedSourceTabTitle(
                 if ((duplicateTitleCounts[baseTitle] ?: 0) > 1) {
-                    "$baseTitle ${definition.addonName}"
+                    "$baseTitle ${source.definition?.addonName ?: source.cloudStreamTarget?.providerId.orEmpty()}"
                 } else {
                     baseTitle
                 },
             )
-            ResolvedMergedHomeRowSource(
-                definition = definition,
-                title = title,
-            )
+            source.copy(title = title)
         }
         return ResolvedMergedHomeRow(
             definition = row,
@@ -501,9 +524,18 @@ object HomeCatalogSettingsRepository {
         HomeCatalogSettingsSyncService.triggerPush()
     }
 
+    private fun isValidMergedHomeRowSource(key: String): Boolean =
+        definitions.any { definition ->
+            definition.key == key &&
+                definition.serverConnectionId == null &&
+                !ServerCatalog.isServerKey(definition.key)
+        } || cloudStreamCatalogSections.any { section ->
+            section.key == key && section.target is com.nuvio.app.features.catalog.CatalogTarget.CloudStream
+        }
+
     /**
      * Create a virtual row. Source catalogs remain intact and independently configurable.
-     * Only enabled addon catalog definitions (not server rows or collections) can be sources.
+     * Regular add-on and runnable CloudStream catalogs can be selected as sources.
      */
     fun createMergedRow(
         title: String,
@@ -517,13 +549,9 @@ object HomeCatalogSettingsRepository {
         hideTitlesWithoutPosters: Boolean = false,
     ): String? {
         ensureLoaded()
-        val validSources = sourceKeys.distinct().filter { key ->
-            definitions.any { definition ->
-                definition.key == key &&
-                    definition.serverConnectionId == null &&
-                    !ServerCatalog.isServerKey(definition.key)
-            }
-        }.take(MAX_MERGED_HOME_ROW_SOURCES)
+        val validSources = sourceKeys.distinct()
+            .filter(::isValidMergedHomeRowSource)
+            .take(MAX_MERGED_HOME_ROW_SOURCES)
         val safeTitle = title.trim()
         if (safeTitle.isBlank() || validSources.size < 2) return null
 
@@ -574,13 +602,9 @@ object HomeCatalogSettingsRepository {
     ): Boolean {
         ensureLoaded()
         val existing = mergedRows.firstOrNull { it.id == id } ?: return false
-        val validSources = sourceKeys.distinct().filter { key ->
-            definitions.any { definition ->
-                definition.key == key &&
-                    definition.serverConnectionId == null &&
-                    !ServerCatalog.isServerKey(definition.key)
-            }
-        }.take(MAX_MERGED_HOME_ROW_SOURCES)
+        val validSources = sourceKeys.distinct()
+            .filter(::isValidMergedHomeRowSource)
+            .take(MAX_MERGED_HOME_ROW_SOURCES)
         val safeTitle = title.trim()
         if (safeTitle.isBlank() || validSources.size < 2) return false
         val updated = existing.copy(

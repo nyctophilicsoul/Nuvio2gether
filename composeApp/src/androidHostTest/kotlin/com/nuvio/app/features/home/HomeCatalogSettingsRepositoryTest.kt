@@ -897,4 +897,65 @@ class HomeCatalogSettingsRepositoryTest {
             return delegate.edit()
         }
     }
+
+    @Test
+    fun cloudStreamCatalogsCanBeCreatedUpdatedAndResolvedAsMergedSources() {
+        val providerA = "https://one.example/repo.json#ProviderA"
+        val providerB = "https://two.example/repo.json#ProviderB"
+        val first = HomeCatalogSection(
+            key = "cloudstream:$providerA:Anime",
+            title = "Anime",
+            addonName = "Provider A",
+            target = CatalogTarget.CloudStream(providerA, "Anime", "series"),
+            items = listOf(MetaPreview(id = "show-a", type = "series", name = "Show A")),
+        )
+        val second = HomeCatalogSection(
+            key = "cloudstream:$providerB:Movies",
+            title = "Movies",
+            addonName = "Provider B",
+            target = CatalogTarget.CloudStream(providerB, "Movies", "movie"),
+            items = listOf(MetaPreview(id = "movie-b", type = "movie", name = "Movie B")),
+        )
+        HomeCatalogSettingsRepository.syncCloudStreamCatalogs(listOf(first, second))
+
+        val rowId = HomeCatalogSettingsRepository.createMergedRow(
+            title = "CloudStream Mix",
+            sourceKeys = listOf(first.key, second.key),
+            displayMode = MergedHomeRowDisplayMode.SOURCE_TABS,
+        )
+        assertNotNull(rowId)
+
+        val resolved = HomeCatalogSettingsRepository.resolveMergedHomeRow(rowId)
+        assertNotNull(resolved)
+        assertEquals(listOf(first.key, second.key), resolved.sources.map { it.key })
+        assertEquals(listOf(providerA, providerB), resolved.sources.map { it.cloudStreamTarget?.providerId })
+        assertTrue(resolved.sources.all { it.definition == null && it.supportsPagination })
+
+        assertTrue(
+            HomeCatalogSettingsRepository.updateMergedRow(
+                id = rowId,
+                title = "Updated CloudStream Mix",
+                sourceKeys = listOf(second.key, first.key),
+                displayMode = MergedHomeRowDisplayMode.UNIFIED_CAROUSEL,
+                deduplicate = true,
+            ),
+        )
+        assertEquals(
+            listOf(second.key, first.key),
+            HomeCatalogSettingsRepository.resolveMergedHomeRow(rowId)?.sources?.map { it.key },
+        )
+    }
+
+    @Test
+    fun globalPosterVisibilityPreferenceIsPersistedAndExported() {
+        HomeCatalogSettingsRepository.setHideMergedTitlesWithoutPosters(true)
+
+        assertTrue(HomeCatalogSettingsRepository.uiState.value.hideMergedTitlesWithoutPosters)
+        assertTrue(HomeCatalogSettingsRepository.exportToSyncPayload().hideMergedTitlesWithoutPosters)
+
+        HomeCatalogSettingsRepository.clearLocalState()
+        HomeCatalogSettingsRepository.snapshot()
+        assertTrue(HomeCatalogSettingsRepository.uiState.value.hideMergedTitlesWithoutPosters)
+    }
+
 }

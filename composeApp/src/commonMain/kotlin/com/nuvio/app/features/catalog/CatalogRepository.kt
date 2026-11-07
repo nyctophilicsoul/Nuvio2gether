@@ -152,7 +152,7 @@ object CatalogRepository {
                     result.fold(
                         onSuccess = { page ->
                             val pagination = nextCatalogPaginationState(
-                                supportsPagination = source.definition.supportsPagination ||
+                                supportsPagination = source.supportsPagination ||
                                     page.rawItemCount >= CATALOG_PAGE_SIZE,
                                 requestedSkip = 0,
                                 page = page,
@@ -201,15 +201,30 @@ object CatalogRepository {
         forceRefresh: Boolean,
         hideUnreleasedContent: Boolean,
     ): Result<CatalogPage> = try {
-        val definition = source.definition
-        val page = fetchCatalogPage(
-            manifestUrl = definition.manifestUrl,
-            type = definition.type,
-            catalogId = definition.catalogId,
-            skip = skip.takeIf { it > 0 },
-            maxItems = CATALOG_PAGE_SIZE,
-            forceRefresh = forceRefresh,
-        ).withUnreleasedFilter(hideUnreleasedContent)
+        val page = (source.definition?.let { definition ->
+            fetchCatalogPage(
+                manifestUrl = definition.manifestUrl,
+                type = definition.type,
+                catalogId = definition.catalogId,
+                skip = skip.takeIf { it > 0 },
+                maxItems = CATALOG_PAGE_SIZE,
+                forceRefresh = forceRefresh,
+            )
+        } ?: run {
+            val target = requireNotNull(source.cloudStreamTarget) {
+                "Merged source ${source.key} has no supported catalog target."
+            }
+            val sections = CloudStreamRepository.getMainPage(
+                target.providerId,
+                cloudStreamPageNumber(skip),
+            ).getOrThrow()
+            val items = sections.firstOrNull { it.first == target.sectionName }?.second.orEmpty()
+            CatalogPage(
+                items = items.map { it.toMetaPreview() },
+                rawItemCount = items.size,
+                nextSkip = cloudStreamNextPageSkip(skip, items.size),
+            )
+        }).withUnreleasedFilter(hideUnreleasedContent)
         CustomPosterUrlRepository.ensureLoaded()
         val posterPattern = CustomPosterUrlRepository.patternForScreen(
             com.nuvio.app.core.poster.CustomPosterScreen.HOME,
@@ -233,7 +248,7 @@ object CatalogRepository {
         if (activeRequest != request || _uiState.value.isLoading) return
         val session = mergedSessions[request] ?: return
         val candidates = session.sources.filter { source ->
-            (sourceKey == null || source.source.definition.key == sourceKey) &&
+            (sourceKey == null || source.source.key == sourceKey) &&
                 if (retryFailedOnly) source.retrySkip != null else source.nextSkip != null
         }
         if (candidates.isEmpty()) return
@@ -261,15 +276,15 @@ object CatalogRepository {
                 }
                 if (activeRequest != request) return@launch
 
-                val outcomesByKey = outcomes.associateBy { it.first.source.definition.key }
+                val outcomesByKey = outcomes.associateBy { it.first.source.key }
                 val updatedSources = session.sources.map { previous ->
-                    val outcome = outcomesByKey[previous.source.definition.key] ?: return@map previous
+                    val outcome = outcomesByKey[previous.source.key] ?: return@map previous
                     val requestedSkip = outcome.second
                     outcome.third.fold(
                         onSuccess = { page ->
                             val updatedItems = mergeCatalogItems(previous.items, page.items)
                             val pagination = nextCatalogPaginationState(
-                                supportsPagination = previous.source.definition.supportsPagination ||
+                                supportsPagination = previous.source.supportsPagination ||
                                     page.rawItemCount >= CATALOG_PAGE_SIZE,
                                 requestedSkip = requestedSkip,
                                 page = page,
@@ -322,7 +337,7 @@ object CatalogRepository {
         val hasMore = session.sources.any { it.nextSkip != null }
         val failedSourceKeys = session.sources
             .filter { it.retrySkip != null }
-            .mapTo(linkedSetOf()) { it.source.definition.key }
+            .mapTo(linkedSetOf()) { it.source.key }
         val sourceTabs = when (session.definition.resolvedDisplayMode()) {
             MergedHomeRowDisplayMode.SOURCE_TABS -> buildList {
                 add(HomeCatalogTab("all", "All", mergedItems, mergedItems.size, hasMore))
@@ -334,7 +349,7 @@ object CatalogRepository {
                     )
                     add(
                         HomeCatalogTab(
-                            key = source.source.definition.key,
+                            key = source.source.key,
                             title = com.nuvio.app.features.home.cleanMergedSourceTabTitle(source.source.title),
                             items = items,
                             availableItemCount = items.size,
