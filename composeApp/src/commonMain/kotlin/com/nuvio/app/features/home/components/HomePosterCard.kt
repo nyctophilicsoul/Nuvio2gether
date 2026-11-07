@@ -43,7 +43,7 @@ fun HomePosterCard(
         detailLine = if (isLandscapeMode || hideLabels) null else item.releaseInfo?.let { formatReleaseDateForDisplay(it) },
         showTitleBelow = !hideLabels,
         bottomLeftLogoUrl = if (isLandscapeMode && showLandscapeOverlay && effectiveLandscapePoster.isNullOrBlank()) item.logo else null,
-        bottomLeftText = if (isLandscapeMode && showLandscapeOverlay && effectiveLandscapePoster.isNullOrBlank() && item.logo.isNullOrBlank() && !hideLabels) item.name else null,
+        bottomLeftText = if (isLandscapeMode && showLandscapeOverlay && effectiveLandscapePoster.isNullOrBlank() && !hideLabels) item.name else null,
         isWatched = isWatched,
         onClick = onClick,
         onLongClick = onLongClick,

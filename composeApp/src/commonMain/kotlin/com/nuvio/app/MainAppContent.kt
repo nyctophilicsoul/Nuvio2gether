@@ -1919,6 +1919,7 @@ internal fun MainAppContent(
                 key(posterActionTarget) {
                     val preview = posterActionTarget.preview
                     val isSaved = LibraryRepository.isSaved(preview.id, preview.type)
+                    val isLocallySaved = LibraryRepository.isLocallySaved(preview.id, preview.type)
                     val isWatched = WatchingState.isPosterWatched(
                         watchedKeys = watchedUiState.watchedKeys,
                         item = preview,
@@ -2048,7 +2049,40 @@ internal fun MainAppContent(
                                     }
                                 },
                             ),
-                        ),
+                        ) + if (isLocallySaved) {
+                            listOf(
+                                PosterZoomOverlayAction(
+                                    icon = Icons.Default.DeleteOutline,
+                                    label = "Mark as Dropped",
+                                    onSelected = {
+                                        if (LibraryRepository.setLocalStatusIfSaved(
+                                                preview.id,
+                                                preview.type,
+                                                LocalLibraryStatus.DROPPED,
+                                            )
+                                        ) {
+                                            NuvioToastController.show(LocalLibraryStatus.DROPPED.title)
+                                        }
+                                    },
+                                ),
+                                PosterZoomOverlayAction(
+                                    icon = Icons.Default.Info,
+                                    label = "Mark as On Hold",
+                                    onSelected = {
+                                        if (LibraryRepository.setLocalStatusIfSaved(
+                                                preview.id,
+                                                preview.type,
+                                                LocalLibraryStatus.ON_HOLD,
+                                            )
+                                        ) {
+                                            NuvioToastController.show(LocalLibraryStatus.ON_HOLD.title)
+                                        }
+                                    },
+                                ),
+                            )
+                        } else {
+                            emptyList()
+                        },
                         hazeState = posterOverlayHazeState,
                         onDismissed = {
                             selectedPosterActionTarget = null

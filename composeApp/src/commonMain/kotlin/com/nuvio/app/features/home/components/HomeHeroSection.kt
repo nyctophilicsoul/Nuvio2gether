@@ -56,6 +56,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.nuvio.app.core.ui.isValidCatalogClearlogo
 import com.nuvio.app.core.ui.heroStretchHeight
 import com.nuvio.app.core.ui.LocalVerticalBarPadding
 import com.nuvio.app.core.ui.ScreenActivityEffect
@@ -83,7 +84,6 @@ private const val HERO_AUTO_SCROLL_INTERVAL_MS = 8_000L
 private const val MOBILE_HERO_VIEWPORT_RATIO = 0.82f
 private const val MOBILE_HERO_MIN_HEIGHT_DP = 360f
 private const val MOBILE_HERO_MAX_HEIGHT_DP = 760f
-private const val HOME_HERO_LOGO_MIN_ASPECT_RATIO = 1.9f
 
 internal data class HomeHeroLayout(
     val isTablet: Boolean,
@@ -155,9 +155,7 @@ internal fun homeHeroItemIndexForKey(items: List<MetaPreview>, selectedStableKey
         ?: 0
 
 internal fun isValidHomeHeroLogo(widthPx: Int, heightPx: Int): Boolean =
-    widthPx > 0 &&
-        heightPx > 0 &&
-        widthPx.toFloat() / heightPx.toFloat() >= HOME_HERO_LOGO_MIN_ASPECT_RATIO
+    isValidCatalogClearlogo(widthPx = widthPx, heightPx = heightPx)
 
 internal fun isDistinctHomeHeroLogo(item: MetaPreview, logoUrl: String): Boolean {
     val candidate = logoUrl.trim()
